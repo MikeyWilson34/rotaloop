@@ -13,6 +13,7 @@ export const statusDotColor: Record<DisplayStatus, keyof ColorTokens> = {
   confirmed: 'success',
   pending: 'warning',
   needsCoverage: 'danger',
+  findReplacement: 'danger',
   covered: 'primary',
   scheduled: 'borderStrong',
 };

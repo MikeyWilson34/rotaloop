@@ -81,6 +81,8 @@ export interface EventRow {
   responsibility_ids: string[] | null;
   skip_date_marked_at: string | null;
   skip_date_marked_by: string | null;
+  /** Added by 20261119000000_skip_reason_time_off_zone.sql; absent in older selects. */
+  skip_date_reason?: string | null;
 }
 
 export interface TimeOffRow {
@@ -94,6 +96,9 @@ export interface TimeOffRow {
   responsibility_ids: string[] | null;
   removed_at: string | null;
   retained_event_ids: string[];
+  /** Added by 20261119000000_skip_reason_time_off_zone.sql; absent in older selects. */
+  time_zone?: string | null;
+  note?: string | null;
 }
 
 export interface MakeUpTurnRow {
@@ -219,6 +224,7 @@ export function rowsFromState(state: GroupState): GroupRows {
       responsibility_ids: e.responsibilityIds && [...e.responsibilityIds],
       skip_date_marked_at: e.skipDate?.markedAt ?? null,
       skip_date_marked_by: e.skipDate?.markedBy ?? null,
+      skip_date_reason: e.skipDate?.reason ?? null,
     })),
     time_off: state.timeOff.map((t, position) => ({
       id: t.id,
@@ -231,6 +237,8 @@ export function rowsFromState(state: GroupState): GroupRows {
       responsibility_ids: t.responsibilityIds && [...t.responsibilityIds],
       removed_at: t.removedAt,
       retained_event_ids: [...t.retainedEventIds],
+      time_zone: t.timeZone,
+      note: t.note,
     })),
     make_up_turns: state.makeUpTurns.map((t, position) => ({
       id: t.id,
@@ -323,7 +331,11 @@ export function stateFromRows(rows: GroupRows): GroupState {
       skipDate:
         e.skip_date_marked_at === null
           ? null
-          : { markedBy: e.skip_date_marked_by, markedAt: toInstant(e.skip_date_marked_at) },
+          : {
+              markedBy: e.skip_date_marked_by,
+              markedAt: toInstant(e.skip_date_marked_at),
+              reason: e.skip_date_reason ?? null,
+            },
     })),
     timeOff: byPosition(rows.time_off).map((t) => ({
       id: t.id,
@@ -335,6 +347,8 @@ export function stateFromRows(rows: GroupRows): GroupState {
       responsibilityIds: t.responsibility_ids && [...t.responsibility_ids],
       removedAt: instantOrNull(t.removed_at),
       retainedEventIds: [...t.retained_event_ids],
+      timeZone: t.time_zone ?? null,
+      note: t.note ?? null,
     })),
     assignments: byPosition(rows.assignments).map(assignmentFromRow),
     makeUpTurns: byPosition(rows.make_up_turns).map((t) => ({

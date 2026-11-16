@@ -82,3 +82,30 @@ describe('Skip Date', () => {
     expect(rejected(state, { type: 'addSkipDate', eventId: 'w1' }, { at: afterWeek(1) })).toBe('eventHasPassed');
   });
 });
+
+describe('Skip Date reason', () => {
+  it('stores the reason with the Skip Date and in the history cause', () => {
+    const state = setup();
+    const result = act(state, { type: 'addSkipDate', eventId: 'w3', reason: 'Holiday: Building closed' }, { by: 'ben' });
+    const event = result.state.events.find((e) => e.id === 'w3');
+    expect(event?.skipDate).toEqual({ markedBy: 'ben', markedAt: expect.any(String), reason: 'Holiday: Building closed' });
+    expect(result.history[0].cause).toEqual({ type: 'addSkipDate', eventId: 'w3', reason: 'Holiday: Building closed' });
+  });
+
+  it('a Skip Date without a reason has a null reason', () => {
+    const result = act(setup(), { type: 'addSkipDate', eventId: 'w3' }, { by: 'ben' });
+    expect(result.state.events.find((e) => e.id === 'w3')?.skipDate?.reason).toBeNull();
+  });
+
+  it('a blank reason is stored as null, and an over-long one is rejected', () => {
+    const blank = act(setup(), { type: 'addSkipDate', eventId: 'w3', reason: '   ' });
+    expect(blank.state.events.find((e) => e.id === 'w3')?.skipDate?.reason).toBeNull();
+    expect(rejected(setup(), { type: 'addSkipDate', eventId: 'w3', reason: 'x'.repeat(301) })).toBe('invalid');
+  });
+
+  it('removing the Skip Date removes its reason', () => {
+    let state = act(setup(), { type: 'addSkipDate', eventId: 'w3', reason: 'Closure' }).state;
+    state = act(state, { type: 'removeSkipDate', eventId: 'w3' }, { by: 'cal' }).state;
+    expect(state.events.find((e) => e.id === 'w3')?.skipDate).toBeNull();
+  });
+});

@@ -117,6 +117,20 @@ function joinPhrases(parts: string[]): string {
 // ---------------------------------------------------------------------------
 // One entry
 
+/** " (Holiday: Building closed)" for a Skip Date's reason (ticket 10), or nothing. */
+function skipReasonPhrase(reason: string | null | undefined): string {
+  const text = reason?.trim().replace(/[.!\s]+$/, '');
+  return text ? ` (${text})` : '';
+}
+
+/** ", repeats weekly" for repeating Time Off, or nothing. */
+function repeatPhrase(weeks: number | null | undefined): string {
+  if (!weeks) return '';
+  if (weeks === 1) return ', repeats weekly';
+  if (weeks === 2) return ', every other week';
+  return `, every ${weeks} weeks`;
+}
+
 /** The sentence for an entry's cause. */
 function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; tone: HistoryTone } {
   const cause: Cause = entry.cause;
@@ -133,7 +147,7 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
     }
     case 'addSkipDate':
       return {
-        text: `${actor} marked ${eventDate(ctx, cause.eventId) ?? 'an Event'} as a Skip Date. Turns move forward one Event.`,
+        text: `${actor} marked ${eventDate(ctx, cause.eventId) ?? 'an Event'} as a Skip Date${skipReasonPhrase(cause.reason)}. Turns move forward one Event.`,
         tone: 'neutral',
       };
     case 'removeSkipDate':
@@ -147,7 +161,7 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
       const to = formatMonthDay(dateIn(new Date(Date.parse(endsAt) - 1).toISOString(), ctx.timeZone));
       const range = from === to ? from : `${from} – ${to}`;
       const whose = self(memberId) ? '' : ` for ${nameOf(ctx, memberId)}`;
-      return { text: `${actor} added Time Off${whose} (${range}).`, tone: 'neutral' };
+      return { text: `${actor} added Time Off${whose} (${range}${repeatPhrase(cause.timeOff.repeatEveryWeeks)}).`, tone: 'neutral' };
     }
     case 'removeTimeOff': {
       const off = ctx.state.timeOff.find((t) => t.id === cause.timeOffId);

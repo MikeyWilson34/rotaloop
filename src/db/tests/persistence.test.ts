@@ -86,12 +86,14 @@ describe('apply_group_command_result round trip', () => {
             repeatEveryWeeks: 2,
             repeatUntil: week(6),
             responsibilityIds: ['greeter'],
+            timeZone: 'America/Chicago',
+            note: 'Family trip',
           },
         },
         'ben',
       ),
     );
-    await step(run(state, { type: 'addSkipDate', eventId: 'w5' }, 'cal'));
+    await step(run(state, { type: 'addSkipDate', eventId: 'w5', reason: 'Holiday: Building closed' }, 'cal'));
     expect(state.assignments.some((a) => a.eventId === 'w5')).toBe(false);
     await step(run(state, { type: 'removeTimeOff', timeOffId: 't1' }, 'ben'));
 
@@ -114,7 +116,8 @@ describe('apply_group_command_result round trip', () => {
 
     // Every mapped field was exercised.
     expect(state.timeOff[0].removedAt).not.toBeNull();
-    expect(state.events.find((e) => e.id === 'w5')?.skipDate).toEqual({ markedBy: 'cal', markedAt: NOW });
+    expect(state.events.find((e) => e.id === 'w5')?.skipDate).toEqual({ markedBy: 'cal', markedAt: NOW, reason: 'Holiday: Building closed' });
+    expect(state.timeOff[0]).toMatchObject({ timeZone: 'America/Chicago', note: 'Family trip' });
     expect(state.members.find((m) => m.id === 'cal')?.leftAt).toBe(afterWeek(2));
     expect(state.members.find((m) => m.id === 'eve')?.accountId).toBe(uuid(5));
     expect(state.assignments.some((a) => a.coverageRequest?.cover?.kind === 'guest')).toBe(true);

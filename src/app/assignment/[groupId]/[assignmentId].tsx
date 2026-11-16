@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { CalendarClock, ChevronLeft, ChevronRight, Handshake, UserRound } from 'lucide-react-native';
+import { CalendarClock, ChevronLeft, ChevronRight, Handshake } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AssignmentActions } from '@/components/assignment/AssignmentActions';
 import { GroupTile } from '@/components/group/GroupTile';
 import { eventTimeText, Tag } from '@/components/schedule/cards';
 import { Timeline } from '@/components/schedule/history';
@@ -23,15 +24,15 @@ import { useTheme } from '@/theme';
 /**
  * Assignment details: the Group, Responsibility, date and time, who fills it (or covers it, or
  * "Open"), its status, the rest of the Event, notices (moved, Make-up Turn) and its history.
- * The actions (Confirm, Can't make it, I can cover, Mark covered) arrive with ticket 09 in the
- * marked slot below.
+ * The actions (Confirm, Can't make it, I can cover, Mark covered: ticket 09) live in
+ * `AssignmentActions`. `?action=decline|cover|markCovered` opens that sheet on arrival.
  */
 export default function AssignmentScreen() {
-  const { groupId, assignmentId } = useLocalSearchParams<{ groupId: string; assignmentId: string }>();
+  const { groupId, assignmentId, action } = useLocalSearchParams<{ groupId: string; assignmentId: string; action?: string }>();
   const { colors, space, minTapTarget, fonts } = useTheme();
   const { session } = useSession();
   const accountId = session?.user.id ?? null;
-  const { data, loading, error, refresh, refreshing } = useGroup(groupId);
+  const { data, loading, error, refresh, refreshing, reload } = useGroup(groupId);
   const viewerTimeZone = deviceTimeZone();
   const now = useMemo(() => new Date().toISOString(), [data]); // eslint-disable-line react-hooks/exhaustive-deps
   const today = dateIn(now, viewerTimeZone);
@@ -138,10 +139,16 @@ export default function AssignmentScreen() {
           {makeUp.paying ? <InfoBox icon={Handshake} tone="primary" text={`Make-up Turn. ${makeUp.paying}`} /> : null}
           {makeUp.created ? <InfoBox icon={Handshake} tone="primary" text={makeUp.created} /> : null}
 
-          {/* ACTIONS SLOT (ticket 09): Confirm / Can't make it for the assigned Member, "I can cover"
-              for Qualified Members on a Coverage Request, and "Mark covered" for whoever holds
-              Replacement Duty. Read-only until then. */}
-          <AssignmentActionsSlot slot={slot} />
+          <AssignmentActions
+            group={data}
+            myMemberId={me.id}
+            event={event}
+            slot={slot}
+            now={now}
+            viewerTimeZone={viewerTimeZone}
+            reload={reload}
+            initialSheet={action}
+          />
         </View>
 
         <View style={{ gap: space.md }}>
@@ -199,18 +206,6 @@ export default function AssignmentScreen() {
       </ScrollView>
     </SafeAreaView>
   );
-}
-
-/**
- * Where ticket 09's buttons go. Until then it only explains a Coverage Request in words.
- */
-function AssignmentActionsSlot({ slot }: { slot: SlotView }) {
-  if (slot.status !== 'needsCoverage') return null;
-  const text =
-    slot.who.kind === 'open'
-      ? 'No one is available for this seat yet. It needs coverage.'
-      : `${slot.requestedBy === 'you' ? "You can't" : `${slot.requestedBy ?? slot.whoLabel} can't`} make it. Qualified Members are asked to cover; the first to accept gets it.`;
-  return <InfoBox icon={UserRound} tone="danger" text={text} />;
 }
 
 function WhoAvatar({ who }: { who: Who }) {

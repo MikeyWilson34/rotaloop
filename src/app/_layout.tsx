@@ -13,7 +13,7 @@ import * as Linking from 'expo-linking';
 import { useEffect } from 'react';
 
 import { SignOutButton } from '@/components/SignOutButton';
-import { AppColumn, Button, FormScreen, Notice } from '@/components/ui';
+import { AppColumn, Button, FormScreen, Notice, ToastHost } from '@/components/ui';
 import { redirectFor } from '@/lib/gate';
 import { inviteTokenFromUrl, resumeInviteRoute } from '@/lib/invite';
 import { loadPendingInvite, setPendingInvite, usePendingInvite } from '@/lib/pendingInvite';
@@ -44,6 +44,7 @@ export default function RootLayout() {
         <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
         <AppColumn>
           <RootNavigator />
+          <ToastHost />
         </AppColumn>
       </ThemeProvider>
     </SessionProvider>
@@ -117,6 +118,7 @@ function RootNavigator() {
         <Stack.Screen name="group/[groupId]/responsibility/[responsibilityId]" />
         <Stack.Screen name="group/[groupId]/series/[seriesId]" />
         <Stack.Screen name="assignment/[groupId]/[assignmentId]" />
+        <Stack.Screen name="time-off" />
         <Stack.Screen name="join/index" />
       </Stack.Protected>
       {/* Signed out, an invite link shows the Group's name before making a guest account. */}

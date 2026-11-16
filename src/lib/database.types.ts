@@ -170,6 +170,7 @@ export type Database = {
           series_id: string | null
           skip_date_marked_at: string | null
           skip_date_marked_by: string | null
+          skip_date_reason: string | null
           starts_at: string
         }
         Insert: {
@@ -180,6 +181,7 @@ export type Database = {
           series_id?: string | null
           skip_date_marked_at?: string | null
           skip_date_marked_by?: string | null
+          skip_date_reason?: string | null
           starts_at: string
         }
         Update: {
@@ -190,6 +192,7 @@ export type Database = {
           series_id?: string | null
           skip_date_marked_at?: string | null
           skip_date_marked_by?: string | null
+          skip_date_reason?: string | null
           starts_at?: string
         }
         Relationships: [
@@ -626,6 +629,7 @@ export type Database = {
           group_id: string
           id: string
           member_id: string
+          note: string | null
           position: number
           removed_at: string | null
           repeat_every_weeks: number | null
@@ -633,12 +637,14 @@ export type Database = {
           responsibility_ids: string[] | null
           retained_event_ids: string[]
           starts_at: string
+          time_zone: string | null
         }
         Insert: {
           ends_at: string
           group_id: string
           id: string
           member_id: string
+          note?: string | null
           position: number
           removed_at?: string | null
           repeat_every_weeks?: number | null
@@ -646,12 +652,14 @@ export type Database = {
           responsibility_ids?: string[] | null
           retained_event_ids?: string[]
           starts_at: string
+          time_zone?: string | null
         }
         Update: {
           ends_at?: string
           group_id?: string
           id?: string
           member_id?: string
+          note?: string | null
           position?: number
           removed_at?: string | null
           repeat_every_weeks?: number | null
@@ -659,6 +667,7 @@ export type Database = {
           responsibility_ids?: string[] | null
           retained_event_ids?: string[]
           starts_at?: string
+          time_zone?: string | null
         }
         Relationships: [
           {

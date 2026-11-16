@@ -94,6 +94,8 @@ export function toTimeOff(timeOff: NewTimeOff): TimeOff {
     repeatEveryWeeks: timeOff.repeatEveryWeeks ?? null,
     repeatUntil: timeOff.repeatUntil ?? null,
     responsibilityIds: timeOff.responsibilityIds ?? null,
+    timeZone: timeOff.timeZone ?? null,
+    note: timeOff.note ?? null,
     removedAt: null,
     retainedEventIds: [],
   };

@@ -29,6 +29,16 @@ export type GroupAction =
   | 'removeEvent'
   | 'changeSettings'
   | 'groupDetails'
+  /** Assignment actions (ticket 09). */
+  | 'confirm'
+  | 'decline'
+  | 'cover'
+  | 'markCovered'
+  /** Time Off and Skip Dates (ticket 10). */
+  | 'addTimeOff'
+  | 'removeTimeOff'
+  | 'addSkipDate'
+  | 'removeSkipDate'
   | 'other';
 
 const LAST_ADMIN: Record<GroupAction, string> = {
@@ -51,7 +61,15 @@ const LAST_ADMIN: Record<GroupAction, string> = {
   removeEvent: 'The group needs at least one Admin. Make someone else an Admin first.',
   changeSettings: 'The group needs at least one Admin. Make someone else an Admin first.',
   groupDetails: 'The group needs at least one Admin. Make someone else an Admin first.',
-  other: 'The group needs at least one Admin. Make someone else an Admin first.',
+  confirm: 'The group needs at least one Admin. Make someone else an Admin first.',
+  decline: 'The group needs at least one Admin. Make someone else an Admin first.',
+  cover: 'The group needs at least one Admin. Make someone else an Admin first.',
+  markCovered: 'The group needs at least one Admin. Make someone else an Admin first.',
+  addTimeOff: 'The group needs at least one Admin. Make someone else an Admin first.',
+  removeTimeOff: 'The group needs at least one Admin. Make someone else an Admin first.',
+  addSkipDate: 'The group needs at least one Admin. Make someone else an Admin first.',
+  removeSkipDate: 'The group needs at least one Admin. Make someone else an Admin first.',
+  other:'The group needs at least one Admin. Make someone else an Admin first.',
 };
 
 const INVALID: Partial<Record<GroupAction, string>> = {
@@ -66,6 +84,8 @@ const INVALID: Partial<Record<GroupAction, string>> = {
   removeEvent: 'Only one-off Events can be removed. To skip one Event of a series, add a Skip Date.',
   changeSettings: "That setting isn't available. Pull down to refresh, then try again.",
   groupDetails: 'Check the group name and time zone, then try again.',
+  addTimeOff: 'Check the days you picked, then try again.',
+  addSkipDate: "That Event is already a Skip Date, or the reason is too long. Pull down to refresh, then try again.",
 };
 
 const NOT_FOUND: Partial<Record<GroupAction, string>> = {
@@ -76,9 +96,40 @@ const NOT_FOUND: Partial<Record<GroupAction, string>> = {
   saveSeries: "That Event Series or one of its Responsibilities isn't in the group anymore. Pull down to refresh.",
   removeSeries: "That Event Series isn't in the group anymore. Pull down to refresh.",
   removeEvent: "That Event isn't on the schedule anymore. Pull down to refresh.",
+  removeTimeOff: 'That Time Off was already removed. Pull down to refresh.',
+  addSkipDate: "That Event isn't on the schedule anymore. Pull down to refresh.",
+  removeSkipDate: "That Skip Date was already removed. Pull down to refresh.",
+};
+
+/** Assignment actions (ticket 09): messages that replace the general ones for that action. */
+const ASSIGNMENT: Partial<Record<GroupAction, Partial<Record<string, string>>>> = {
+  confirm: {
+    notPermitted: "Only the person assigned can confirm this. Pull down to refresh.",
+    alreadyNeedsCoverage: "You've already said you can't make it, so this needs coverage now.",
+  },
+  decline: {
+    notPermitted: "Only the person assigned can say they can't make it. Pull down to refresh.",
+    alreadyNeedsCoverage: 'This already needs coverage. Qualified Members have been asked.',
+    invalid: 'No one holds this Assignment anymore. Pull down to refresh.',
+  },
+  cover: {
+    notPermitted: 'Only Members of this group can cover.',
+    notQualified: "Only Qualified Members for this Responsibility can cover it. Ask an Admin to add you.",
+    noCoverageRequest: "This doesn't need coverage anymore. Pull down to refresh.",
+    alreadyAssignedAtEvent: "You already have an Assignment at this Event, so you can't cover this one too.",
+    invalid: "You asked for coverage on this one, so you can't cover it yourself.",
+  },
+  markCovered: {
+    notPermitted: 'Only whoever is finding a replacement, or an Admin, can mark this covered.',
+    noCoverageRequest: "This doesn't need coverage anymore. Pull down to refresh.",
+    invalid: "Enter the guest's name, or pick someone other than the person who can't make it.",
+    notFound: "That person isn't in the group anymore. Pick someone else.",
+  },
 };
 
 export function groupCommandMessage(reason: GroupCommandFailure | string, action: GroupAction = 'other'): string {
+  const specific = ASSIGNMENT[action]?.[reason];
+  if (specific) return specific;
   switch (reason) {
     case 'lastAdmin':
       return LAST_ADMIN[action];

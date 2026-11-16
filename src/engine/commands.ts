@@ -21,7 +21,7 @@ import {
   toResponsibility,
   toTimeOff,
 } from './state';
-import { isPast, laterOf, ms, timeOffCovers } from './time';
+import { isKnownTimeZone, isPast, laterOf, ms, timeOffCovers } from './time';
 import { workload } from './workload';
 import type {
   Assignment,
@@ -43,6 +43,8 @@ import type {
   ResponsibilityChanges,
   Rotation,
 } from './types';
+/** The longest Skip Date reason accepted. */
+export const MAX_SKIP_REASON = 300;
 
 type Outcome = { ok: true; state: GroupState } | { ok: false; reason: RejectionReason; message: string };
 
@@ -170,7 +172,7 @@ function handle(state: GroupState, command: Command, ctx: Context): Outcome {
     case 'addEvents':
       return addEvents(state, command.events);
     case 'addSkipDate':
-      return addSkipDate(state, command.eventId, ctx);
+      return addSkipDate(state, command.eventId, command.reason ?? null, ctx);
     case 'removeSkipDate':
       return removeSkipDate(state, command.eventId, ctx);
     case 'addTimeOff':
@@ -364,11 +366,13 @@ function removeEventSeries(state: GroupState, seriesId: string, ctx: Context): O
   return done(withoutEvents(next, new Set(future)));
 }
 
-function addSkipDate(state: GroupState, eventId: string, ctx: Context): Outcome {
+function addSkipDate(state: GroupState, eventId: string, rawReason: string | null, ctx: Context): Outcome {
   const event = findEvent(state, eventId);
   if (!event) return reject('notFound', `No Event ${eventId}`);
   if (isPast(event, ctx.now)) return reject('eventHasPassed', 'The Event has already started');
   if (event.skipDate) return reject('invalid', 'The Event is already a Skip Date');
+  const reason = rawReason?.trim() || null;
+  if (reason !== null && reason.length > MAX_SKIP_REASON) return reject('invalid', 'The reason is too long');
   // Covers at a skipped Event never happen, so their Make-up Turns go too.
   const covers = state.assignments.filter((a) => a.eventId === eventId && a.coverageRequest?.cover);
   let next = closeMakeUpTurns(
@@ -381,7 +385,7 @@ function addSkipDate(state: GroupState, eventId: string, ctx: Context): Outcome 
   next = {
     ...next,
     events: next.events.map((e) =>
-      e.id === eventId ? { ...e, skipDate: { markedBy: ctx.actorId, markedAt: ctx.now } } : e,
+      e.id === eventId ? { ...e, skipDate: { markedBy: ctx.actorId, markedAt: ctx.now, reason } } : e,
     ),
   };
   return done(next);
@@ -402,6 +406,7 @@ function addTimeOff(state: GroupState, command: Extract<Command, { type: 'addTim
   const timeOff = toTimeOff(command.timeOff);
   if (state.timeOff.some((t) => t.id === timeOff.id)) return reject('invalid', 'Time Off id already exists');
   if (!isActiveMember(state, timeOff.memberId)) return reject('notFound', 'No such Member');
+  if (timeOff.timeZone !== null && !isKnownTimeZone(timeOff.timeZone)) return reject('invalid', 'Unknown time zone');
   let next: GroupState = { ...state, timeOff: [...state.timeOff, timeOff] };
   // A Cover the Member gave for a date they are now away is withdrawn.
   for (const a of next.assignments) {

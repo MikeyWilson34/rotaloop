@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { createGroupState, type Assignment } from '../../engine';
+import { createGroupState, DEFAULT_GROUP_SETTINGS, type Assignment } from '../../engine';
 import {
   dayItems,
   displayStatus,
+  displayStatusLabel,
   eventViews,
   findSlot,
   groupByWeek,
@@ -67,6 +68,36 @@ describe('slotStatus (via the engine assignmentStatus)', () => {
     };
     expect(slotStatus(covered, EVENT_AT, NOW)).toBe('covered');
     expect(slotStatus({ ...covered, confirmation: 'requested' }, EVENT_AT, NOW)).toBe('pending');
+  });
+  it('Find a replacement once the "find a replacement by" deadline passes with no taker', () => {
+    const declined = { ...base, coverageRequest: { reason: 'declined' as const, requestedBy: 'ana', requestedAt: NOW, cover: null } };
+    // Default deadline: 3 days before the Event (Nov 26, 15:00 UTC).
+    const justBefore = '2026-11-26T14:59:59.000Z';
+    const atDeadline = '2026-11-26T15:00:00.000Z';
+    expect(slotStatus(declined, EVENT_AT, justBefore, DEFAULT_GROUP_SETTINGS)).toBe('needsCoverage');
+    expect(slotStatus(declined, EVENT_AT, atDeadline, DEFAULT_GROUP_SETTINGS)).toBe('findReplacement');
+    expect(slotStatus(declined, EVENT_AT, atDeadline, { ...DEFAULT_GROUP_SETTINGS, replacementDuty: 'admins' })).toBe(
+      'findReplacement',
+    );
+    // A longer deadline starts earlier.
+    const week = { ...DEFAULT_GROUP_SETTINGS, replacementDeadlineMs: 7 * 24 * 60 * 60 * 1000 };
+    expect(slotStatus(declined, EVENT_AT, '2026-11-23T12:00:00.000Z', week)).toBe('findReplacement');
+    // Without settings (callers that don't know them) it stays "Needs coverage".
+    expect(slotStatus(declined, EVENT_AT, atDeadline)).toBe('needsCoverage');
+    expect(displayStatusLabel('findReplacement')).toBe('Find a replacement');
+  });
+  it('a covered Assignment never shows Find a replacement', () => {
+    const cover = { kind: 'guest' as const, guestName: 'Jo', arrangedBy: 'ana', coveredAt: NOW };
+    const covered = { ...base, memberId: null, coverageRequest: { reason: 'declined' as const, requestedBy: 'ana', requestedAt: NOW, cover } };
+    expect(slotStatus(covered, EVENT_AT, '2026-11-28T12:00:00.000Z', DEFAULT_GROUP_SETTINGS)).toBe('covered');
+  });
+  it('slotView uses the Group settings', () => {
+    const built = buildGroup();
+    const sound = seat(built.state, '2026-11-29', 'sound');
+    run(built, { type: 'decline', assignmentId: sound.id }, sound.memberId);
+    const a = built.state.assignments.find((x) => x.id === sound.id)!;
+    expect(slotView(asGroup(built.state), a, EVENT_AT, NOW).status).toBe('needsCoverage');
+    expect(slotView(asGroup(built.state), a, EVENT_AT, '2026-11-27T12:00:00.000Z').status).toBe('findReplacement');
   });
 });
 
@@ -147,7 +178,7 @@ describe('eventViews and scheduleItems', () => {
 
   it('draws a Skip Date with who marked it and no rows', () => {
     const skip = eventViews([group], NOW, ZONE).find((e) => e.date === '2026-12-06')!;
-    expect(skip.skipDate).toEqual({ markedBy: 'Ben' });
+    expect(skip.skipDate).toEqual({ markedBy: 'Ben', reason: null });
     expect(skip.slots).toEqual([]);
   });
 

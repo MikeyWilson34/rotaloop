@@ -37,6 +37,25 @@ describe('parseRequest', () => {
     });
   });
 
+  it('parses Skip Date reasons and Time Off time zones and notes', () => {
+    expect(parseClientCommand({ type: 'addSkipDate', eventId: 'w3', reason: ' Holiday: closed ' })).toEqual({
+      type: 'addSkipDate',
+      eventId: 'w3',
+      reason: 'Holiday: closed',
+    });
+    expect(parseClientCommand({ type: 'addSkipDate', eventId: 'w3', reason: '  ' })).toEqual({ type: 'addSkipDate', eventId: 'w3' });
+    expect(parseClientCommand({ type: 'addSkipDate', eventId: 'w3', reason: null })).toEqual({ type: 'addSkipDate', eventId: 'w3' });
+    expect(() => parseClientCommand({ type: 'addSkipDate', eventId: 'w3', reason: 'x'.repeat(301) })).toThrow();
+    expect(() => parseClientCommand({ type: 'addSkipDate', eventId: 'w3', reason: 7 })).toThrow();
+    const timeOff = { id: 't1', memberId: 'ben', startsAt: '2027-01-01T00:00:00Z', endsAt: '2027-01-02T00:00:00Z' };
+    expect(parseClientCommand({ type: 'addTimeOff', timeOff: { ...timeOff, timeZone: 'America/Chicago', note: ' Trip ' } })).toMatchObject({
+      timeOff: { timeZone: 'America/Chicago', note: 'Trip' },
+    });
+    expect(parseClientCommand({ type: 'addTimeOff', timeOff: { ...timeOff, note: '' } })).toMatchObject({ timeOff: { note: null } });
+    expect(() => parseClientCommand({ type: 'addTimeOff', timeOff: { ...timeOff, timeZone: 'Mars/Olympus' } })).toThrow();
+    expect(() => parseClientCommand({ type: 'addTimeOff', timeOff: { ...timeOff, note: 'x'.repeat(201) } })).toThrow();
+  });
+
   it('parses the setup commands, keeping only known fields', () => {
     const repeat = {
       frequency: 'monthly',

@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { View } from 'react-native';
 
 import { EventCard, SkipCard } from '@/components/schedule/cards';
+import { AddSkipDateButton, RemoveSkipDateButton } from '@/components/skipDate/SkipDateActions';
 import { SectionHeading } from '@/components/schedule/parts';
 import { Card, IconTile, Text } from '@/components/ui';
 import { deviceTimeZone } from '@/lib/groupViews';
@@ -12,11 +13,23 @@ import { dateIn, zoneCity } from '@/schedule/format';
 import { eventViews, groupByWeek } from '@/schedule/views';
 import { useTheme } from '@/theme';
 
+import type { RunCommand } from './MemberActionsSheet';
+
 /**
  * The Group's upcoming Events with who serves each Responsibility, Skip Dates included,
- * by week. Adding and removing Skip Dates arrives with ticket 10.
+ * by week. Any Member can add a Skip Date (top button) or remove one (under its card).
  */
-export function GroupScheduleTab({ group, accountId }: { group: GroupDetails; accountId: string | null }) {
+export function GroupScheduleTab({
+  group,
+  accountId,
+  isAdmin,
+  run,
+}: {
+  group: GroupDetails;
+  accountId: string | null;
+  isAdmin: boolean;
+  run: RunCommand;
+}) {
   const { space } = useTheme();
   const viewerTimeZone = deviceTimeZone();
   const now = useMemo(() => new Date().toISOString(), [group]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -41,6 +54,7 @@ export function GroupScheduleTab({ group, accountId }: { group: GroupDetails; ac
   }
   return (
     <>
+      <AddSkipDateButton group={group} accountId={accountId} isAdmin={isAdmin} run={run} />
       {group.timeZone !== viewerTimeZone ? (
         <Text variant="caption" color="textSecondary">
           {`Times in your time zone (${zoneCity(viewerTimeZone)}). The group's own time shows where it differs.`}
@@ -51,7 +65,10 @@ export function GroupScheduleTab({ group, accountId }: { group: GroupDetails; ac
           <SectionHeading title={week.label} aside={week.range} />
           {week.items.map((event) =>
             event.skipDate ? (
-              <SkipCard key={event.key} event={event} showGroup={false} />
+              <View key={event.key} style={{ gap: space.md }}>
+                <SkipCard event={event} showGroup={false} />
+                <RemoveSkipDateButton event={event} run={run} />
+              </View>
             ) : (
               <EventCard key={event.key} event={event} viewerTimeZone={viewerTimeZone} today={today} />
             ),

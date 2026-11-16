@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import { StatusPill, Text } from '@/components/ui';
 import { formatDayShort, formatTimeIn, groupZoneNote, relativeDay } from '@/schedule/format';
+import { skipDateText } from '@/schedule/skipDate';
 import { displayStatusLabel, type EventView, type SlotView } from '@/schedule/views';
 import { useTheme } from '@/theme';
 
@@ -220,8 +221,8 @@ export function EventCard({
 /** A Skip Date (prototype `skipCard`): dashed, hatched, struck date, who marked it. */
 export function SkipCard({ event, showGroup = true }: { event: EventView; showGroup?: boolean }) {
   const { colors, fonts, radii, space } = useTheme();
-  const by = event.skipDate?.markedBy;
-  const text = `No one needed${by ? `. Marked by ${by}` : ''}. Turns move forward one Event.`;
+  // The reason (ticket 10) and who marked it.
+  const text = skipDateText(event.skipDate ?? { markedBy: null, reason: null });
   return (
     <View
       accessible

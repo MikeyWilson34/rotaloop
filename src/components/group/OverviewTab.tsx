@@ -2,9 +2,10 @@ import { Check, ChevronRight, ListChecks } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
-import { eventTimeText, SlotRow } from '@/components/schedule/cards';
+import { eventTimeText, SkipCard, SlotRow } from '@/components/schedule/cards';
 import { HistoryList } from '@/components/schedule/history';
 import { SectionHeading } from '@/components/schedule/parts';
+import { AddSkipDateButton, RemoveSkipDateButton } from '@/components/skipDate/SkipDateActions';
 import { Button, Card, IconTile, Notice, Text } from '@/components/ui';
 import { firstUnstaffedResponsibility, setupChecklist, type ChecklistKey } from '@/lib/groupSetup';
 import { deviceTimeZone } from '@/lib/groupViews';
@@ -12,9 +13,10 @@ import type { GroupDetails } from '@/lib/groups';
 import { scheduleGroupOf, useHistory } from '@/lib/schedule';
 import { dateIn, formatDayLong, relativeDay } from '@/schedule/format';
 import { historyLines } from '@/schedule/history';
-import { nextEvent } from '@/schedule/views';
+import { eventViews, nextEvent } from '@/schedule/views';
 import { useTheme } from '@/theme';
 
+import type { RunCommand } from './MemberActionsSheet';
 import { openSeries } from './settings/EventsSection';
 import { openResponsibility } from './settings/ResponsibilitiesSection';
 
@@ -29,11 +31,13 @@ export function OverviewTab({
   group,
   accountId,
   isAdmin,
+  run,
   onInvite,
 }: {
   group: GroupDetails;
   accountId: string | null;
   isAdmin: boolean;
+  run: RunCommand;
   onInvite: () => void;
 }) {
   const { space } = useTheme();
@@ -43,7 +47,11 @@ export function OverviewTab({
       {checklist.show ? (
         <SetupChecklist group={group} isAdmin={isAdmin} onInvite={onInvite} />
       ) : (
-        <NextEventCard group={group} accountId={accountId} />
+        <>
+          <NextEventCard group={group} accountId={accountId} />
+          <AddSkipDateButton group={group} accountId={accountId} isAdmin={isAdmin} run={run} />
+          <UpcomingSkipDates group={group} accountId={accountId} run={run} />
+        </>
       )}
       <View style={{ gap: space.md }}>
         <SectionHeading title="Schedule history" aside="Visible to all Members" />
@@ -89,6 +97,29 @@ function NextEventCard({ group, accountId }: { group: GroupDetails; accountId: s
         )}
       </View>
     </Card>
+  );
+}
+
+/** The Group's upcoming Skip Dates (prototype groupOverview), each removable by any Member. */
+function UpcomingSkipDates({ group, accountId, run }: { group: GroupDetails; accountId: string | null; run: RunCommand }) {
+  const { space } = useTheme();
+  const viewerTimeZone = deviceTimeZone();
+  const now = useMemo(() => new Date().toISOString(), [group]); // eslint-disable-line react-hooks/exhaustive-deps
+  const skips = useMemo(
+    () => eventViews([scheduleGroupOf(group, accountId)], now, viewerTimeZone).filter((e) => e.skipDate),
+    [group, accountId, now, viewerTimeZone],
+  );
+  if (skips.length === 0) return null;
+  return (
+    <View style={{ gap: space.md }}>
+      <SectionHeading title="Upcoming Skip Dates" />
+      {skips.map((event) => (
+        <View key={event.key} style={{ gap: space.md }}>
+          <SkipCard event={event} showGroup={false} />
+          <RemoveSkipDateButton event={event} run={run} />
+        </View>
+      ))}
+    </View>
   );
 }
 

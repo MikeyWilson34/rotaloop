@@ -6,8 +6,8 @@
  * Pure TypeScript: no React, Supabase or clock reads (callers pass `now` and the viewer's
  * time zone), so it is unit-tested under Node.
  */
-import { assignmentStatus } from '../engine/status';
-import type { Assignment, AssignmentStatus, Event, GroupState, Instant, MemberId } from '../engine/types';
+import { assignmentStatus, replacementDutyHolder } from '../engine/status';
+import type { Assignment, AssignmentStatus, Event, GroupSettings, GroupState, Instant, MemberId } from '../engine/types';
 import { dateOf, dayNumber, weekdayOf } from './expandSeries';
 import { addDays, dateIn, daysBetween, formatMonthDay } from './format';
 
@@ -33,13 +33,16 @@ export type ScheduleGroup = {
 /**
  * The statuses the app shows (design-system §2). The engine's "Unconfirmed" is an Admin
  * alert about a missing confirmation, so it is shown as "Pending" (still awaiting it).
+ * "Find a replacement" is a Coverage Request past the Group's "find a replacement by"
+ * deadline with no taker: Replacement Duty has started.
  */
-export type DisplayStatus = 'confirmed' | 'pending' | 'needsCoverage' | 'covered' | 'scheduled';
+export type DisplayStatus = 'confirmed' | 'pending' | 'needsCoverage' | 'findReplacement' | 'covered' | 'scheduled';
 
 const STATUS_LABELS: Record<DisplayStatus, string> = {
   confirmed: 'Confirmed',
   pending: 'Pending',
   needsCoverage: 'Needs coverage',
+  findReplacement: 'Find a replacement',
   covered: 'Covered',
   scheduled: 'Scheduled',
 };
@@ -53,9 +56,21 @@ export function displayStatus(status: AssignmentStatus): DisplayStatus {
   return status === 'unconfirmed' ? 'pending' : status;
 }
 
-/** The status shown for an Assignment at an Event starting at `startsAt`. */
-export function slotStatus(assignment: Assignment, startsAt: Instant, now: Instant): DisplayStatus {
-  return displayStatus(assignmentStatus(assignment, startsAt, now));
+/**
+ * The status shown for an Assignment at an Event starting at `startsAt`. Given the Group's
+ * settings, a Coverage Request whose Replacement Duty has started is "Find a replacement".
+ */
+export function slotStatus(
+  assignment: Assignment,
+  startsAt: Instant,
+  now: Instant,
+  settings?: GroupSettings,
+): DisplayStatus {
+  const status = displayStatus(assignmentStatus(assignment, startsAt, now));
+  if (status === 'needsCoverage' && settings && replacementDutyHolder(assignment, startsAt, settings, now) !== null) {
+    return 'findReplacement';
+  }
+  return status;
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +140,7 @@ export function slotView(group: ScheduleGroup, assignment: Assignment, startsAt:
     responsibilityId: assignment.responsibilityId,
     responsibilityName: state.responsibilities.find((r) => r.id === assignment.responsibilityId)?.name ?? 'Responsibility',
     startsAt,
-    status: slotStatus(assignment, startsAt, now),
+    status: slotStatus(assignment, startsAt, now, state.settings),
     who,
     whoLabel: whoLabel(who),
     coveredFor: cover ? personLabel(state, askedBy, me, 'you') : null,
@@ -145,7 +160,8 @@ export function whoLabel(who: Who): string {
 // ---------------------------------------------------------------------------
 // Events
 
-export type SkipDateView = { markedBy: string | null };
+/** A Skip Date as shown: who marked it ("You" or a name) and why (ticket 10). */
+export type SkipDateView = { markedBy: string | null; reason: string | null };
 
 export type EventView = {
   /** `${groupId}/${eventId}`. */
@@ -187,7 +203,10 @@ export function eventView(group: ScheduleGroup, event: Event, now: Instant, view
     date: dateIn(event.startsAt, viewerTimeZone),
     seriesName: series?.name ?? null,
     skipDate: event.skipDate
-      ? { markedBy: personLabel(state, event.skipDate.markedBy, group.myMemberId, 'You') }
+      ? {
+          markedBy: personLabel(state, event.skipDate.markedBy, group.myMemberId, 'You'),
+          reason: event.skipDate.reason ?? null,
+        }
       : null,
     slots,
     mine: slots.some((s) => s.mine),

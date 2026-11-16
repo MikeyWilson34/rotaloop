@@ -5,7 +5,9 @@ import {
   ShieldCheck,
   Smartphone,
   CalendarX,
+  CalendarOff,
 } from 'lucide-react-native';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 
@@ -170,6 +172,16 @@ export default function ProfileScreen() {
             ) : null}
           </View>
         </Card>
+
+        {/* Time Off (ticket 10). */}
+        <SettingsList>
+          <ValueRow
+            icon={CalendarOff}
+            label="Time Off"
+            description="Days you can’t serve"
+            onPress={() => router.push('/time-off')}
+          />
+        </SettingsList>
 
         {error ? <Notice>{error}</Notice> : null}
 

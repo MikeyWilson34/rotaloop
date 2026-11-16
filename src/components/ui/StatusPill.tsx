@@ -20,6 +20,7 @@ export type DisplayStatus =
   | 'pending'
   | 'declined'
   | 'needsCoverage'
+  | 'findReplacement'
   | 'covered'
   | 'skipped'
   | 'scheduled';
@@ -37,6 +38,8 @@ export const displayStatuses: Record<
     bg: 'dangerTint',
     fg: 'dangerText',
   },
+  /** A Coverage Request past the "find a replacement by" deadline with no taker. */
+  findReplacement: { label: 'Find a replacement', icon: CircleAlert, bg: 'dangerTint', fg: 'dangerText' },
   covered: { label: 'Covered', icon: Repeat, bg: 'primaryTint', fg: 'primary' },
   skipped: { label: 'Skipped', icon: CalendarX, bg: 'neutralTint', fg: 'textSecondary' },
   scheduled: { label: 'Scheduled', icon: Calendar, bg: 'neutralTint', fg: 'textSecondary' },

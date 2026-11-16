@@ -21,6 +21,9 @@ export class InvalidRequest extends Error {}
 const MAX_ID = 64;
 const MAX_NAME = 80;
 const MAX_LIST = 500;
+/** Skip Date reasons and Time Off notes (the engine accepts reasons up to 300). */
+const MAX_REASON = 300;
+const MAX_NOTE = 200;
 
 type Obj = Record<string, unknown>;
 
@@ -38,6 +41,14 @@ function text(value: unknown, field: string, max: number): string {
   const trimmed = value.trim();
   if (trimmed.length === 0 || trimmed.length > max) fail(`${field} must be 1-${max} characters`);
   return trimmed;
+}
+
+/** Free text that may be blank (stored as null). */
+function optionalText(value: unknown, field: string, max: number): string | null {
+  if (typeof value !== 'string') fail(`${field} must be a string`);
+  const trimmed = value.trim();
+  if (trimmed.length > max) fail(`${field} must be at most ${max} characters`);
+  return trimmed.length === 0 ? null : trimmed;
 }
 
 const id = (value: unknown, field: string) => text(value, field, MAX_ID);
@@ -118,9 +129,13 @@ function newTimeOff(value: unknown, field: string): NewTimeOff {
   const repeatEveryWeeks = optional(o.repeatEveryWeeks, (v) => nullable(v, (x) => int(x, `${field}.repeatEveryWeeks`, 1, 52)));
   const repeatUntil = optional(o.repeatUntil, (v) => nullable(v, (x) => instant(x, `${field}.repeatUntil`)));
   const responsibilityIds = optional(o.responsibilityIds, (v) => nullable(v, (x) => ids(x, `${field}.responsibilityIds`)));
+  const zone = optional(o.timeZone, (v) => nullable(v, (x) => timeZone(x, `${field}.timeZone`)));
+  const note = optional(o.note, (v) => nullable(v, (x) => optionalText(x, `${field}.note`, MAX_NOTE)));
   if (repeatEveryWeeks !== undefined) timeOff.repeatEveryWeeks = repeatEveryWeeks;
   if (repeatUntil !== undefined) timeOff.repeatUntil = repeatUntil;
   if (responsibilityIds !== undefined) timeOff.responsibilityIds = responsibilityIds;
+  if (zone !== undefined) timeOff.timeZone = zone;
+  if (note !== undefined) timeOff.note = note;
   return timeOff;
 }
 
@@ -243,7 +258,12 @@ export function parseClientCommand(value: unknown): ClientCommand {
       return { type: 'fillSchedule' };
     case 'addEvents':
       return { type: 'addEvents', events: events(o.events, f('events')) };
-    case 'addSkipDate':
+    case 'addSkipDate': {
+      const reason = optional(o.reason, (v) => nullable(v, (x) => optionalText(x, f('reason'), MAX_REASON)));
+      const command: Extract<ClientCommand, { type: 'addSkipDate' }> = { type: 'addSkipDate', eventId: id(o.eventId, f('eventId')) };
+      if (reason) command.reason = reason;
+      return command;
+    }
     case 'removeSkipDate':
       return { type: o.type, eventId: id(o.eventId, f('eventId')) };
     case 'addTimeOff':

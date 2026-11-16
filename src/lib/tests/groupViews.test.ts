@@ -46,7 +46,7 @@ function sampleState(): GroupState {
       r.id === 'r3' ? { ...r, removedAt: '2026-10-01T00:00:00.000Z' } : r,
     ),
     events: state.events.map((e) =>
-      e.id === 'e3' ? { ...e, skipDate: { markedBy: 'm2', markedAt: '2026-11-10T00:00:00.000Z' } } : e,
+      e.id === 'e3' ? { ...e, skipDate: { markedBy: 'm2', markedAt: '2026-11-10T00:00:00.000Z', reason: null } } : e,
     ),
   };
 }

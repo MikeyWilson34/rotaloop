@@ -118,9 +118,9 @@ export default function GroupScreen() {
         </View>
         <View style={{ paddingHorizontal: space.lg, gap: space.md }}>
           {tab === 'overview' ? (
-            <OverviewTab group={data} accountId={accountId} isAdmin={isAdmin} onInvite={() => setInviting(true)} />
+            <OverviewTab group={data} accountId={accountId} isAdmin={isAdmin} run={run} onInvite={() => setInviting(true)} />
           ) : null}
-          {tab === 'schedule' ? <GroupScheduleTab group={data} accountId={accountId} /> : null}
+          {tab === 'schedule' ? <GroupScheduleTab group={data} accountId={accountId} isAdmin={isAdmin} run={run} /> : null}
           {tab === 'members' ? (
             <MembersTab group={data} accountId={accountId} isAdmin={isAdmin} run={run} onInvite={() => setInviting(true)} />
           ) : null}

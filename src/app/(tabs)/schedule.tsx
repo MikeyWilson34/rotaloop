@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { CalendarDays, CalendarPlus, LayoutGrid, List } from 'lucide-react-native';
+import { CalendarDays, CalendarOff, CalendarPlus, LayoutGrid, List } from 'lucide-react-native';
 import { useMemo } from 'react';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MonthCalendar } from '@/components/schedule/MonthCalendar';
@@ -38,7 +38,7 @@ type Params = { view?: string; scope?: string; month?: string; day?: string };
  * selected day live in the URL, so they survive reloads and can be linked to.
  */
 export default function ScheduleScreen() {
-  const { colors, space } = useTheme();
+  const { colors, space, minTapTarget } = useTheme();
   const params = useLocalSearchParams<Params>();
   const view: View_ = params.view === 'month' ? 'month' : 'list';
   const scope: Scope = params.scope === 'everyone' ? 'everyone' : 'me';
@@ -65,14 +65,30 @@ export default function ScheduleScreen() {
 
   const header = (
     <View style={{ gap: space.md }}>
-      <View style={{ gap: 2 }}>
-        <Text variant="title1" accessibilityRole="header">
-          Schedule
-        </Text>
-        <Text variant="subhead" color="textSecondary">
-          {scope === 'me' ? 'Your Assignments' : 'All your groups'}
-          {otherZone ? ` · Times in your time zone (${zoneCity(viewerTimeZone)})` : ''}
-        </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.sm }}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text variant="title1" accessibilityRole="header">
+            Schedule
+          </Text>
+          <Text variant="subhead" color="textSecondary">
+            {scope === 'me' ? 'Your Assignments' : 'All your groups'}
+            {otherZone ? ` · Times in your time zone (${zoneCity(viewerTimeZone)})` : ''}
+          </Text>
+        </View>
+        {/* Time Off (ticket 10). */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Time Off"
+          onPress={() => router.push('/time-off')}
+          style={({ pressed }) => ({
+            width: minTapTarget,
+            height: minTapTarget,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed ? 0.6 : 1,
+          })}>
+          <CalendarOff size={24} color={colors.text} strokeWidth={1.75} />
+        </Pressable>
       </View>
       <SegmentedControl
         accessibilityLabel="Schedule view"

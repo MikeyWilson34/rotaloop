@@ -115,6 +115,11 @@ export interface EventSeries {
 export interface SkipDate {
   markedBy: MemberId | null;
   markedAt: Instant;
+  /**
+   * Why the Event needs no one, shown to everyone and kept in history, e.g. "Holiday" or
+   * "Closure: Building closed for repairs". `null` when none was given.
+   */
+  reason: string | null;
 }
 
 export interface Event {
@@ -134,6 +139,10 @@ export interface Event {
 /**
  * A period a Member can't serve: `[startsAt, endsAt)`, optionally repeating every
  * N weeks until `repeatUntil`, optionally limited to some Responsibilities.
+ *
+ * A repeat counts whole weeks on the wall clock of `timeZone` (the Group's), so
+ * "Sundays 8:30-9:30" stays at 8:30 local time across daylight-saving changes. Without a
+ * time zone it counts whole weeks of UTC time, which drifts an hour at those changes.
  */
 export interface TimeOff {
   id: TimeOffId;
@@ -144,6 +153,10 @@ export interface TimeOff {
   repeatUntil: Instant | null;
   /** `null` means every Responsibility. */
   responsibilityIds: ResponsibilityId[] | null;
+  /** IANA time zone a repeat is counted in (see above). `null`: whole UTC weeks. */
+  timeZone: string | null;
+  /** The Member's own note, e.g. "Family trip". Stored only. */
+  note: string | null;
   /**
    * Set when the Time Off was removed. Removing Time Off never undoes routing that
    * already happened, so it keeps applying to the Events in `retainedEventIds`
@@ -266,8 +279,10 @@ export interface NewMember {
   accountId?: string | null;
 }
 
-export type NewTimeOff = Omit<TimeOff, 'removedAt' | 'retainedEventIds' | 'repeatEveryWeeks' | 'repeatUntil' | 'responsibilityIds'> &
-  Partial<Pick<TimeOff, 'repeatEveryWeeks' | 'repeatUntil' | 'responsibilityIds'>>;
+type OptionalTimeOffFields = 'repeatEveryWeeks' | 'repeatUntil' | 'responsibilityIds' | 'timeZone' | 'note';
+
+export type NewTimeOff = Omit<TimeOff, 'removedAt' | 'retainedEventIds' | OptionalTimeOffFields> &
+  Partial<Pick<TimeOff, OptionalTimeOffFields>>;
 
 export type NewEvent = Omit<Event, 'skipDate' | 'responsibilityIds'> &
   Partial<Pick<Event, 'responsibilityIds'>>;
@@ -285,7 +300,7 @@ export type CoverTarget = { memberId: MemberId } | { guestName: string };
 export type Command =
   | { type: 'fillSchedule' }
   | { type: 'addEvents'; events: NewEvent[] }
-  | { type: 'addSkipDate'; eventId: EventId }
+  | { type: 'addSkipDate'; eventId: EventId; reason?: string | null }
   | { type: 'removeSkipDate'; eventId: EventId }
   | { type: 'addTimeOff'; timeOff: NewTimeOff }
   | { type: 'removeTimeOff'; timeOffId: TimeOffId }
