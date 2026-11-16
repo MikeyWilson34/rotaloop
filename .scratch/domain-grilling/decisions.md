@@ -56,3 +56,6 @@ Running log of rules settled with the product owner (2026-11-15). Terms live in 
 
 ## Open
 - None. Awaiting the owner's confirmation of shared understanding.
+
+## Distribution
+- Early sharing happens through a hosted website (the Expo web build on EAS Hosting), not app-store builds (owner, 2026-11-16). Invite links are https URLs so they open in any browser. Native store builds come later.
