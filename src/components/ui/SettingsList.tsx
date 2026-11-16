@@ -169,3 +169,52 @@ export function ValueRow({
     </Pressable>
   );
 }
+
+/** A settings row that runs an action (no value), e.g. "Leave group". */
+export function ActionRow({
+  icon,
+  label,
+  description,
+  onPress,
+  disabled,
+  destructive,
+}: RowBaseProps & { onPress: () => void; destructive?: boolean }) {
+  const { fonts } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={description}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [rowStyle, { opacity: disabled ? 0.55 : pressed ? 0.85 : 1 }]}>
+      <IconTile icon={icon} bg={destructive ? 'dangerTint' : 'surfaceAlt'} fg={destructive ? 'dangerText' : 'textSecondary'} />
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text variant="subhead" color={destructive ? 'dangerText' : 'text'} style={{ fontFamily: fonts.bold }}>
+          {label}
+        </Text>
+        {description ? (
+          <Text variant="caption" color="textSecondary" style={{ fontFamily: fonts.regular }}>
+            {description}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
+/** A read-only settings row: a label with a value on the right or a description under it. */
+export function InfoRow({ icon, label, description, value }: Omit<RowBaseProps, 'disabled'> & { value?: string }) {
+  const { fonts } = useTheme();
+  return (
+    <View accessible accessibilityLabel={`${label}: ${value ?? description ?? ''}`} style={rowStyle}>
+      <IconTile icon={icon} />
+      <RowText label={label} description={description} />
+      {value ? (
+        <Text variant="subhead" color="textSecondary" style={{ fontFamily: fonts.bold }}>
+          {value}
+        </Text>
+      ) : null}
+    </View>
+  );
+}

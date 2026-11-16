@@ -15,3 +15,11 @@ export const APP_SCHEME = 'rotaloop';
  */
 export const EAS_PROJECT_ID = '28fc862c-d400-47f3-9568-228c043f78fd';
 export const EAS_OWNER = 'mikeywilson';
+
+/**
+ * Where the web app is hosted. Shareable invite links point here (`<WEB_URL>/join/<token>`),
+ * so they open in any browser; the app also accepts `<APP_SCHEME>://join/<token>`.
+ * Set EXPO_PUBLIC_WEB_URL in .env to override the default.
+ */
+export const DEFAULT_WEB_URL = 'https://rotaloop.expo.app';
+export const WEB_URL = (process.env.EXPO_PUBLIC_WEB_URL || DEFAULT_WEB_URL).replace(/\/+$/, '');

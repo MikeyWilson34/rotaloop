@@ -46,7 +46,9 @@ export const GATE_HOME = {
 const ALLOWED_SEGMENTS: Record<keyof typeof GATE_HOME, readonly string[]> = {
   auth: ['(auth)'],
   onboarding: ['(onboarding)', 'create-group'],
-  app: ['(tabs)', 'create-group'],
+  // A join link opened mid-onboarding waits (see resumeInviteRoute in invite.ts), so
+  // `join` and `group` are app-only.
+  app: ['(tabs)', 'create-group', 'group', 'join'],
 };
 
 /**

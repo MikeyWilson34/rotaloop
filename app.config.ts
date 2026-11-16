@@ -35,6 +35,14 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-font',
     [
+      'expo-camera',
+      {
+        cameraPermission: `Allow ${APP_NAME} to use the camera to scan invite QR codes.`,
+        microphonePermission: false,
+        recordAudioAndroid: false,
+      },
+    ],
+    [
       'expo-notifications',
       {
         color: '#3A6894',

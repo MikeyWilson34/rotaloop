@@ -9,11 +9,14 @@ import {
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import * as Linking from 'expo-linking';
 import { useEffect } from 'react';
 
 import { SignOutButton } from '@/components/SignOutButton';
 import { Button, FormScreen, Notice } from '@/components/ui';
 import { redirectFor } from '@/lib/gate';
+import { inviteTokenFromUrl, resumeInviteRoute } from '@/lib/invite';
+import { loadPendingInvite, setPendingInvite, usePendingInvite } from '@/lib/pendingInvite';
 import { SessionProvider, useSession } from '@/lib/session';
 import { useTheme } from '@/theme';
 import { useAppFonts } from '@/theme/fonts';
@@ -58,7 +61,23 @@ function RootNavigator() {
   const { gate } = useSession();
   const ready = (fontsLoaded || !!fontError) && gate !== 'loading';
   const segments = useSegments();
-  const redirect = ready ? redirectFor(gate, segments[0]) : null;
+  const pendingInvite = usePendingInvite();
+  const url = Linking.useLinkingURL();
+  const redirect = ready
+    ? (resumeInviteRoute(gate, pendingInvite, segments[0]) ?? redirectFor(gate, segments[0]))
+    : null;
+
+  useEffect(() => {
+    loadPendingInvite();
+  }, []);
+
+  // An invite link opened before the app is usable (a web URL load or a deep link while
+  // signed out, mid-onboarding or still loading) is remembered, so it survives sign-in and
+  // onboarding and then resumes. In the app, expo-router opens the join screen itself.
+  useEffect(() => {
+    const token = inviteTokenFromUrl(url);
+    if (token && gate !== 'app') setPendingInvite(token);
+  }, [url, gate]);
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync();
@@ -85,6 +104,11 @@ function RootNavigator() {
       </Stack.Protected>
       <Stack.Protected guard={gate === 'onboarding' || gate === 'app'}>
         <Stack.Screen name="create-group" />
+      </Stack.Protected>
+      <Stack.Protected guard={gate === 'app'}>
+        <Stack.Screen name="group/[groupId]/index" />
+        <Stack.Screen name="join/index" />
+        <Stack.Screen name="join/[token]" />
       </Stack.Protected>
     </Stack>
   );

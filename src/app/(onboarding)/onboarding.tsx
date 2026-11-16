@@ -5,7 +5,6 @@ import { BackHandler, Pressable, View } from 'react-native';
 
 import {
   Button,
-  Card,
   FieldLabel,
   FormScreen,
   IconTile,
@@ -17,10 +16,10 @@ import {
   TextField,
 } from '@/components/ui';
 import { ONBOARDING_STEPS } from '@/lib/gate';
-import { parseInviteToken } from '@/lib/invite';
+import { inviteUrl, NOT_AN_INVITE, parseInviteToken } from '@/lib/invite';
+import { clearPendingInvite, setPendingInvite, usePendingInvite } from '@/lib/pendingInvite';
 import { enablePushNotifications } from '@/lib/push';
 import { useProfile, useSession } from '@/lib/session';
-import { supabase } from '@/lib/supabase';
 import { isValidPhone, normalizePhone } from '@/lib/validation';
 import { useTheme, type ColorTokens } from '@/theme';
 
@@ -28,7 +27,6 @@ import { useTheme, type ColorTokens } from '@/theme';
 const FIRST_STEP = ONBOARDING_STEPS - 2;
 
 type Choice = 'join' | 'create' | null;
-type InvitePreview = { groupName: string; placeholderName: string | null };
 
 function deviceTimeZone(): string {
   try {
@@ -57,10 +55,13 @@ export default function OnboardingScreen() {
   const [phoneError, setPhoneError] = useState<string | null>(null);
 
   // Step 1: join or create.
-  const [choice, setChoice] = useState<Choice>(null);
-  const [link, setLink] = useState('');
+  // An invite link opened before signing up (see pendingInvite.ts) preselects joining.
+  const pending = usePendingInvite();
+  const [pickedChoice, setChoice] = useState<Choice>(null);
+  const [typedLink, setLink] = useState<string | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<InvitePreview | null>(null);
+  const choice: Choice = pickedChoice ?? (pending ? 'join' : null);
+  const link = typedLink ?? (pending ? inviteUrl(pending) : '');
 
   function goTo(next: number) {
     setError(null);
@@ -109,26 +110,19 @@ export default function OnboardingScreen() {
     if (saved) goTo(1);
   }
 
-  async function checkInvite() {
+  /**
+   * Keeps the invite and finishes onboarding; once in the app, the join screen opens with it
+   * (resumeInviteRoute in invite.ts) to preview the group and join.
+   */
+  async function continueWithInvite() {
     const token = parseInviteToken(link);
     if (!token) {
-      setLinkError("That doesn't look like an invite link. Paste the whole link you were sent.");
+      setLinkError(NOT_AN_INVITE);
       return;
     }
     setLinkError(null);
-    setBusy(true);
-    const { data, error: rpcError } = await supabase.rpc('invite_link_preview', { p_token: token });
-    setBusy(false);
-    if (rpcError) {
-      setLinkError("Couldn't check that link. Check your connection and try again.");
-      return;
-    }
-    const row = data?.[0];
-    if (!row) {
-      setLinkError("That invite link isn't working. It may have been reset: ask for a new one.");
-      return;
-    }
-    setPreview({ groupName: row.group_name, placeholderName: row.placeholder_name || null });
+    setPendingInvite(token);
+    await finish();
   }
 
   /** Marks onboarding done; the auth gate then moves on to the app. */
@@ -136,8 +130,14 @@ export default function OnboardingScreen() {
     await save({ onboarding_completed_at: new Date().toISOString(), time_zone: deviceTimeZone() });
   }
 
+  async function later() {
+    clearPendingInvite();
+    await finish();
+  }
+
   async function createGroup() {
-    // The placeholder is reachable during onboarding too, so open it first, then finish.
+    clearPendingInvite();
+    // The create screen is reachable during onboarding too, so open it first, then finish.
     router.push('/create-group');
     await finish();
   }
@@ -210,15 +210,13 @@ export default function OnboardingScreen() {
   const primary =
     choice === 'create' ? (
       <Button label="Create group" size="lg" loading={busy} onPress={createGroup} />
-    ) : choice === 'join' && preview ? (
-      <Button label="Continue" size="lg" loading={busy} onPress={finish} />
     ) : choice === 'join' ? (
       <Button
-        label="Check invite link"
+        label="Continue"
         size="lg"
         loading={busy}
         disabled={!link.trim()}
-        onPress={checkInvite}
+        onPress={continueWithInvite}
       />
     ) : (
       <Button label="Continue" size="lg" disabled />
@@ -233,7 +231,7 @@ export default function OnboardingScreen() {
       footer={
         <>
           {primary}
-          <Button label="I'll do this later" variant="quiet" disabled={busy} onPress={finish} />
+          <Button label="I'll do this later" variant="quiet" disabled={busy} onPress={later} />
         </>
       }>
       <ChoiceCard
@@ -246,48 +244,22 @@ export default function OnboardingScreen() {
         onPress={() => setChoice('join')}
       />
       {choice === 'join' ? (
-        preview ? (
-          <Card style={{ gap: 8 }}>
-            <Text variant="overline" color="textSecondary">
-              {"You're invited to"}
-            </Text>
-            <Text variant="title3">{preview.groupName}</Text>
-            {preview.placeholderName ? (
-              <Text variant="subhead" color="textSecondary">
-                {`You'll join as ${preview.placeholderName}.`}
-              </Text>
-            ) : null}
-            <Notice tone="info">
-              {
-                'Joining from the app arrives in the next update. Keep your link: you can use it from Groups then.'
-              }
-            </Notice>
-            <Button
-              label="Use a different link"
-              variant="quiet"
-              onPress={() => {
-                setPreview(null);
-                setLink('');
-              }}
-            />
-          </Card>
-        ) : (
-          <TextField
-            label="Invite link"
-            value={link}
-            onChangeText={(text) => {
-              setLink(text);
-              if (linkError) setLinkError(null);
-            }}
-            error={linkError}
-            placeholder="Paste invite link"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            returnKeyType="go"
-            onSubmitEditing={checkInvite}
-          />
-        )
+        <TextField
+          label="Invite link"
+          value={link}
+          onChangeText={(text) => {
+            setLink(text);
+            if (linkError) setLinkError(null);
+          }}
+          error={linkError}
+          hint="Next, you'll see the group and join it."
+          placeholder="Paste invite link"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          returnKeyType="go"
+          onSubmitEditing={continueWithInvite}
+        />
       ) : null}
       <ChoiceCard
         icon={Plus}

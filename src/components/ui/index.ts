@@ -9,3 +9,6 @@ export * from './SettingsList';
 export * from './StatusPill';
 export * from './Text';
 export * from './TextField';
+export * from './Badge';
+export * from './SegmentedControl';
+export * from './Sheet';

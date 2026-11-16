@@ -82,6 +82,14 @@ describe('redirectFor', () => {
     expect(redirectFor('onboarding', 'create-group')).toBeNull();
   });
 
+  it('keeps join and Group screens for the app (a join link waits until onboarding is done)', () => {
+    expect(redirectFor('onboarding', 'join')).toBe('/onboarding');
+    expect(redirectFor('onboarding', 'group')).toBe('/onboarding');
+    expect(redirectFor('auth', 'join')).toBe('/welcome');
+    expect(redirectFor('app', 'join')).toBeNull();
+    expect(redirectFor('app', 'group')).toBeNull();
+  });
+
   it('moves onboarded people out of sign-in and onboarding into the app', () => {
     expect(redirectFor('app', '(auth)')).toBe('/');
     expect(redirectFor('app', '(onboarding)')).toBe('/');
