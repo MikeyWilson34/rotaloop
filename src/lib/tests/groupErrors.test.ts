@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { GroupCommandFailure } from '../../db/protocol';
-import { groupCommandMessage, type GroupAction } from '../groupErrors';
+import { groupCommandMessage, groupDetailsMessage, type GroupAction } from '../groupErrors';
 
 const ALL_REASONS: GroupCommandFailure[] = [
   'notFound',
@@ -32,6 +32,17 @@ const ACTIONS: GroupAction[] = [
   'addPlaceholder',
   'join',
   'createGroup',
+  'saveResponsibility',
+  'removeResponsibility',
+  'qualify',
+  'reorder',
+  'rebalance',
+  'saveSeries',
+  'removeSeries',
+  'addEvent',
+  'removeEvent',
+  'changeSettings',
+  'groupDetails',
   'other',
 ];
 
@@ -67,5 +78,20 @@ describe('groupCommandMessage', () => {
 
   it('falls back to a generic message for unknown reasons', () => {
     expect(groupCommandMessage('somethingNew')).toBe(GENERIC);
+  });
+});
+
+describe('group setup messages', () => {
+  it('explains setup refusals in plain words', () => {
+    expect(groupCommandMessage('invalid', 'removeEvent')).toMatch(/Skip Date/);
+    expect(groupCommandMessage('invalid', 'saveSeries')).toMatch(/days, time/);
+    expect(groupCommandMessage('notFound', 'removeSeries')).toMatch(/Event Series/);
+    expect(groupCommandMessage('notPermitted', 'changeSettings')).toMatch(/Only Admins/);
+  });
+
+  it('maps update_group_details errors', () => {
+    expect(groupDetailsMessage({ code: '42501' })).toMatch(/Only Admins/);
+    expect(groupDetailsMessage({ code: '23514' })).toMatch(/group name and time zone/);
+    expect(groupDetailsMessage(null)).toMatch(/connection/);
   });
 });

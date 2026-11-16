@@ -13,3 +13,6 @@ export * from './Badge';
 export * from './SegmentedControl';
 export * from './Sheet';
 export * from './AppColumn';
+export * from './ChoiceSheet';
+export * from './ReorderList';
+export * from './Stepper';

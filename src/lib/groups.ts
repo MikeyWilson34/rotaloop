@@ -10,6 +10,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GroupRow, GroupRows } from '../db/groupRows';
 import { stateFromRows } from '../db/groupRows';
 import type { GroupState } from '../engine';
+import { runGroupCommand, type ClientCommand } from './groupCommand';
+import { groupCommandMessage, groupDetailsMessage, type GroupAction } from './groupErrors';
 import { groupCards, type GroupCardView } from './groupViews';
 import { useSession } from './session';
 import { supabase } from './supabase';
@@ -217,4 +219,37 @@ export function useGroup(groupId: string | undefined): Loadable<GroupDetails> {
   }, [id, reload]);
 
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Changing a Group
+
+/**
+ * Runs a `group-command` command and reloads the Group. Resolves to a plain-language error,
+ * or null when it worked.
+ */
+export function useRunCommand(
+  groupId: string | undefined,
+  reload: () => Promise<void>,
+): (command: ClientCommand, action: GroupAction) => Promise<string | null> {
+  return useCallback(
+    async (command: ClientCommand, action: GroupAction) => {
+      if (!groupId) return groupCommandMessage('notMember', action);
+      const result = await runGroupCommand(groupId, command);
+      if (!result.ok) return groupCommandMessage(result.reason, action);
+      await reload();
+      return null;
+    },
+    [groupId, reload],
+  );
+}
+
+/** Renames the Group and/or changes its time zone (Admins only). Resolves to an error message or null. */
+export async function updateGroupDetails(groupId: string, name: string, timeZone: string): Promise<string | null> {
+  const { error } = await supabase.rpc('update_group_details', {
+    p_group_id: groupId,
+    p_name: name.trim(),
+    p_time_zone: timeZone,
+  });
+  return error ? groupDetailsMessage(error) : null;
 }

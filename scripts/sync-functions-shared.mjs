@@ -1,16 +1,16 @@
-// Copies the pure TypeScript the Edge Functions share with the app (src/engine and
-// src/db, without tests) into supabase/functions/_shared/, rewriting extensionless
+// Copies the pure TypeScript the Edge Functions share with the app (src/engine, src/db and
+// src/schedule, without tests) into supabase/functions/_shared/, rewriting extensionless
 // relative imports ("./commands", "../engine") into the explicit ".ts" paths Deno needs.
 //
 // Run by `npm run functions:sync` (and by functions:check / functions:deploy). The copies
-// are generated and git-ignored: edit src/, never _shared/engine or _shared/db.
+// are generated and git-ignored: edit src/, never the copies in _shared/.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const shared = join(root, 'supabase', 'functions', '_shared');
-const sources = ['engine', 'db'];
+const sources = ['engine', 'db', 'schedule'];
 
 function resolveSpecifier(fromFile, specifier) {
   const base = resolve(dirname(fromFile), specifier);

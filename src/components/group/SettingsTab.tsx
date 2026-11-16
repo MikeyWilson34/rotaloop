@@ -1,32 +1,38 @@
 import { router } from 'expo-router';
-import { Globe, Link, LogOut, RotateCcw, Shield, Users } from 'lucide-react-native';
+import { Link, LogOut, RotateCcw, Shield } from 'lucide-react-native';
 import { useState } from 'react';
 import { View } from 'react-native';
 
 import { ActionRow, ConfirmSheet, FieldLabel, InfoRow, Notice, SettingsList, Text } from '@/components/ui';
 import type { Member } from '@/engine';
-import { adminNames, activeMemberCount, memberCountLabel, orList, timeZoneLabel } from '@/lib/groupViews';
+import { adminNames, orList } from '@/lib/groupViews';
 import type { GroupDetails } from '@/lib/groups';
 import { resetGroupInviteToken } from '@/lib/inviteLinks';
 import { useTheme } from '@/theme';
 
 import type { RunCommand } from './MemberActionsSheet';
+import { CoverageSection } from './settings/CoverageSection';
+import { EventsSection } from './settings/EventsSection';
+import { GroupDetailsSection } from './settings/GroupDetailsSection';
+import { ResponsibilitiesSection } from './settings/ResponsibilitiesSection';
 
 /**
- * Settings: the Group's details and its people (Admins, invite link, leaving). Coverage and
- * Rotation settings arrive with group setup (ticket 07).
+ * Settings: the Group's details, Responsibilities, Event Series and one-off Events, coverage
+ * rules, and its people (Admins, invite link, leaving). Admins edit; Members see it read-only.
  */
 export function SettingsTab({
   group,
   me,
   isAdmin,
   run,
+  reload,
   onInvite,
 }: {
   group: GroupDetails;
   me: Member;
   isAdmin: boolean;
   run: RunCommand;
+  reload: () => Promise<void>;
   onInvite: () => void;
 }) {
   const { space } = useTheme();
@@ -71,11 +77,10 @@ export function SettingsTab({
     <>
       {!isAdmin ? <Notice tone="info">{`Only Admins can change settings. Ask ${orList(admins)}.`}</Notice> : null}
 
-      <FieldLabel>Group</FieldLabel>
-      <SettingsList>
-        <InfoRow icon={Users} label="Members" value={memberCountLabel(activeMemberCount(group.state))} />
-        <InfoRow icon={Globe} label="Time zone" value={timeZoneLabel(group.timeZone).split(' · ')[0]} />
-      </SettingsList>
+      <GroupDetailsSection group={group} isAdmin={isAdmin} reload={reload} />
+      <ResponsibilitiesSection group={group} isAdmin={isAdmin} run={run} />
+      <EventsSection group={group} isAdmin={isAdmin} run={run} />
+      <CoverageSection group={group} isAdmin={isAdmin} run={run} />
 
       <FieldLabel>People</FieldLabel>
       <SettingsList>

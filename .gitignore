@@ -49,3 +49,4 @@ Thumbs.db
 # Generated copies of src/engine and src/db for Edge Functions (npm run functions:sync)
 supabase/functions/_shared/engine/
 supabase/functions/_shared/db/
+supabase/functions/_shared/schedule/

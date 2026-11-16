@@ -708,6 +708,7 @@ export type Database = {
       is_group_admin: { Args: { p_group_id: string }; Returns: boolean }
       is_group_member: { Args: { p_group_id: string }; Returns: boolean }
       is_repeat_pattern: { Args: { p: Json }; Returns: boolean }
+      is_service_role_caller: { Args: never; Returns: boolean }
       new_token: { Args: never; Returns: string }
       register_push_token: {
         Args: {
@@ -716,6 +717,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      request_event_horizon_extension: { Args: never; Returns: number }
       reset_invite_link: { Args: { p_group_id: string }; Returns: string }
       update_group_details: {
         Args: { p_group_id: string; p_name: string; p_time_zone: string }

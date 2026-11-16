@@ -12,7 +12,8 @@
  * Cover and the engine rejects it with `alreadyCovered`.
  */
 import { applyCommand, createGroupState } from '../engine';
-import type { Command, GroupState, HistoryEntry, Instant, Member } from '../engine';
+import type { Command, GroupState, HistoryEntry, Instant, Member, NewEvent } from '../engine';
+import { expandSeries, horizonEnd, replacementEvents } from '../schedule/expandSeries';
 import { rowsFromState, stateFromRows, type GroupRow, type GroupRows } from './groupRows';
 import { InvalidRequest, parseRequest } from './parseRequest';
 import type { ClientCommand, GroupCommandRequest, GroupCommandResponse } from './protocol';
@@ -40,6 +41,8 @@ export interface GroupStore {
   persist(input: PersistInput): Promise<number | null>;
   /** Resolves an invite link token. `memberId` is set for a Placeholder's claim link. */
   findInvite(token: string): Promise<{ groupId: string; memberId: string | null } | null>;
+  /** Ids of Groups with at least one active Event Series that has a repeat pattern. */
+  groupsWithRepeatingSeries(): Promise<string[]>;
 }
 
 export interface HandlerContext {
@@ -102,7 +105,7 @@ async function commit(
   store: GroupStore,
   groupId: string,
   context: HandlerContext,
-  plan: (state: GroupState) => Step,
+  plan: (state: GroupState, now: Instant) => Step,
   missing: () => Failure,
   mapRejection: (reason: Failure['reason'], message: string) => Failure = failure,
 ): Promise<GroupCommandResponse> {
@@ -110,10 +113,11 @@ async function commit(
   for (let attempt = 0; attempt < attempts; attempt++) {
     const loaded = await store.load(groupId);
     if (!loaded) return missing();
-    const step = plan(stateFromRows(loaded.rows));
+    const now = context.now();
+    const step = plan(stateFromRows(loaded.rows), now);
     if ('done' in step) return step.done;
 
-    const result = runEngine(step.state, step.command, context.now(), step.actorId);
+    const result = runEngine(step.state, step.command, now, step.actorId);
     if (!result.ok) return mapRejection(result.reason, result.message);
 
     const version = await store.persist({
@@ -137,7 +141,7 @@ async function commit(
 }
 
 /** applyCommand, treating a throw (malformed input the parser let through) as a bad request. */
-function runEngine(state: GroupState, command: Command, now: Instant, actorId: string) {
+function runEngine(state: GroupState, command: Command, now: Instant, actorId: string | null) {
   try {
     return applyCommand(state, command, { now, actorId });
   } catch (error) {
@@ -151,22 +155,137 @@ function runCommand(
   context: HandlerContext,
 ): Promise<GroupCommandResponse> {
   const notMember = () => failure('notMember', 'You are not a Member of this Group');
-  const plan = (state: GroupState): Step => {
+  const plan = (state: GroupState, now: Instant): Step => {
     const actor = activeMemberFor(state, context.accountId);
     if (!actor) return { done: notMember() };
-    return { state, command: toEngineCommand(request.command, context), actorId: actor.id };
+    return { state, command: toEngineCommand(request.command, context, state, now), actorId: actor.id };
   };
   return commit(store, request.groupId, context, plan, notMember);
 }
 
-function toEngineCommand(command: ClientCommand, context: HandlerContext): Command {
-  if (command.type !== 'addMember') return command;
-  // An Admin adds a Placeholder Member; the server picks the id.
-  return {
-    type: 'addMember',
-    member: { id: context.newId(), name: command.member.name, accountId: null },
-    qualifiedFor: command.qualifiedFor,
-  };
+function toEngineCommand(command: ClientCommand, context: HandlerContext, state: GroupState, now: Instant): Command {
+  switch (command.type) {
+    case 'addMember':
+      // An Admin adds a Placeholder Member; the server picks the id.
+      return {
+        type: 'addMember',
+        member: { id: context.newId(), name: command.member.name, accountId: null },
+        qualifiedFor: command.qualifiedFor,
+      };
+    case 'addEventSeries':
+      // A new series with a repeat pattern gets its Events up to the horizon in the same
+      // command, so they are added and filled in one engine run (one history entry).
+      if (command.series.repeat && command.events === undefined) {
+        const events = expandSeries({
+          seriesId: command.series.id,
+          pattern: command.series.repeat,
+          existing: state.events,
+          now,
+          until: horizonEnd(now),
+        });
+        return { ...command, events };
+      }
+      return command;
+    case 'editEventSeries':
+      // A new pattern replaces the series' future Events: those still at the same time keep
+      // their Assignments, the rest go and the new dates are filled from the Rotations.
+      if (command.changes.repeat && command.replaceFutureEvents === undefined) {
+        const replaceFutureEvents = replacementEvents({
+          seriesId: command.seriesId,
+          pattern: command.changes.repeat,
+          existing: state.events,
+          now,
+          until: horizonEnd(now),
+        });
+        return { ...command, replaceFutureEvents };
+      }
+      return command;
+    default:
+      return command;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Keeping every Group's horizon full (the daily system job)
+
+/** The Events each active repeating series is missing up to the horizon. */
+export function missingSeriesEvents(state: GroupState, now: Instant): NewEvent[] {
+  const until = horizonEnd(now);
+  const added: NewEvent[] = [];
+  for (const series of state.eventSeries) {
+    if (series.removedAt !== null || !series.repeat) continue;
+    // Earlier series' new Events count as existing, so ids never clash.
+    const existing = [...state.events, ...added];
+    added.push(...expandSeries({ seriesId: series.id, pattern: series.repeat, existing, now, until }));
+  }
+  return added;
+}
+
+export interface HorizonReport {
+  groups: number;
+  /** Groups that got new Events. */
+  extended: number;
+  eventsAdded: number;
+  /** Groups that could not be saved (conflicts or errors); the next run tries again. */
+  failed: number;
+}
+
+/**
+ * The daily system job: for every Group with a repeating Event Series, adds the Events
+ * missing up to the rolling horizon (`addEvents` run as the system, which also fills their
+ * Assignments). Groups with nothing missing are not written. Only the service role may run
+ * it: the Edge Function checks the caller before calling this.
+ */
+export async function extendHorizons(
+  store: GroupStore,
+  context: Pick<HandlerContext, 'now' | 'maxAttempts'>,
+): Promise<HorizonReport> {
+  const report: HorizonReport = { groups: 0, extended: 0, eventsAdded: 0, failed: 0 };
+  for (const groupId of await store.groupsWithRepeatingSeries()) {
+    report.groups++;
+    try {
+      const added = await extendHorizon(store, groupId, context);
+      if (added === null) report.failed++;
+      else if (added > 0) {
+        report.extended++;
+        report.eventsAdded += added;
+      }
+    } catch (error) {
+      console.error('extendHorizon failed', groupId, error);
+      report.failed++;
+    }
+  }
+  return report;
+}
+
+/** Adds one Group's missing Events. Returns how many, or null when it couldn't be saved. */
+async function extendHorizon(
+  store: GroupStore,
+  groupId: string,
+  context: Pick<HandlerContext, 'now' | 'maxAttempts'>,
+): Promise<number | null> {
+  const attempts = context.maxAttempts ?? 4;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const loaded = await store.load(groupId);
+    if (!loaded) return 0;
+    const now = context.now();
+    const state = stateFromRows(loaded.rows);
+    const events = missingSeriesEvents(state, now);
+    if (events.length === 0) return 0;
+    const result = runEngine(state, { type: 'addEvents', events }, now, null);
+    if (!result.ok) {
+      console.error('extendHorizon rejected', groupId, result.reason, result.message);
+      return null;
+    }
+    const version = await store.persist({
+      groupId,
+      expectedVersion: loaded.version,
+      rows: rowsFromState(result.state),
+      history: result.history,
+    });
+    if (version !== null) return events.length;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -239,7 +358,11 @@ async function createGroup(
     eventSeries: request.eventSeries,
     events: request.events,
   });
-  const result = runEngine(state, { type: 'fillSchedule' }, context.now(), memberId);
+  const now = context.now();
+  // Repeating series get their Events up to the horizon; addEvents also fills the schedule.
+  const missing = missingSeriesEvents(state, now);
+  const command: Command = missing.length > 0 ? { type: 'addEvents', events: missing } : { type: 'fillSchedule' };
+  const result = runEngine(state, command, now, memberId);
   if (!result.ok) return failure(result.reason, result.message);
 
   const version = await store.persist({

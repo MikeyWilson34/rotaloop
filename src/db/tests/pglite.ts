@@ -98,6 +98,13 @@ export async function createTestDb(): Promise<TestDb> {
         );
         return rows[0] ? { groupId: rows[0].group_id, memberId: rows[0].member_id } : null;
       }),
+    groupsWithRepeatingSeries: () =>
+      as('service_role', null, async () => {
+        const { rows } = await db.query<{ group_id: string }>(
+          'select distinct group_id from public.event_series where removed_at is null and repeat is not null order by group_id',
+        );
+        return rows.map((r) => r.group_id);
+      }),
   };
 
   return {

@@ -142,7 +142,7 @@ export function SwitchRow({
   );
 }
 
-/** A settings row that shows a value and opens or cycles something when tapped. */
+/** A settings row that shows a value (optional) and opens or cycles something when tapped. */
 export function ValueRow({
   icon,
   label,
@@ -150,21 +150,23 @@ export function ValueRow({
   value,
   onPress,
   disabled,
-}: RowBaseProps & { value: string; onPress: () => void }) {
+}: RowBaseProps & { value?: string; onPress: () => void }) {
   const { colors, fonts } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${label}: ${value}`}
+      accessibilityLabel={value ? `${label}: ${value}` : label}
       accessibilityHint={description}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [rowStyle, { opacity: disabled ? 0.55 : pressed ? 0.85 : 1 }]}>
       <IconTile icon={icon} />
       <RowText label={label} description={description} />
-      <Text variant="subhead" color="textSecondary" style={{ fontFamily: fonts.bold }}>
-        {value}
-      </Text>
+      {value ? (
+        <Text variant="subhead" color="textSecondary" style={{ fontFamily: fonts.bold, maxWidth: '45%' }} numberOfLines={2}>
+          {value}
+        </Text>
+      ) : null}
       <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.75} />
     </Pressable>
   );

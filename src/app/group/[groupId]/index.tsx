@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, UserPlus } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,10 +12,8 @@ import { OverviewTab, ScheduleTab } from '@/components/group/PlaceholderTabs';
 import { SettingsTab } from '@/components/group/SettingsTab';
 import { Badge, Button, Notice, SegmentedControl, Text } from '@/components/ui';
 import { APP_NAME } from '@/config/app';
-import { runGroupCommand } from '@/lib/groupCommand';
-import { groupCommandMessage } from '@/lib/groupErrors';
 import { activeMemberCount, memberCountLabel, myMember } from '@/lib/groupViews';
-import { GROUP_GONE, useGroup } from '@/lib/groups';
+import { GROUP_GONE, useGroup, useRunCommand } from '@/lib/groups';
 import { fetchGroupInviteToken, resetGroupInviteToken } from '@/lib/inviteLinks';
 import { useSession } from '@/lib/session';
 import { useTheme } from '@/theme';
@@ -32,7 +30,7 @@ function isTab(value: unknown): value is Tab {
   return TABS.some((t) => t.value === value);
 }
 
-/** A Group: header, segmented tabs, and the Members and Settings (membership) tabs. */
+/** A Group: header, segmented tabs, the setup checklist (Overview), Members and Settings. */
 export default function GroupScreen() {
   const { groupId, tab: tabParam } = useLocalSearchParams<{ groupId: string; tab?: string }>();
   const { colors, space, minTapTarget } = useTheme();
@@ -42,15 +40,7 @@ export default function GroupScreen() {
   const [inviting, setInviting] = useState(false);
   const tab: Tab = isTab(tabParam) ? tabParam : 'overview';
 
-  const run: RunCommand = useCallback(
-    async (command, action) => {
-      const result = await runGroupCommand(groupId, command);
-      if (!result.ok) return groupCommandMessage(result.reason, action);
-      await reload();
-      return null;
-    },
-    [groupId, reload],
-  );
+  const run: RunCommand = useRunCommand(groupId, reload);
 
   function back() {
     if (router.canGoBack()) router.back();
@@ -126,13 +116,13 @@ export default function GroupScreen() {
           />
         </View>
         <View style={{ paddingHorizontal: space.lg, gap: space.md }}>
-          {tab === 'overview' ? <OverviewTab group={data} isAdmin={isAdmin} /> : null}
+          {tab === 'overview' ? <OverviewTab group={data} isAdmin={isAdmin} onInvite={() => setInviting(true)} /> : null}
           {tab === 'schedule' ? <ScheduleTab /> : null}
           {tab === 'members' ? (
             <MembersTab group={data} accountId={accountId} isAdmin={isAdmin} run={run} onInvite={() => setInviting(true)} />
           ) : null}
           {tab === 'settings' ? (
-            <SettingsTab group={data} me={me} isAdmin={isAdmin} run={run} onInvite={() => setInviting(true)} />
+            <SettingsTab group={data} me={me} isAdmin={isAdmin} run={run} reload={reload} onInvite={() => setInviting(true)} />
           ) : null}
         </View>
         {/* Every Member can share the join link; only Admins can reset it. */}
