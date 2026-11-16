@@ -86,8 +86,16 @@ describe('redirectFor', () => {
     expect(redirectFor('onboarding', 'join')).toBe('/onboarding');
     expect(redirectFor('onboarding', 'group')).toBe('/onboarding');
     expect(redirectFor('auth', 'join')).toBe('/welcome');
+    expect(redirectFor('onboarding', 'join', '[token]')).toBe('/onboarding');
     expect(redirectFor('app', 'join')).toBeNull();
     expect(redirectFor('app', 'group')).toBeNull();
+  });
+
+  it('lets signed-out visitors open an invite link preview, but not the paste screen', () => {
+    expect(redirectFor('auth', 'join', '[token]')).toBeNull();
+    expect(redirectFor('auth', 'join', 'index')).toBe('/welcome');
+    expect(redirectFor('auth', 'join', undefined)).toBe('/welcome');
+    expect(redirectFor('auth', 'group', '[groupId]')).toBe('/welcome');
   });
 
   it('moves onboarded people out of sign-in and onboarding into the app', () => {

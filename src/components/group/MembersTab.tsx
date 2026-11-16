@@ -41,9 +41,9 @@ export function MembersTab({
           <MemberRow key={m.id} member={m} onPress={isAdmin ? () => setSelectedId(m.id) : undefined} />
         ))}
       </SettingsList>
+      <Button label="Invite people" variant="secondary" onPress={onInvite} />
       {isAdmin ? (
         <View style={{ gap: space.sm }}>
-          <Button label="Invite people" variant="secondary" onPress={onInvite} />
           <Button label="Add a Placeholder Member" variant="quiet" onPress={() => setAdding(true)} />
           <Text variant="caption" color="textSecondary">
             {"A Placeholder is someone you add by name before they join. They're rotated like anyone else, and keep their place when they join with their personal link."}

@@ -31,7 +31,9 @@ The app runs without a `.env` for now, because no screen talks to Supabase yet. 
 | `npm start` | Start the Expo dev server (press `w`, `a` or `i`, or scan the QR code with Expo Go) |
 | `npm run web` | Start the dev server and open the web build |
 | `npm run android` / `npm run ios` | Start and open on an emulator or simulator (iOS needs macOS) |
-| `npm run build:web` | Static web export to `dist/` |
+| `npm run web:export` | Web export to `dist/` (single-page app, plus the web app manifest and home-screen meta) |
+| `npm run deploy:web:preview` | Export, then deploy a preview to EAS Hosting (a `https://rotaloop--<id>.expo.app` URL) |
+| `npm run deploy:web` | Export, then deploy to production: https://rotaloop.expo.app |
 | `npm test` | Run the Vitest unit tests once (`npm run test:watch` to watch) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | `expo lint` (ESLint with eslint-config-expo) |
@@ -59,6 +61,17 @@ supabase/
 ## Theme
 
 `useTheme()` returns the light or dark token set, following the device setting: `colors`, `typography`, `space`, `radii` and `shadows`. Token names match `design/design-system.md`. Nunito Sans loads through `@expo-google-fonts/nunito-sans`, and the splash screen stays up until the fonts are ready. Icons come from `lucide-react-native`.
+
+## Website (EAS Hosting)
+
+The web build is live at **https://rotaloop.expo.app** for early sharing, with no app-store builds needed.
+
+- Run `npm run deploy:web:preview` to try a build at its own preview URL, then `npm run deploy:web` for production. Both use `npx eas-cli`, logged in to the Expo account that owns the project (run `npx eas-cli login` once).
+- **Environment:** `EXPO_PUBLIC_*` values are baked into the bundle at export time, from `.env`. Before deploying, `.env` needs `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` and `EXPO_PUBLIC_WEB_URL=https://rotaloop.expo.app` (invite links and QR codes use it). After changing `.env`, export and deploy again.
+- **Output:** `web.output: 'single'`. EAS Hosting serves `index.html` for any path, so deep links such as `/join/<token>` and `/group/<id>?tab=members` load directly. `scripts/web-postexport.ts` writes `manifest.json` and adds the home-screen meta to `index.html`. The name comes from `APP_NAME`, the colours from the theme tokens, and the icons from `public/icons`.
+- **Layout:** on wide screens the app stays in a centred column (`AppColumn`; the width is `appColumnMaxWidth` in the theme tokens). Bottom sheets and the tab bar use the same width.
+- **Notifications:** the website has no push yet, because Expo push doesn't reach browsers. Reminders show in the app (Home and Activity). Web push is a follow-up; on iOS it needs the site added to the Home Screen (iOS 16.4+).
+- The first deploy chose the subdomain with `--dev-domain rotaloop`. Expo reserves it for this project permanently.
 
 ## Supabase
 

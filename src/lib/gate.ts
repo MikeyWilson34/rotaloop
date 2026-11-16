@@ -47,16 +47,24 @@ const ALLOWED_SEGMENTS: Record<keyof typeof GATE_HOME, readonly string[]> = {
   auth: ['(auth)'],
   onboarding: ['(onboarding)', 'create-group'],
   // A join link opened mid-onboarding waits (see resumeInviteRoute in invite.ts), so
-  // `join` and `group` are app-only.
+  // `join` and `group` are app-only (apart from the signed-out invite preview below).
   app: ['(tabs)', 'create-group', 'group', 'join'],
 };
 
 /**
- * The route to replace the current one with, or null to stay. `firstSegment` is the first of
- * expo-router's `useSegments()` (undefined at the root, or e.g. "+not-found").
+ * The route to replace the current one with, or null to stay. `firstSegment` and
+ * `secondSegment` are the first two of expo-router's `useSegments()` (undefined at the root,
+ * or e.g. "+not-found").
  */
-export function redirectFor(gate: Gate, firstSegment: string | undefined): string | null {
+export function redirectFor(
+  gate: Gate,
+  firstSegment: string | undefined,
+  secondSegment?: string,
+): string | null {
   if (gate === 'loading' || gate === 'profileError') return null;
+  // A signed-out visitor may open an invite link (`/join/<token>`): it shows the Group's name
+  // and sends them to make a guest account. The invite is kept and resumes after onboarding.
+  if (gate === 'auth' && firstSegment === 'join' && secondSegment === '[token]') return null;
   if (firstSegment && ALLOWED_SEGMENTS[gate].includes(firstSegment)) return null;
   return GATE_HOME[gate];
 }

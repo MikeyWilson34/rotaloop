@@ -80,9 +80,7 @@ export function SettingsTab({
       <FieldLabel>People</FieldLabel>
       <SettingsList>
         <InfoRow icon={Shield} label="Admins" description={admins.join(', ')} />
-        {isAdmin ? (
-          <ActionRow icon={Link} label="Share invite link" description="Anyone with the link joins directly." onPress={onInvite} />
-        ) : null}
+        <ActionRow icon={Link} label="Share invite link" description="Anyone with the link joins directly." onPress={onInvite} />
         {isAdmin ? (
           <ActionRow
             icon={RotateCcw}

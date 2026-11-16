@@ -12,3 +12,4 @@ export * from './TextField';
 export * from './Badge';
 export * from './SegmentedControl';
 export * from './Sheet';
+export * from './AppColumn';

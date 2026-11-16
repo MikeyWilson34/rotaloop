@@ -18,7 +18,7 @@ import {
 import { ONBOARDING_STEPS } from '@/lib/gate';
 import { inviteUrl, NOT_AN_INVITE, parseInviteToken } from '@/lib/invite';
 import { clearPendingInvite, setPendingInvite, usePendingInvite } from '@/lib/pendingInvite';
-import { enablePushNotifications } from '@/lib/push';
+import { enablePushNotifications, PUSH_ON_THIS_PLATFORM, WEB_PUSH_NOTE } from '@/lib/push';
 import { useProfile, useSession } from '@/lib/session';
 import { isValidPhone, normalizePhone } from '@/lib/validation';
 import { useTheme, type ColorTokens } from '@/theme';
@@ -95,7 +95,8 @@ export default function OnboardingScreen() {
     setPhoneError(null);
     setBusy(true);
     let pushEnabled = push;
-    if (push) {
+    // On the website there is no push yet: no permission prompt.
+    if (push && PUSH_ON_THIS_PLATFORM) {
       // Ask the OS now, while the reason is on screen. A "no" turns push off here too.
       const result = await enablePushNotifications();
       if (result === 'denied') pushEnabled = false;
@@ -154,15 +155,19 @@ export default function OnboardingScreen() {
         title="Stay in the loop"
         lead="We'll remind you before your turns and let you know when someone needs cover. That's it: no noise."
         footer={<Button label="Continue" size="lg" loading={busy} onPress={saveNotifications} />}>
-        <SettingsList>
-          <SwitchRow
-            icon={Bell}
-            label="Push notifications"
-            description="Recommended. Reminders and Coverage Requests arrive on this device."
-            value={push}
-            onValueChange={setPush}
-          />
-        </SettingsList>
+        {PUSH_ON_THIS_PLATFORM ? (
+          <SettingsList>
+            <SwitchRow
+              icon={Bell}
+              label="Push notifications"
+              description="Recommended. Reminders and Coverage Requests arrive on this device."
+              value={push}
+              onValueChange={setPush}
+            />
+          </SettingsList>
+        ) : (
+          <Notice tone="info">{WEB_PUSH_NOTE}</Notice>
+        )}
         <FieldLabel>Also reach me by (optional)</FieldLabel>
         <SettingsList>
           <SwitchRow

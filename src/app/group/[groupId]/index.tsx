@@ -10,11 +10,11 @@ import type { RunCommand } from '@/components/group/MemberActionsSheet';
 import { MembersTab } from '@/components/group/MembersTab';
 import { OverviewTab, ScheduleTab } from '@/components/group/PlaceholderTabs';
 import { SettingsTab } from '@/components/group/SettingsTab';
-import { Badge, Button, Notice, SegmentedControl, Sheet, Text } from '@/components/ui';
+import { Badge, Button, Notice, SegmentedControl, Text } from '@/components/ui';
 import { APP_NAME } from '@/config/app';
 import { runGroupCommand } from '@/lib/groupCommand';
 import { groupCommandMessage } from '@/lib/groupErrors';
-import { activeMemberCount, adminNames, memberCountLabel, myMember, orList } from '@/lib/groupViews';
+import { activeMemberCount, memberCountLabel, myMember } from '@/lib/groupViews';
 import { GROUP_GONE, useGroup } from '@/lib/groups';
 import { fetchGroupInviteToken, resetGroupInviteToken } from '@/lib/inviteLinks';
 import { useSession } from '@/lib/session';
@@ -135,23 +135,16 @@ export default function GroupScreen() {
             <SettingsTab group={data} me={me} isAdmin={isAdmin} run={run} onInvite={() => setInviting(true)} />
           ) : null}
         </View>
+        {/* Every Member can share the join link; only Admins can reset it. */}
         <InviteSheet
-          visible={inviting && isAdmin}
+          visible={inviting}
           onClose={() => setInviting(false)}
           groupName={data.name}
           title="Invite people"
           message="Anyone with this link or QR code joins the group directly."
           loadToken={() => fetchGroupInviteToken(data.id)}
-          resetToken={() => resetGroupInviteToken(data.id)}
+          resetToken={isAdmin ? () => resetGroupInviteToken(data.id) : undefined}
           shareMessage={`Join ${data.name} on ${APP_NAME}:`}
-        />
-        <Sheet
-          visible={inviting && !isAdmin}
-          onClose={() => setInviting(false)}
-          overline={data.name}
-          title="Invite people"
-          message={`Only Admins can share the invite link. Ask ${orList(adminNames(data.state))} to send it to the person you'd like to invite.`}
-          footer={<Button label="OK" variant="quiet" onPress={() => setInviting(false)} />}
         />
       </>
     );
@@ -161,9 +154,10 @@ export default function GroupScreen() {
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.bg }}>
       {topBar}
       <ScrollView
-        contentContainerStyle={{ paddingBottom: space.huge, width: '100%', maxWidth: 720, alignSelf: 'center' }}
+        contentContainerStyle={{ paddingBottom: space.huge }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}>
         {body}
-      </ScrollView>    </SafeAreaView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }

@@ -695,6 +695,7 @@ export type Database = {
         Args: { p_group_id: string; p_member_id: string }
         Returns: string
       }
+      group_invite_link: { Args: { p_group_id: string }; Returns: string }
       group_state_rows: { Args: { p_group_id: string }; Returns: Json }
       invite_link_preview: {
         Args: { p_token: string }

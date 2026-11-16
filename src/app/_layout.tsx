@@ -13,7 +13,7 @@ import * as Linking from 'expo-linking';
 import { useEffect } from 'react';
 
 import { SignOutButton } from '@/components/SignOutButton';
-import { Button, FormScreen, Notice } from '@/components/ui';
+import { AppColumn, Button, FormScreen, Notice } from '@/components/ui';
 import { redirectFor } from '@/lib/gate';
 import { inviteTokenFromUrl, resumeInviteRoute } from '@/lib/invite';
 import { loadPendingInvite, setPendingInvite, usePendingInvite } from '@/lib/pendingInvite';
@@ -42,7 +42,9 @@ export default function RootLayout() {
     <SessionProvider>
       <ThemeProvider value={navigationTheme}>
         <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
-        <RootNavigator />
+        <AppColumn>
+          <RootNavigator />
+        </AppColumn>
       </ThemeProvider>
     </SessionProvider>
   );
@@ -64,7 +66,7 @@ function RootNavigator() {
   const pendingInvite = usePendingInvite();
   const url = Linking.useLinkingURL();
   const redirect = ready
-    ? (resumeInviteRoute(gate, pendingInvite, segments[0]) ?? redirectFor(gate, segments[0]))
+    ? (resumeInviteRoute(gate, pendingInvite, segments[0]) ?? redirectFor(gate, segments[0], segments[1]))
     : null;
 
   useEffect(() => {
@@ -83,8 +85,13 @@ function RootNavigator() {
     if (ready) SplashScreen.hideAsync();
   }, [ready]);
 
+  // Deferred a tick: when the gate changes, the navigator applies the new Stack.Protected
+  // guards after this render. Navigating at once to a screen that only just became allowed
+  // (e.g. resuming /join/<token> right after onboarding) would be refused and land on "/".
   useEffect(() => {
-    if (redirect) router.replace(redirect as Href);
+    if (!redirect) return;
+    const id = setTimeout(() => router.replace(redirect as Href), 0);
+    return () => clearTimeout(id);
   }, [redirect]);
 
   // The splash screen stays up until the session and profile are known.
@@ -108,6 +115,9 @@ function RootNavigator() {
       <Stack.Protected guard={gate === 'app'}>
         <Stack.Screen name="group/[groupId]/index" />
         <Stack.Screen name="join/index" />
+      </Stack.Protected>
+      {/* Signed out, an invite link shows the Group's name before making a guest account. */}
+      <Stack.Protected guard={gate === 'auth' || gate === 'app'}>
         <Stack.Screen name="join/[token]" />
       </Stack.Protected>
     </Stack>

@@ -27,7 +27,10 @@ const config: ExpoConfig = {
     predictiveBackGestureEnabled: false,
   },
   web: {
-    // Single-page app: the app is behind sign-in, so static pre-rendering buys nothing.
+    // Single-page app: EAS Hosting serves index.html for any path, so deep links such as
+    // /join/<token> load directly, and no page is rendered on a server (the app is behind
+    // sign-in). scripts/web-postexport.ts adds the manifest and home-screen meta to index.html.
+    // Deploy with npm run deploy:web (see README).
     output: 'single',
     favicon: './assets/images/favicon.png',
   },

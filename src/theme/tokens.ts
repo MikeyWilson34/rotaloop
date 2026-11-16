@@ -195,3 +195,9 @@ export type ShadowToken = keyof typeof shadows;
 
 /** Minimum hit area for anything tappable. */
 export const minTapTarget = 48;
+
+/**
+ * The app's column width on wide screens (web on a desktop or tablet): the app stays a
+ * phone-like column, centred on the page, instead of stretching across the window.
+ */
+export const appColumnMaxWidth = 600;

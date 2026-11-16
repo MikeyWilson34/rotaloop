@@ -238,6 +238,47 @@ describe('invite links', () => {
     expect(unknown.rows).toEqual([]);
   });
 
+  it('gives any active Member the current join link, and no one else', async () => {
+    const link = (account: string) =>
+      t.asUser(account, () =>
+        t.db.query<{ t: string | null }>('select public.group_invite_link($1) t', [GROUP_A]).then((r) => r.rows[0].t),
+      );
+    const current = await t.as('service_role', null, () =>
+      t.db
+        .query<{ token: string }>('select token from public.invite_links where group_id = $1 and member_id is null', [GROUP_A])
+        .then((r) => r.rows[0].token),
+    );
+    expect(await link(ANA)).toBe(current);
+    expect(await link(BEN)).toBe(current);
+    await expect(link(CAL)).rejects.toThrow(/Members only/);
+    await expect(link(OUT)).rejects.toThrow(/Members only/);
+    await expect(
+      t.as('anon', null, () => t.db.query('select public.group_invite_link($1)', [GROUP_A])),
+    ).rejects.toThrow(/permission denied/);
+
+    // After a reset, Members get the new link.
+    const fresh = await t.asUser(ANA, () =>
+      t.db.query<{ t: string }>('select public.reset_invite_link($1) t', [GROUP_A]).then((r) => r.rows[0].t),
+    );
+    expect(await link(BEN)).toBe(fresh);
+  });
+
+  it('previews an invite link for signed-out (anon) visitors: the Group name only', async () => {
+    const token = await t.asUser(BEN, () =>
+      t.db.query<{ t: string }>('select public.group_invite_link($1) t', [GROUP_A]).then((r) => r.rows[0].t),
+    );
+    const preview = await t.as('anon', null, () => t.db.query('select * from public.invite_link_preview($1)', [token]));
+    expect(preview.rows).toHaveLength(1);
+    expect(preview.rows[0]).toMatchObject({ group_id: GROUP_A, placeholder_name: null });
+    expect(Object.keys(preview.rows[0] as object).sort()).toEqual(['group_id', 'group_name', 'placeholder_name']);
+    const unknown = await t.as('anon', null, () => t.db.query('select * from public.invite_link_preview($1)', ['nope']));
+    expect(unknown.rows).toEqual([]);
+    // Still nothing else for anon.
+    await expect(t.as('anon', null, () => t.db.query('select public.claim_link_for($1, $2)', [GROUP_A, 'dee']))).rejects.toThrow(
+      /permission denied/,
+    );
+  });
+
   it('lets Admins rename the Group, and no one else', async () => {
     await t.asUser(ANA, () => t.db.query(`select public.update_group_details($1, ' Crew A ', 'America/Chicago')`, [GROUP_A]));
     const g = await t.asUser(BEN, () => t.db.query<{ name: string; time_zone: string }>('select name, time_zone from public.groups where id = $1', [GROUP_A]));

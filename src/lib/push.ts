@@ -15,6 +15,12 @@ import { supabase } from './supabase';
  *   Permission may still have been granted.
  * - `failed`: something went wrong getting or saving the token.
  */
+/** Expo push doesn't reach browsers; web push is a follow-up (iOS needs an installed PWA). */
+export const PUSH_ON_THIS_PLATFORM = Platform.OS !== 'web';
+
+/** Shown on the website where the push setting would be. */
+export const WEB_PUSH_NOTE = "Notifications on the website are coming soon; reminders will show in the app.";
+
 export type PushSetupResult = 'registered' | 'denied' | 'unsupported' | 'failed';
 
 /**
@@ -23,7 +29,7 @@ export type PushSetupResult = 'registered' | 'denied' | 'unsupported' | 'failed'
  */
 export async function enablePushNotifications(): Promise<PushSetupResult> {
   // Web push needs a service worker and VAPID keys; not part of the MVP.
-  if (Platform.OS === 'web') return 'unsupported';
+  if (!PUSH_ON_THIS_PLATFORM) return 'unsupported';
   try {
     if (Platform.OS === 'android') {
       // Android 13+ only shows the permission prompt once a channel exists.

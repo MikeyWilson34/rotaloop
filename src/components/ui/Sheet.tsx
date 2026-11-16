@@ -1,7 +1,7 @@
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useTheme } from '@/theme';
+import { appColumnMaxWidth, useTheme } from '@/theme';
 
 import { Text } from './Text';
 
@@ -58,7 +58,8 @@ export function Sheet({
           accessibilityViewIsModal
           style={{
             width: '100%',
-            maxWidth: 560,
+            // As wide as the app column, so on a desktop the sheet stays in the column.
+            maxWidth: appColumnMaxWidth,
             maxHeight: '92%',
             alignSelf: 'center',
             backgroundColor: colors.surface,

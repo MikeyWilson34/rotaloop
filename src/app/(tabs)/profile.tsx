@@ -34,7 +34,7 @@ import {
   normalizeTime,
   toggleReminderDay,
 } from '@/lib/notificationPrefs';
-import { enablePushNotifications } from '@/lib/push';
+import { enablePushNotifications, PUSH_ON_THIS_PLATFORM } from '@/lib/push';
 import { useProfile, useSession, type ProfilePatch } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import { initials, isValidPhone, joinName, normalizePhone, splitName } from '@/lib/validation';
@@ -255,9 +255,10 @@ export default function ProfileScreen() {
             <SwitchRow
               icon={Smartphone}
               label="Push notifications"
-              description="On by default"
-              value={profile.push_enabled}
+              description={PUSH_ON_THIS_PLATFORM ? 'On by default' : 'Not available on the website yet. Coming soon.'}
+              value={PUSH_ON_THIS_PLATFORM && profile.push_enabled}
               onValueChange={setPushEnabled}
+              disabled={!PUSH_ON_THIS_PLATFORM}
             />
             <SwitchRow
               icon={Mail}

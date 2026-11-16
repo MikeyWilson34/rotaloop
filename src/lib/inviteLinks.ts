@@ -7,17 +7,12 @@ import { supabase } from './supabase';
 const OFFLINE = "Couldn't load the invite link. Check your connection and try again.";
 const ADMINS_ONLY = 'Only Admins can share invite links.';
 
-/** The Group's join link token (Admins only, under RLS). */
+/** The Group's join link token (any active Member, via `group_invite_link`). */
 export async function fetchGroupInviteToken(groupId: string): Promise<string> {
-  const { data, error } = await supabase
-    .from('invite_links')
-    .select('token')
-    .eq('group_id', groupId)
-    .is('member_id', null)
-    .maybeSingle();
-  if (error) throw new Error(OFFLINE);
-  if (!data) throw new Error(ADMINS_ONLY);
-  return data.token;
+  const { data, error } = await supabase.rpc('group_invite_link', { p_group_id: groupId });
+  if (error) throw new Error(error.code === '42501' ? "You're no longer a Member of this group." : OFFLINE);
+  if (!data) throw new Error('This group has no invite link right now. Ask an Admin to reset it.');
+  return data;
 }
 
 /** Replaces the Group's join link (Admins only). Returns the new token. */
@@ -66,8 +61,11 @@ export async function previewInvite(token: string): Promise<InvitePreview> {
   if (error) throw new InvitePreviewError("Couldn't check that link. Check your connection and try again.", 'offline');
   const row = data?.[0];
   if (!row) throw new InvitePreviewError(INVITE_INVALID, 'invalid');
-  // Under RLS a Group's row is readable only by its active Members.
-  const { data: mine } = await supabase.from('groups').select('id').eq('id', row.group_id).maybeSingle();
+  // Under RLS a Group's row is readable only by its active Members (signed out: no one).
+  const { data: session } = await supabase.auth.getSession();
+  const { data: mine } = session.session
+    ? await supabase.from('groups').select('id').eq('id', row.group_id).maybeSingle()
+    : { data: null };
   return {
     groupId: row.group_id,
     groupName: row.group_name,
