@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GroupScheduleTab } from '@/components/group/GroupScheduleTab';
 import { GroupTile } from '@/components/group/GroupTile';
 import { InviteSheet } from '@/components/group/InviteSheet';
 import type { RunCommand } from '@/components/group/MemberActionsSheet';
 import { MembersTab } from '@/components/group/MembersTab';
-import { OverviewTab, ScheduleTab } from '@/components/group/PlaceholderTabs';
+import { OverviewTab } from '@/components/group/OverviewTab';
 import { SettingsTab } from '@/components/group/SettingsTab';
 import { Badge, Button, Notice, SegmentedControl, Text } from '@/components/ui';
 import { APP_NAME } from '@/config/app';
@@ -30,7 +31,7 @@ function isTab(value: unknown): value is Tab {
   return TABS.some((t) => t.value === value);
 }
 
-/** A Group: header, segmented tabs, the setup checklist (Overview), Members and Settings. */
+/** A Group: header, segmented tabs, Overview (setup or next Event, history), Schedule, Members and Settings. */
 export default function GroupScreen() {
   const { groupId, tab: tabParam } = useLocalSearchParams<{ groupId: string; tab?: string }>();
   const { colors, space, minTapTarget } = useTheme();
@@ -116,8 +117,10 @@ export default function GroupScreen() {
           />
         </View>
         <View style={{ paddingHorizontal: space.lg, gap: space.md }}>
-          {tab === 'overview' ? <OverviewTab group={data} isAdmin={isAdmin} onInvite={() => setInviting(true)} /> : null}
-          {tab === 'schedule' ? <ScheduleTab /> : null}
+          {tab === 'overview' ? (
+            <OverviewTab group={data} accountId={accountId} isAdmin={isAdmin} onInvite={() => setInviting(true)} />
+          ) : null}
+          {tab === 'schedule' ? <GroupScheduleTab group={data} accountId={accountId} /> : null}
           {tab === 'members' ? (
             <MembersTab group={data} accountId={accountId} isAdmin={isAdmin} run={run} onInvite={() => setInviting(true)} />
           ) : null}

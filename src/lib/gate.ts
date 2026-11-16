@@ -48,7 +48,7 @@ const ALLOWED_SEGMENTS: Record<keyof typeof GATE_HOME, readonly string[]> = {
   onboarding: ['(onboarding)', 'create-group'],
   // A join link opened mid-onboarding waits (see resumeInviteRoute in invite.ts), so
   // `join` and `group` are app-only (apart from the signed-out invite preview below).
-  app: ['(tabs)', 'create-group', 'group', 'join'],
+  app: ['(tabs)', 'create-group', 'group', 'assignment', 'join'],
 };
 
 /**

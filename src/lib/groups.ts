@@ -38,7 +38,7 @@ export const GROUP_GONE = "This group isn't available. You may have left it or b
  * Runs `load` now, on every refresh, and when the screen regains focus. Results from stale
  * runs are dropped.
  */
-function useLoader<T>(key: string | null, load: () => Promise<T>, failedMessage: string): Loadable<T> {
+export function useLoader<T>(key: string | null, load: () => Promise<T>, failedMessage: string): Loadable<T> {
   const [data, setData] = useState<T | null>(null);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +92,7 @@ function useLoader<T>(key: string | null, load: () => Promise<T>, failedMessage:
   };
 }
 
-class GoneError extends Error {}
+export class GoneError extends Error {}
 
 // ---------------------------------------------------------------------------
 // The person's Groups

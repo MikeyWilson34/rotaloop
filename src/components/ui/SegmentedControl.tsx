@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
 import { useTheme } from '@/theme';
@@ -5,7 +6,7 @@ import { useTheme } from '@/theme';
 import { Text } from './Text';
 
 export type SegmentedControlProps<T extends string> = {
-  options: readonly { value: T; label: string }[];
+  options: readonly { value: T; label: string; icon?: LucideIcon }[];
   value: T;
   onChange: (value: T) => void;
   accessibilityLabel?: string;
@@ -32,6 +33,8 @@ export function SegmentedControl<T extends string>({
       }}>
       {options.map((o) => {
         const selected = o.value === value;
+        const color = selected ? colors.text : colors.textSecondary;
+        const Icon = o.icon;
         return (
           <Pressable
             key={o.value}
@@ -44,6 +47,8 @@ export function SegmentedControl<T extends string>({
               flex: 1,
               minHeight: 42,
               borderRadius: 9,
+              flexDirection: 'row',
+              gap: 6,
               alignItems: 'center',
               justifyContent: 'center',
               paddingHorizontal: 4,
@@ -51,10 +56,8 @@ export function SegmentedControl<T extends string>({
               boxShadow: selected ? shadows.shadow1 : undefined,
             }}
             hitSlop={{ top: 3, bottom: 3 }}>
-            <Text
-              variant="subhead"
-              numberOfLines={1}
-              style={{ fontFamily: fonts.bold, color: selected ? colors.text : colors.textSecondary }}>
+            {Icon ? <Icon size={18} color={color} strokeWidth={1.75} /> : null}
+            <Text variant="subhead" numberOfLines={1} style={{ fontFamily: fonts.bold, color }}>
               {o.label}
             </Text>
           </Pressable>

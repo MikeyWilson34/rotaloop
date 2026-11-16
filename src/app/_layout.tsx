@@ -116,6 +116,7 @@ function RootNavigator() {
         <Stack.Screen name="group/[groupId]/index" />
         <Stack.Screen name="group/[groupId]/responsibility/[responsibilityId]" />
         <Stack.Screen name="group/[groupId]/series/[seriesId]" />
+        <Stack.Screen name="assignment/[groupId]/[assignmentId]" />
         <Stack.Screen name="join/index" />
       </Stack.Protected>
       {/* Signed out, an invite link shows the Group's name before making a guest account. */}

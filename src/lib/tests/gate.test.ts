@@ -89,6 +89,9 @@ describe('redirectFor', () => {
     expect(redirectFor('onboarding', 'join', '[token]')).toBe('/onboarding');
     expect(redirectFor('app', 'join')).toBeNull();
     expect(redirectFor('app', 'group')).toBeNull();
+    expect(redirectFor('app', 'assignment')).toBeNull();
+    expect(redirectFor('onboarding', 'assignment')).toBe('/onboarding');
+    expect(redirectFor('auth', 'assignment')).toBe('/welcome');
   });
 
   it('lets signed-out visitors open an invite link preview, but not the paste screen', () => {
