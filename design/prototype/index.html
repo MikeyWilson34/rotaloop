@@ -1,0 +1,1692 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rotaloop Prototype</title>
+<meta name="description" content="Clickable prototype of a mobile app for sharing recurring responsibilities fairly across a group.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400..800&display=swap" rel="stylesheet">
+<style>
+/* ===== Tokens (mirror design/design-system.md) ===== */
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface-alt:#F3EEE6; --border:#E8E1D6; --border-strong:#D8CFC1;
+  --text:#1F2D45; --text-2:#5F6673; --text-3:#686E79;
+  --navy:#1F2D45; --on-navy:#FFFFFF; --on-navy-2:#C7D0DD; --navy-raise:#2E3E5A;
+  --primary:#3A6894; --on-primary:#FFFFFF; --primary-tint:#E5EDF5;
+  --success:#4E7D5B; --on-success:#FFFFFF; --success-text:#3D6B4A; --success-tint:#E4EEE6;
+  --warning:#C98A2B; --warning-text:#8A5A0F; --warning-tint:#FBEED6;
+  --danger:#A9483F; --on-danger:#FFFFFF; --danger-text:#9C3F37; --danger-tint:#F7E2DE;
+  --neutral-tint:#ECEAE6;
+  --hero-confirm:#86BC95; --on-hero-confirm:#10213A; --hero-amber:#F2C46D; --hero-sage:#A9D4B3; --hero-red:#F2A196;
+  --shadow-1:0 1px 2px rgba(31,45,69,.06),0 2px 8px rgba(31,45,69,.05);
+  --shadow-2:0 4px 12px rgba(31,45,69,.08),0 12px 32px rgba(31,45,69,.10);
+  --shadow-3:0 -8px 32px rgba(31,45,69,.16);
+  --card-border:transparent;
+  --scrim:rgba(17,22,31,.45);
+  --stage:#EAE3D8; --stage-text:#1F2D45; --stage-2:#5F6673; --ctl-on:#FFFFFF; --chip-on:#1F2D45; --on-chip-on:#FFFFFF;
+  --acc-blue:#3A6894; --acc-blue-t:#E5EDF5; --acc-plum:#7A5A8C; --acc-plum-t:#EFE7F3;
+  --acc-clay:#A0603E; --acc-clay-t:#F6E8DF; --acc-teal:#2F7C7A; --acc-teal-t:#DFF0EE;
+  --av-s:45%; --av-l:88%; --av-fs:38%; --av-fl:30%;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11161F; --surface:#1A212C; --surface-alt:#232C3A; --border:#2C3646; --border-strong:#3B475A;
+    --text:#EEF1F6; --text-2:#A7B0BE; --text-3:#7F8999;
+    --navy:#22324D; --on-navy:#FFFFFF; --on-navy-2:#C7D0DD; --navy-raise:#2F4363;
+    --primary:#86AEDB; --on-primary:#0F1A2A; --primary-tint:#1F2E42;
+    --success:#93C4A0; --on-success:#0F1A2A; --success-text:#93C4A0; --success-tint:#1E3326;
+    --warning:#E6B567; --warning-text:#E6B567; --warning-tint:#3A2E17;
+    --danger:#EE958B; --on-danger:#0F1A2A; --danger-text:#EE958B; --danger-tint:#3D2220;
+    --neutral-tint:#262D38;
+    --shadow-1:none; --shadow-2:0 8px 24px rgba(0,0,0,.35); --shadow-3:0 -8px 32px rgba(0,0,0,.5);
+    --card-border:#2C3646; --scrim:rgba(0,0,0,.55);
+    --stage:#0B0F15; --stage-text:#EEF1F6; --stage-2:#A7B0BE; --ctl-on:#2C3646; --chip-on:#86AEDB; --on-chip-on:#0F1A2A;
+    --acc-blue:#86AEDB; --acc-blue-t:#1F2E42; --acc-plum:#C3A6D3; --acc-plum-t:#2E2436;
+    --acc-clay:#E3A88A; --acc-clay-t:#382820; --acc-teal:#86CBC8; --acc-teal-t:#1A3332;
+    --av-s:25%; --av-l:27%; --av-fs:55%; --av-fl:82%;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11161F; --surface:#1A212C; --surface-alt:#232C3A; --border:#2C3646; --border-strong:#3B475A;
+  --text:#EEF1F6; --text-2:#A7B0BE; --text-3:#7F8999;
+  --navy:#22324D; --on-navy:#FFFFFF; --on-navy-2:#C7D0DD; --navy-raise:#2F4363;
+  --primary:#86AEDB; --on-primary:#0F1A2A; --primary-tint:#1F2E42;
+  --success:#93C4A0; --on-success:#0F1A2A; --success-text:#93C4A0; --success-tint:#1E3326;
+  --warning:#E6B567; --warning-text:#E6B567; --warning-tint:#3A2E17;
+  --danger:#EE958B; --on-danger:#0F1A2A; --danger-text:#EE958B; --danger-tint:#3D2220;
+  --neutral-tint:#262D38;
+  --shadow-1:none; --shadow-2:0 8px 24px rgba(0,0,0,.35); --shadow-3:0 -8px 32px rgba(0,0,0,.5);
+  --card-border:#2C3646; --scrim:rgba(0,0,0,.55);
+  --stage:#0B0F15; --stage-text:#EEF1F6; --stage-2:#A7B0BE; --ctl-on:#2C3646; --chip-on:#86AEDB; --on-chip-on:#0F1A2A;
+  --acc-blue:#86AEDB; --acc-blue-t:#1F2E42; --acc-plum:#C3A6D3; --acc-plum-t:#2E2436;
+  --acc-clay:#E3A88A; --acc-clay-t:#382820; --acc-teal:#86CBC8; --acc-teal-t:#1A3332;
+  --av-s:25%; --av-l:27%; --av-fs:55%; --av-fl:82%;
+  color-scheme: dark;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--stage);color:var(--text);font-family:"Nunito Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;text-align:inherit}
+button:focus-visible,[tabindex]:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+svg{display:block;flex:none}
+
+/* ===== Stage / phone frame ===== */
+.stage{min-height:100vh;display:flex;align-items:center;justify-content:center;gap:48px;padding:32px 24px}
+.controls{width:280px;color:var(--stage-text);display:flex;flex-direction:column;gap:20px}
+.controls h1{font-size:22px;line-height:28px;margin:0;font-weight:800;display:flex;align-items:center;gap:10px}
+.controls .logo{width:36px;height:36px;border-radius:11px;background:var(--navy);color:#fff;display:grid;place-items:center}
+.controls p{margin:0;color:var(--stage-2);font-size:14px;line-height:20px}
+.ctl-label{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--stage-2);margin-bottom:6px}
+.ctl-seg{display:flex;background:color-mix(in srgb,var(--stage-text) 8%,transparent);border-radius:12px;padding:3px;gap:2px}
+.ctl-seg button{flex:1;min-height:40px;border-radius:9px;font-size:13px;font-weight:700;text-align:center;color:var(--stage-2);padding:0 8px}
+.ctl-seg button[aria-pressed="true"]{background:var(--ctl-on);color:var(--text);box-shadow:var(--shadow-1)}
+.ctl-reset{font-size:13px;font-weight:700;color:var(--stage-2);text-decoration:underline;align-self:flex-start;min-height:32px}
+.phone{width:390px;height:844px;flex:none;border-radius:56px;padding:11px;background:#0E1219;box-shadow:0 30px 80px rgba(20,25,35,.35),inset 0 0 0 2px #2A303B}
+.screen{position:relative;width:100%;height:100%;border-radius:46px;overflow:hidden;background:var(--bg);display:flex;flex-direction:column;isolation:isolate}
+.statusbar{height:50px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 30px 0 34px;font-size:15px;font-weight:800;color:var(--text);position:relative;z-index:6;background:var(--bg)}
+.statusbar .island{position:absolute;left:50%;top:11px;transform:translateX(-50%);width:120px;height:34px;border-radius:20px;background:#0E1219}
+.statusbar .sb-icons{display:flex;gap:6px;align-items:center}
+@media (max-width:760px){
+  .stage{display:block;padding:0;min-height:0;height:100dvh;display:flex;flex-direction:column;gap:0}
+  .controls{width:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 16px;background:var(--stage);border-bottom:1px solid var(--border)}
+  .controls h1,.controls p,.controls .ctl-label{display:none}
+  .controls .ctl-group{flex:1 1 140px}
+  .ctl-seg button{min-height:34px;font-size:12px}
+  .ctl-reset{min-height:34px}
+  .phone{width:100%;height:auto;flex:1;min-height:0;border-radius:0;padding:0;background:none;box-shadow:none}
+  .screen{border-radius:0}
+  .statusbar{display:none}
+}
+
+/* ===== App chrome ===== */
+.view{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:24px}
+.view::-webkit-scrollbar{display:none}
+.tabbar{flex:none;display:flex;background:var(--surface);border-top:1px solid var(--border);padding:6px 6px 22px;position:relative;z-index:5}
+@media (max-width:760px){.tabbar{padding-bottom:max(8px,env(safe-area-inset-bottom))}}
+.tab{flex:1;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:700;color:var(--text-3);position:relative;border-radius:12px}
+.tab[aria-current="page"]{color:var(--text)}
+.tab[aria-current="page"] .tab-ic{background:var(--primary-tint)}
+.tab-ic{width:52px;height:30px;border-radius:15px;display:grid;place-items:center;transition:background .2s}
+.tab .badge{position:absolute;top:2px;left:calc(50% + 8px);min-width:18px;height:18px;border-radius:9px;background:var(--danger);color:var(--on-danger);font-size:11px;line-height:18px;text-align:center;padding:0 5px;font-weight:800}
+
+.pad{padding:0 16px}
+.lt-head{padding:8px 16px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.lt-head h1{font-size:28px;line-height:34px;font-weight:800;margin:0;letter-spacing:-.01em}
+.lt-head .sub{font-size:14px;color:var(--text-2);font-weight:600}
+.navbar{position:sticky;top:0;z-index:4;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:flex;align-items:center;gap:4px;padding:4px 8px;min-height:56px}
+.navbar .title{flex:1;text-align:center;font-weight:800;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.icon-btn{width:48px;height:48px;border-radius:24px;display:grid;place-items:center;color:var(--text);flex:none}
+.icon-btn:active{background:var(--surface-alt)}
+.icon-btn.ghost{color:var(--primary)}
+
+.section{margin-top:28px}
+.sec-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 16px;margin-bottom:12px}
+.sec-head h2{font-size:18px;line-height:24px;font-weight:800;margin:0;display:flex;align-items:center;gap:8px}
+.sec-head .link{font-size:14px;font-weight:700;color:var(--primary);min-height:40px;display:flex;align-items:center}
+.count{min-width:22px;height:22px;border-radius:11px;background:var(--warning-tint);color:var(--warning-text);font-size:12px;font-weight:800;display:inline-grid;place-items:center;padding:0 6px}
+.overline{font-size:12px;line-height:16px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)}
+
+.card{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow-1);border:1px solid var(--card-border)}
+.stack{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;align-items:center;gap:12px}
+.grow{flex:1;min-width:0}
+.muted{color:var(--text-2)}
+.small{font-size:14px;line-height:20px}
+.xs{font-size:13px;line-height:18px}
+.b{font-weight:700}
+.bb{font-weight:800}
+.ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tap{cursor:pointer;transition:transform .12s}
+.tap:active{transform:scale(.985)}
+
+/* Pills / chips */
+.pill{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px 0 8px;border-radius:999px;font-size:13px;font-weight:700;white-space:nowrap;flex:none}
+.pill.ok{background:var(--success-tint);color:var(--success-text)}
+.pill.warn{background:var(--warning-tint);color:var(--warning-text)}
+.pill.bad{background:var(--danger-tint);color:var(--danger-text)}
+.pill.info{background:var(--primary-tint);color:var(--primary)}
+.pill.neutral{background:var(--neutral-tint);color:var(--text-2)}
+.pill.admin{background:var(--primary-tint);color:var(--primary);height:22px;font-size:12px;padding:0 8px 0 6px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chips.scroll{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:0 16px;margin:0}
+.chips.scroll::-webkit-scrollbar{display:none}
+.chip{min-height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--border-strong);background:var(--surface);font-size:14px;font-weight:700;color:var(--text);display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex:none}
+.chip[aria-pressed="true"]{background:var(--chip-on);border-color:var(--chip-on);color:var(--on-chip-on)}
+.chip .n{font-size:12px;opacity:.8}
+
+/* Buttons */
+.btn{min-height:48px;padding:0 16px;border-radius:var(--r-md);font-weight:800;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-align:center;transition:transform .12s,filter .12s}
+.btn:active{transform:scale(.98);filter:brightness(.94)}
+.btn.lg{min-height:56px;font-size:16px;padding:0 20px;border-radius:14px}
+.btn.sm{min-height:40px;font-size:14px;padding:0 14px;border-radius:10px;position:relative}
+.btn.sm::after{content:"";position:absolute;inset:-4px 0}
+.btn.block{width:100%}
+.btn.primary{background:var(--primary);color:var(--on-primary)}
+.btn.positive{background:var(--success);color:var(--on-success)}
+.btn.danger{background:var(--danger);color:var(--on-danger)}
+.btn.secondary{background:var(--surface);color:var(--text);border:1.5px solid var(--border-strong)}
+.btn.quiet{color:var(--primary);padding:0 8px}
+.btn[disabled]{opacity:.4;pointer-events:none}
+.btn-row{display:flex;gap:10px}
+.btn-row>.btn{flex:1}
+
+/* Avatars */
+.av{--h:210;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:800;background:hsl(var(--h) var(--av-s) var(--av-l));color:hsl(var(--h) var(--av-fs) var(--av-fl));flex:none;letter-spacing:.02em}
+.av.sm{width:28px;height:28px;font-size:11px}
+.av.lg{width:64px;height:64px;font-size:22px}
+.av-stack{display:flex}
+.av-stack .av{box-shadow:0 0 0 2px var(--surface);margin-left:-8px}
+.av-stack .av:first-child{margin-left:0}
+
+/* Group tile */
+.gtile{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;flex:none}
+.gtile.sm{width:32px;height:32px;border-radius:10px}
+.gtile.lg{width:56px;height:56px;border-radius:16px}
+.acc-blue{background:var(--acc-blue-t);color:var(--acc-blue)}
+.acc-plum{background:var(--acc-plum-t);color:var(--acc-plum)}
+.acc-clay{background:var(--acc-clay-t);color:var(--acc-clay)}
+.acc-teal{background:var(--acc-teal-t);color:var(--acc-teal)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.dot.acc-blue{background:var(--acc-blue)}.dot.acc-plum{background:var(--acc-plum)}.dot.acc-clay{background:var(--acc-clay)}.dot.acc-teal{background:var(--acc-teal)}
+
+/* Home */
+.greet{padding:8px 16px 16px;display:flex;align-items:center;gap:12px}
+.greet .hello{font-size:26px;line-height:32px;font-weight:800;margin:0;letter-spacing:-.01em}
+.hero{margin:0 16px;background:var(--navy);color:var(--on-navy);border-radius:var(--r-xl);padding:20px;box-shadow:var(--shadow-2);position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;top:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(134,174,219,.22),transparent 70%);pointer-events:none}
+.hero .overline{color:var(--on-navy-2)}
+.hero-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hero .gname{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--on-navy-2)}
+.hero .gtile{background:rgba(255,255,255,.12);color:#fff}
+.hero h3{font-size:30px;line-height:36px;font-weight:800;margin:14px 0 2px;letter-spacing:-.01em}
+.hero .when{font-size:16px;font-weight:700}
+.hero .when2{font-size:14px;color:var(--on-navy-2);margin-top:2px}
+.hero .pill{background:rgba(255,255,255,.12);color:#fff}
+.hero .pill.warn svg{color:var(--hero-amber)}
+.hero .pill.ok svg{color:var(--hero-sage)}
+.hero .pill.bad svg,.hero .pill.info svg{color:var(--hero-red)}
+.hero .with{display:flex;align-items:center;gap:10px;margin-top:16px;font-size:14px;color:var(--on-navy-2)}
+.hero .av-stack .av{box-shadow:0 0 0 2px var(--navy)}
+.hero .actions{display:flex;gap:10px;margin-top:20px;position:relative;z-index:1}
+.hero .actions .btn{flex:1}
+.btn.hero-yes{background:var(--hero-confirm);color:var(--on-hero-confirm)}
+.btn.hero-no{background:var(--navy-raise);color:#fff}
+.hero .done{margin-top:20px;display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.08);border-radius:14px;padding:12px 14px;font-size:14px;line-height:20px;position:relative;z-index:1}
+.hero .done .ck{width:32px;height:32px;border-radius:50%;background:var(--hero-confirm);color:var(--on-hero-confirm);display:grid;place-items:center;flex:none}
+.hero-empty{margin:0 16px;padding:24px;text-align:center}
+
+.att{display:flex;gap:12px;padding:14px 14px 14px 16px;position:relative;overflow:hidden}
+.att::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+.att.t-bad::before{background:var(--danger)}
+.att.t-warn::before{background:var(--warning)}
+.att.t-info::before{background:var(--primary)}
+.att-ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none}
+.t-bad .att-ic{background:var(--danger-tint);color:var(--danger-text)}
+.t-warn .att-ic{background:var(--warning-tint);color:var(--warning-text)}
+.t-info .att-ic{background:var(--primary-tint);color:var(--primary)}
+.t-ok .att-ic{background:var(--success-tint);color:var(--success-text)}
+.t-neutral .att-ic{background:var(--neutral-tint);color:var(--text-2)}
+.att .ttl{font-weight:800;font-size:15px;line-height:21px}
+.att .sub{font-size:14px;line-height:20px;color:var(--text-2);margin-top:2px}
+.att .acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.caught{display:flex;align-items:center;gap:10px;margin:0 16px;padding:14px 16px;border-radius:var(--r-lg);background:var(--success-tint);color:var(--success-text);font-weight:700;font-size:14px}
+
+.gcard{padding:14px 14px 14px 14px;display:flex;align-items:center;gap:12px;min-height:72px}
+.gcard .nm{font-weight:800;font-size:16px;line-height:22px}
+.gcard .meta{font-size:14px;line-height:20px;color:var(--text-2)}
+.gcard .right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.issue{font-size:12px;font-weight:800;color:var(--warning-text);display:flex;align-items:center;gap:4px}
+.chev{color:var(--text-3)}
+
+.admin-box{margin:0 16px;padding:4px 0 0;}
+.ahealth{padding:14px;display:flex;flex-direction:column;gap:12px}
+.ahealth .top{display:flex;align-items:center;gap:12px}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.stat{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:var(--surface-alt);font-size:13px;line-height:18px;font-weight:700;color:var(--text-2);min-height:40px}
+.stat b{font-size:15px;color:var(--text)}
+.stat.bad{background:var(--danger-tint);color:var(--danger-text)}.stat.bad b{color:var(--danger-text)}
+.stat.warn{background:var(--warning-tint);color:var(--warning-text)}.stat.warn b{color:var(--warning-text)}
+.stat.info{background:var(--primary-tint);color:var(--primary)}.stat.info b{color:var(--primary)}
+.quick{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 16px}
+.quick .card{padding:14px;display:flex;flex-direction:column;gap:10px;min-height:96px}
+
+/* Lists */
+.list{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow-1);border:1px solid var(--card-border);overflow:hidden}
+.li{display:flex;align-items:center;gap:12px;padding:12px 16px;min-height:60px}
+.li+.li{border-top:1px solid var(--border)}
+.li .t{font-weight:700;font-size:15px;line-height:21px}
+.li .s{font-size:13px;line-height:18px;color:var(--text-2)}
+.li-ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--surface-alt);color:var(--text-2);flex:none}
+
+/* Segmented */
+.seg{display:flex;background:var(--surface-alt);border-radius:12px;padding:3px;gap:2px;margin:0 16px}
+.seg button{flex:1;min-height:42px;border-radius:9px;font-size:14px;font-weight:700;color:var(--text-2);display:flex;align-items:center;justify-content:center;gap:6px}
+.seg button[aria-selected="true"]{background:var(--surface);color:var(--text);box-shadow:var(--shadow-1)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .seg button[aria-selected="true"]{background:var(--border-strong)}}
+:root[data-theme="dark"] .seg button[aria-selected="true"]{background:var(--border-strong)}
+
+/* Schedule */
+.week-h{padding:0 16px;margin:24px 0 10px;display:flex;align-items:baseline;justify-content:space-between}
+.week-h h3{margin:0;font-size:15px;font-weight:800}
+.week-h span{font-size:13px;color:var(--text-3);font-weight:700}
+.sitem{display:flex;gap:14px;padding:14px;align-items:center}
+.datebox{width:52px;flex:none;text-align:center;border-radius:12px;background:var(--surface-alt);padding:6px 0}
+.datebox .m{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-2)}
+.datebox .d{font-size:22px;line-height:26px;font-weight:800}
+.datebox.me{background:var(--primary-tint);color:var(--primary)}
+.datebox.me .m{color:var(--primary)}
+.skipcard{border:1.5px dashed var(--border-strong);background:repeating-linear-gradient(135deg,transparent 0 10px,color-mix(in srgb,var(--surface-alt) 70%,transparent) 10px 20px);border-radius:var(--r-lg);box-shadow:none}
+.skipcard .datebox{background:transparent;border:1.5px dashed var(--border-strong);color:var(--text-3)}
+.skipcard .datebox .d{text-decoration:line-through;text-decoration-thickness:2px}
+.roles{display:flex;flex-direction:column;gap:2px;margin-top:8px}
+.rrow{display:flex;align-items:center;gap:10px;min-height:40px;padding:4px 0;font-size:14px}
+.rrow .rn{width:96px;flex:none;color:var(--text-2);font-weight:600;font-size:13px}
+.rrow .pn{flex:1;min-width:0;font-weight:700}
+.sdot{width:10px;height:10px;border-radius:50%;flex:none}
+.sdot.ok{background:var(--success)}.sdot.warn{background:var(--warning)}.sdot.bad{background:var(--danger)}.sdot.info{background:var(--primary)}.sdot.neutral{background:var(--border-strong)}
+
+/* Calendar */
+.cal{margin:0 16px;padding:12px}
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.cal-head .mt{font-weight:800;font-size:17px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-dow{font-size:12px;font-weight:800;color:var(--text-3);text-align:center;padding:4px 0}
+.cday{aspect-ratio:1/1.05;min-height:44px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:15px;font-weight:700;position:relative}
+.cday.out{color:var(--text-3);opacity:.45}
+.cday.today .num{box-shadow:0 0 0 2px var(--primary);border-radius:50%}
+.cday .num{width:30px;height:30px;display:grid;place-items:center;border-radius:50%}
+.cday.mine .num{background:var(--primary);color:var(--on-primary)}
+.cday.sel{background:var(--primary-tint)}
+.cday .dots{display:flex;gap:2px;height:6px}
+.cday .dots .dot{width:6px;height:6px}
+.cday.skip .num{text-decoration:line-through;color:var(--text-3)}
+.cday.skip::after{content:"";position:absolute;inset:4px;border:1.5px dashed var(--border-strong);border-radius:10px;pointer-events:none}
+.cday.unav{background:repeating-linear-gradient(135deg,var(--danger-tint) 0 5px,transparent 5px 9px);color:var(--danger-text)}
+.cday.pick .num{background:var(--danger);color:var(--on-danger)}
+.cday.rangestart .num{box-shadow:0 0 0 2px var(--danger)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;padding:10px 4px 2px;font-size:12px;font-weight:700;color:var(--text-2)}
+.legend span{display:flex;align-items:center;gap:6px}
+.lg-sw{width:14px;height:14px;border-radius:4px}
+
+/* Group screen */
+.ghead{padding:4px 16px 16px;display:flex;align-items:center;gap:14px}
+.ghead h1{font-size:22px;line-height:28px;margin:0;font-weight:800}
+.sticky-seg{position:sticky;top:56px;z-index:3;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:4px 0 10px}
+.bar{height:8px;border-radius:4px;background:var(--surface-alt);overflow:hidden;display:flex}
+.bar i{display:block;height:100%}
+.bar .b1{background:var(--primary)}
+.bar .b2{background:color-mix(in srgb,var(--primary) 45%,transparent)}
+.bar .b3{background:var(--success)}
+.set-row{display:flex;align-items:center;gap:12px;padding:12px 16px;min-height:60px}
+.set-row+.set-row{border-top:1px solid var(--border)}
+.set-row .val{color:var(--text-2);font-weight:700;font-size:14px;text-align:right}
+.switch{width:52px;height:32px;border-radius:16px;background:var(--border-strong);position:relative;flex:none;transition:background .2s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .2s}
+.switch[aria-checked="true"]{background:var(--success)}
+.switch[aria-checked="true"]::after{transform:translateX(20px)}
+.switch[disabled]{opacity:.55;cursor:default}
+.note{display:flex;gap:10px;padding:12px 14px;border-radius:var(--r-md);background:var(--primary-tint);color:var(--text);font-size:14px;line-height:20px}
+.note svg{color:var(--primary);margin-top:1px}
+.note.warn{background:var(--warning-tint)}.note.warn svg{color:var(--warning-text)}
+.note.bad{background:var(--danger-tint)}.note.bad svg{color:var(--danger-text)}
+.note.ok{background:var(--success-tint)}.note.ok svg{color:var(--success-text)}
+
+/* Detail */
+.dhead{margin:0 16px;padding:20px}
+.dhead h1{font-size:28px;line-height:34px;margin:12px 0 4px;font-weight:800}
+.kv{display:flex;align-items:center;gap:12px;padding:12px 0}
+.kv+.kv{border-top:1px solid var(--border)}
+.kv .k{font-size:13px;color:var(--text-2);font-weight:700}
+.kv .v{font-weight:700}
+.timeline{position:relative;padding-left:22px}
+.timeline::before{content:"";position:absolute;left:6px;top:8px;bottom:8px;width:2px;background:var(--border)}
+.tl{position:relative;padding:6px 0 10px}
+.tl::before{content:"";position:absolute;left:-21px;top:12px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--border-strong)}
+.tl.ok::before{border-color:var(--success);background:var(--success)}
+.tl.bad::before{border-color:var(--danger);background:var(--danger)}
+.tl.info::before{border-color:var(--primary);background:var(--primary)}
+.tl.warn::before{border-color:var(--warning);background:var(--warning)}
+
+/* Activity */
+.act{display:flex;gap:12px;padding:14px 16px;position:relative}
+.act+.act{border-top:1px solid var(--border)}
+.act .txt{font-size:15px;line-height:21px}
+.act .when{font-size:13px;color:var(--text-3);margin-top:3px;font-weight:600;display:flex;align-items:center;gap:6px}
+.act .unread{position:absolute;right:16px;top:20px;width:8px;height:8px;border-radius:50%;background:var(--primary)}
+
+/* Sheet */
+.sheet-layer{position:absolute;inset:0;z-index:20;pointer-events:none}
+.sheet-layer.open{pointer-events:auto}
+.scrim{position:absolute;inset:0;background:var(--scrim);opacity:0;transition:opacity .25s}
+.sheet-layer.open .scrim{opacity:1}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-height:92%;background:var(--surface);border-radius:24px 24px 0 0;box-shadow:var(--shadow-3);transform:translateY(100%);transition:transform .3s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
+.sheet-layer.open .sheet{transform:none}
+.sheet.tall{height:92%}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--border-strong);margin:8px auto 4px;flex:none}
+.sheet-body{overflow-y:auto;padding:8px 20px 16px;flex:1}
+.sheet-foot{padding:12px 20px 28px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;flex:none}
+.sheet h2{font-size:22px;line-height:28px;margin:4px 0 6px;font-weight:800}
+.field-label{font-size:13px;font-weight:800;color:var(--text-2);margin:20px 0 8px}
+textarea,input[type=text]{width:100%;border:1.5px solid var(--border-strong);background:var(--surface-alt);border-radius:12px;padding:12px 14px;font:inherit;font-size:16px;color:var(--text);resize:none}
+.steps{display:flex;gap:6px;margin:6px 0 10px}
+.steps i{flex:1;height:4px;border-radius:2px;background:var(--border)}
+.steps i.on{background:var(--primary)}
+.opt{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1.5px solid var(--border);border-radius:14px;min-height:60px;width:100%}
+.opt[aria-pressed="true"]{border-color:var(--primary);background:var(--primary-tint)}
+.opt .radio{width:22px;height:22px;border-radius:50%;border:2px solid var(--border-strong);flex:none;display:grid;place-items:center}
+.opt[aria-pressed="true"] .radio{border-color:var(--primary)}
+.opt[aria-pressed="true"] .radio::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--primary)}
+.diff{display:flex;align-items:center;gap:8px;font-size:14px;min-height:36px}
+.diff .rn{width:84px;flex:none;color:var(--text-2);font-weight:600;font-size:13px}
+.diff .old{color:var(--text-3);text-decoration:line-through;min-width:0}
+.diff .new{font-weight:800;min-width:0}
+.diff .arrow{color:var(--text-3)}
+.me-hl{background:var(--warning-tint);color:var(--warning-text);border-radius:6px;padding:0 4px}
+.qr{width:168px;height:168px;margin:16px auto;display:grid;grid-template-columns:repeat(21,1fr);padding:10px;background:#fff;border-radius:16px;border:1px solid var(--border)}
+.qr i{background:#1F2D45}.qr b{background:transparent}
+
+/* Toast */
+.toast{position:absolute;left:16px;right:16px;bottom:104px;z-index:30;background:var(--text);color:var(--bg);border-radius:14px;padding:14px 16px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:10px;opacity:0;transform:translateY(12px);transition:all .25s;pointer-events:none;box-shadow:var(--shadow-2)}
+.toast.show{opacity:1;transform:none}
+@media (max-width:760px){.toast{bottom:96px}}
+.fade-in{animation:fi .22s ease-out}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.empty{padding:32px 24px;text-align:center;color:var(--text-2)}
+.spacer{height:16px}
+
+/* ===== v0.2 additions ===== */
+.ctl-btns{display:flex;flex-direction:column;gap:6px}
+.ctl-btn{min-height:40px;border-radius:10px;padding:0 12px;font-size:13px;font-weight:700;color:var(--stage-text);background:color-mix(in srgb,var(--stage-text) 8%,transparent);display:flex;align-items:center;gap:8px;text-align:left}
+.ctl-btn:active{transform:scale(.98)}
+@media (max-width:760px){.ctl-btns{flex-direction:row;flex-wrap:wrap;flex:1 1 100%}.ctl-btn{min-height:34px;font-size:12px}}
+.mgcard{padding:14px;display:flex;flex-direction:column;gap:12px}
+.mgcard .top{display:flex;align-items:center;gap:12px}
+.stat.replace{background:var(--danger-tint);color:var(--danger-text)}
+.debt{display:flex;gap:10px;padding:12px 14px;border-radius:var(--r-md);background:var(--primary-tint);font-size:14px;line-height:20px}
+.debt svg{color:var(--primary);margin-top:1px}
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;color:var(--primary);background:var(--primary-tint);border-radius:6px;padding:1px 6px;margin-right:4px}
+.or{display:flex;align-items:center;gap:10px;color:var(--text-3);font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin:18px 0 10px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--border)}
+/* Onboarding */
+.onb-layer{position:absolute;inset:0;z-index:40;background:var(--bg);display:none;flex-direction:column}
+.onb-layer.open{display:flex}
+.onb-top{display:flex;align-items:center;gap:8px;padding:56px 8px 8px;min-height:64px}
+@media (max-width:760px){.onb-top{padding-top:8px}}
+.onb-dots{flex:1;display:flex;justify-content:center;gap:6px}
+.onb-dots i{width:8px;height:8px;border-radius:4px;background:var(--border-strong);transition:width .2s}
+.onb-dots i.on{width:24px;background:var(--primary)}
+.onb-body{flex:1;overflow-y:auto;padding:12px 24px 16px}
+.onb-body h1{font-size:28px;line-height:34px;font-weight:800;margin:0 0 8px;letter-spacing:-.01em}
+.onb-body p.lead{font-size:16px;line-height:24px;color:var(--text-2);margin:0}
+.onb-foot{padding:12px 24px 32px;display:flex;flex-direction:column;gap:8px}
+.onb-hero{width:88px;height:88px;border-radius:26px;background:var(--navy);color:#fff;display:grid;place-items:center;margin:24px 0 28px;box-shadow:var(--shadow-2)}
+.feat{display:flex;gap:14px;align-items:flex-start;padding:12px 0}
+.feat .li-ic{background:var(--primary-tint);color:var(--primary)}
+.choice{display:flex;gap:14px;align-items:flex-start;padding:16px;border-radius:var(--r-lg);border:1.5px solid var(--border);background:var(--surface);width:100%;text-align:left}
+.choice[aria-pressed="true"]{border-color:var(--primary);background:var(--primary-tint)}
+</style>
+</head>
+<body>
+<div class="stage">
+  <aside class="controls" aria-label="Prototype controls">
+    <h1><span class="logo" id="logo"></span><span id="brandName">Rotaloop</span></h1>
+    <p>Clickable draft (v0.2, approved domain model). Use these controls to see how the app adapts. Everything resets on reload.</p>
+    <div class="ctl-group">
+      <div class="ctl-label">Viewing as</div>
+      <div class="ctl-seg" role="group" aria-label="Persona">
+        <button data-ctl="persona" data-v="member">Member</button>
+        <button data-ctl="persona" data-v="admin">Admin of 2 groups</button>
+      </div>
+    </div>
+    <div class="ctl-group">
+      <div class="ctl-label">Appearance</div>
+      <div class="ctl-seg" role="group" aria-label="Theme">
+        <button data-ctl="theme" data-v="auto">Auto</button>
+        <button data-ctl="theme" data-v="light">Light</button>
+        <button data-ctl="theme" data-v="dark">Dark</button>
+      </div>
+    </div>
+    <div class="ctl-group">
+      <div class="ctl-label">Simulate</div>
+      <div class="ctl-btns">
+        <button class="ctl-btn" data-ctl="onboarding"><span id="ic-onb"></span>Replay onboarding</button>
+        <button class="ctl-btn" data-ctl="sim-cover"><span id="ic-cov"></span>A teammate covers my request</button>
+        <button class="ctl-btn" data-ctl="sim-alert"><span id="ic-alr"></span>Alert time passes, no taker</button>
+      </div>
+    </div>
+    <button class="ctl-reset" data-ctl="reset">Reset demo data</button>
+  </aside>
+  <div class="phone">
+    <div class="screen" id="screen">
+      <div class="statusbar" aria-hidden="true"><span>9:41</span><span class="island"></span><span class="sb-icons" id="sbIcons"></span></div>
+      <main class="view" id="view"></main>
+      <nav class="tabbar" id="tabbar" aria-label="Primary"></nav>
+      <div class="sheet-layer" id="sheetLayer"></div>
+      <div class="onb-layer" id="onbLayer" role="dialog" aria-modal="true" aria-label="Welcome"></div>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   Config: rename the product here.
+   ============================================================ */
+const APP_NAME = "Rotaloop";
+
+/* ============================================================
+   Icons (Lucide-style, hand-inlined, 24px grid)
+   ============================================================ */
+const ICONS = {
+  home:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  calendar:'<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
+  calX:'<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m14 14-4 4"/><path d="m10 14 4 4"/>',
+  calOff:'<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 15h8"/>',
+  activity:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  user:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  checkCircle:'<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+  xCircle:'<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+  x:'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  chevR:'<path d="m9 18 6-6-6-6"/>',
+  chevL:'<path d="m15 18-6-6 6-6"/>',
+  clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  alert:'<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+  repeat:'<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+  arrowR:'<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  plus:'<path d="M5 12h14"/><path d="M12 5v14"/>',
+  shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+  music:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  monitor:'<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>',
+  coffee:'<path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/>',
+  smile:'<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/>',
+  link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  list:'<path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/>',
+  grid:'<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/>',
+  bell:'<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+  mail:'<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  msg:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  phone:'<rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/>',
+  info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  scale:'<path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>',
+  userPlus:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/>',
+  userCheck:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/>',
+  undo:'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  copy:'<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  send:'<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+  loop:'<path d="M21 12a9 9 0 0 1-15.5 6.2"/><path d="M3 12A9 9 0 0 1 18.5 5.8"/><path d="M18 2v4h-4"/><path d="M6 22v-4h4"/>',
+  trash:'<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+  route:'<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
+  handshake:'<path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="m21 3 1 11h-2"/><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/>',
+  play:'<polygon points="6 3 20 12 6 21 6 3"/>',
+  zap:'<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+};
+function ic(name, size=20, sw=1.75){
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]||''}</svg>`;
+}
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ============================================================
+   Dates
+   ============================================================ */
+const TODAY_ISO = '2026-11-19'; // a Thursday
+const END_ISO = '2027-01-31';
+const D = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const addDays = (s,n) => { const d = D(s); d.setDate(d.getDate()+n); return iso(d); };
+const daysUntil = s => Math.round((D(s) - D(TODAY_ISO)) / 86400000);
+const fmt = (s, o) => D(s).toLocaleDateString('en-US', o);
+const fShort = s => fmt(s, {weekday:'short', month:'short', day:'numeric'});
+const fLong = s => fmt(s, {weekday:'long', month:'long', day:'numeric'});
+const fMD = s => fmt(s, {month:'short', day:'numeric'});
+function rel(s){
+  const n = daysUntil(s);
+  if (n === 0) return 'Today'; if (n === 1) return 'Tomorrow';
+  if (n === 7) return 'In 1 week'; if (n === 14) return 'In 2 weeks';
+  if (n < 0) return `${-n} days ago`;
+  return `In ${n} days`;
+}
+
+/* ============================================================
+   Seed data (church sample data; the UI copy itself is generic)
+   ============================================================ */
+const ME = 'jordan';
+const SEED_PEOPLE = {
+  jordan:'Jordan Ellis', grace:'Grace Okafor', daniel:'Daniel Reyes', hannah:'Hannah Lee', maria:'Maria Lopez',
+  sam:'Sam Carter', ben:'Ben Turner', ana:'Ana Silva', chris:'Chris Patel', leah:'Leah Nguyen', tom:'Tom Becker',
+  ruth:'Ruth Adams', ethan:'Ethan Brooks', priya:'Priya Shah', olivia:'Olivia Grant', george:'George Wallace',
+};
+let PEOPLE = Object.assign({}, SEED_PEOPLE);
+const pname = id => PEOPLE[id] || id;
+const first = id => pname(id).split(' ')[0];
+const isMe = id => id === ME;
+const nameMe = id => isMe(id) ? 'You' : pname(id);
+function hue(id){ let h = 0; for (const c of String(id)) h = (h*31 + c.charCodeAt(0)) % 360; return h; }
+function initials(name){ const n = String(name).trim().split(/\s+/); return (n[0][0] || '') + ((n[1]||'')[0] || ''); }
+function avatar(id, cls=''){ return `<span class="av ${cls}" style="--h:${hue(id)}" title="${esc(pname(id))}">${esc(initials(pname(id)))}</span>`; }
+function avatarOf(s, cls=''){
+  if (s.guest) return `<span class="av ${cls}" style="--h:40" title="${esc(s.guest)} (guest)">${esc(initials(s.guest))}</span>`;
+  if (s.assignee) return avatar(s.assignee, cls);
+  return `<span class="av ${cls}" style="background:var(--danger-tint);color:var(--danger-text)">?</span>`;
+}
+const whoLabel = s => s.guest ? `${s.guest} (guest)` : s.assignee ? nameMe(s.assignee) : 'Open';
+
+function seedGroups(){
+  return [
+    { id:'worship', name:'Sunday Worship Team', icon:'music', acc:'acc-blue', start:'2026-11-22', interval:7, cadence:'Weekly · Sundays',
+      time:'Call 8:30 AM · Service 10:00 AM', admins:['grace'], adminInDemo:true, confirmWindow:14,
+      roles:[
+        {id:'lead', name:'Worship Lead', primary:true, confirm:true, roster:['daniel','jordan','grace','hannah']},
+        {id:'vocals', name:'Vocals', confirm:true, roster:['maria','hannah','grace','sam']},
+        {id:'keys', name:'Keys', confirm:true, roster:['ana','ben']},
+        {id:'acoustic', name:'Acoustic', confirm:true, roster:['sam','daniel','chris']},
+      ], skips:{}, settings:{policy:'payItBack', duty:'admins', timeOff:'route', allowDouble:false} },
+    { id:'av', name:'AV & Media', icon:'monitor', acc:'acc-plum', start:'2026-11-22', interval:7, cadence:'Weekly · Sundays',
+      time:'Call 8:00 AM · Service 10:00 AM', admins:['tom'], adminInDemo:true, confirmWindow:14,
+      roles:[
+        {id:'sound', name:'Sound', primary:true, confirm:true, roster:['chris','leah','tom']},
+        {id:'slides', name:'Slides', confirm:true, roster:['leah','ruth','ethan','tom','priya','jordan']},
+        {id:'stream', name:'Livestream', confirm:true, roster:['ethan','tom','chris']},
+      ], skips:{'2026-12-27':{reason:'Guest production crew for the Christmas service', by:'tom'}},
+      settings:{policy:'payItBack', duty:'member', timeOff:'route', allowDouble:false} },
+    { id:'hosp', name:'Hospitality', icon:'coffee', acc:'acc-clay', start:'2026-11-22', interval:7, cadence:'Weekly · Sundays',
+      time:'Arrive 9:30 AM', admins:['olivia'], adminInDemo:false, confirmWindow:14,
+      roles:[
+        {id:'greeter', name:'Greeter', primary:true, confirm:true, roster:['jordan','olivia','priya','hannah','maria','george','ruth']},
+        {id:'coffee', name:'Coffee', confirm:true, roster:['ruth','george','olivia']},
+        {id:'welcome', name:'Welcome Table', confirm:false, roster:['hannah','sam']},
+      ], skips:{}, settings:{policy:'payItBack', duty:'member', timeOff:'route', allowDouble:false} },
+    { id:'kids', name:'Kids Ministry', icon:'smile', acc:'acc-teal', start:'2026-12-13', interval:14, cadence:'Every other Sunday',
+      time:'Arrive 9:45 AM · Room 104', admins:['ana'], adminInDemo:false, confirmWindow:28,
+      roles:[
+        {id:'klead', name:'Lead Teacher', primary:true, confirm:true, roster:['ana','maria','grace']},
+        {id:'helper', name:'Helper', confirm:true, roster:['jordan','daniel','olivia','sam']},
+        {id:'checkin', name:'Check-in', confirm:false, roster:['george','hannah']},
+      ], skips:{}, settings:{policy:'countRealWork', duty:'member', timeOff:'route', allowDouble:false} },
+  ];
+}
+const K = (gid,date,role,person) => `${gid}|${date}|${role}|${person}`;
+function seedSlots(){
+  const s = {}; const set = (k, v) => s[k] = v; const c = {status:'confirmed'};
+  ['vocals|maria','keys|ana','acoustic|sam','lead|daniel'].forEach(x => { const [r,p] = x.split('|'); set(K('worship','2026-11-22',r,p), c); });
+  set(K('worship','2026-11-29','acoustic','daniel'), c);
+  set(K('worship','2026-11-29','keys','ben'), {status:'coverage', reason:'Out of town', notified:['ana'], history:[{t:'Yesterday', text:'Ben Turner declined: “Out of town”', tone:'bad'},{t:'Yesterday', text:'Coverage Request sent to Ana Silva', tone:'warn'}]});
+  set(K('av','2026-11-22','sound','chris'), c);
+  set(K('av','2026-11-22','slides','leah'), c);
+  set(K('av','2026-11-22','stream','ethan'), {status:'replace', reason:'Sick', notified:['tom','chris'], history:[{t:'Mon', text:'Ethan Brooks declined: “Sick”', tone:'bad'},{t:'Mon', text:'Coverage Request sent to Tom Becker, Chris Patel', tone:'warn'},{t:'Today, 8:00 AM', text:'Alert time reached with no taker. Ethan is finding a replacement (Replacement Duty: Assigned Member).', tone:'bad'}]});
+  set(K('av','2026-11-29','sound','leah'), c);
+  set(K('av','2026-11-29','slides','ruth'), c);
+  set(K('av','2027-01-03','slides','jordan'), {status:'pending', moved:'Moved from Sun, Dec 27 because Dec 27 became a Skip Date', history:[{t:'Yesterday', text:'Moved from Sun, Dec 27: Tom Becker added a Skip Date', tone:'warn'}]});
+  set(K('hosp','2026-11-22','greeter','jordan'), {status:'replace', reason:'Work trip', notified:['olivia','priya','hannah','maria','george','ruth'], history:[{t:'Sun', text:'You declined: “Work trip”', tone:'bad'},{t:'Sun', text:'Coverage Request sent to 6 Qualified Members', tone:'warn'},{t:'Today, 8:00 AM', text:'Alert time reached with no taker. You’re finding a replacement (Replacement Duty: Assigned Member).', tone:'bad'}]});
+  set(K('hosp','2026-11-22','coffee','ruth'), c);
+  set(K('hosp','2026-11-29','greeter','olivia'), c);
+  set(K('hosp','2026-12-06','greeter','priya'), {status:'coverage', reason:'Visiting family', notified:['jordan','olivia','hannah','maria','george','ruth'], history:[{t:'1h ago', text:'Priya Shah declined: “Visiting family”', tone:'bad'},{t:'1h ago', text:'Coverage Request sent to 6 Qualified Members', tone:'warn'}]});
+  return s;
+}
+function seedActivity(){
+  return [
+    {day:'Today', t:'1h ago', gid:'hosp', icon:'repeat', tone:'bad', kind:'coverage', unread:true, html:'<b>Priya Shah</b> can’t make <b>Greeter</b> on Sun, Dec 6. Coverage Request sent.'},
+    {day:'Today', t:'8:00 AM', gid:'hosp', icon:'alert', tone:'bad', kind:'coverage', unread:true, html:'Nobody volunteered for your <b>Greeter</b> turn on Sun, Nov 22. Please find a replacement.'},
+    {day:'Today', t:'8:00 AM', gid:'av', icon:'alert', tone:'bad', kind:'coverage', unread:false, html:'Nobody volunteered for <b>Livestream</b> on Sun, Nov 22. <b>Ethan Brooks</b> is finding a replacement.'},
+    {day:'Today', t:'7:30 AM', gid:'worship', icon:'checkCircle', tone:'ok', kind:'confirm', unread:false, html:'<b>Maria Lopez</b> confirmed <b>Vocals</b> for Sun, Nov 22.'},
+    {day:'Yesterday', t:'6:12 PM', gid:'av', icon:'calX', tone:'neutral', kind:'change', unread:true, html:'<b>Tom Becker</b> added a Skip Date on <b>Sun, Dec 27</b>: “Guest production crew for the Christmas service.” Everyone from then on moved forward one Event.'},
+    {day:'Yesterday', t:'2:40 PM', gid:'worship', icon:'repeat', tone:'bad', kind:'coverage', unread:false, html:'<b>Ben Turner</b> can’t make <b>Keys</b> on Sun, Nov 29. Coverage Request sent.'},
+    {day:'Earlier this week', t:'Mon', gid:'av', icon:'repeat', tone:'bad', kind:'coverage', unread:false, html:'<b>Ethan Brooks</b> can’t make <b>Livestream</b> on Sun, Nov 22. Coverage Request sent.'},
+    {day:'Earlier this week', t:'Sun', gid:'hosp', icon:'repeat', tone:'bad', kind:'coverage', unread:false, html:'<b>You</b> declined <b>Greeter</b> on Sun, Nov 22. Coverage Request sent.'},
+    {day:'Earlier this week', t:'Sun', gid:'hosp', icon:'userPlus', tone:'info', kind:'change', unread:false, html:'<b>Ruth Adams</b> joined <b>Hospitality</b> and was added to the end of the Greeter Rotation.'},
+  ];
+}
+const SERVED = {};
+function served(gid, pid){ const k = gid+pid; if (!(k in SERVED)) { let h=0; for (const c of k) h=(h*17+c.charCodeAt(0))%97; SERVED[k] = 2 + (h % 4); } return SERVED[k]; }
+
+function initialState(){
+  return {
+    persona:'admin', tab:'home', stack:[], sheet:null, onb:null,
+    groups: seedGroups(), slots: seedSlots(), activity: seedActivity(), overrides:{}, debts:[],
+    notices:[],
+    homeFilter:'all', sched:{view:'list', scope:'me', month:'2026-11', sel:null},
+    actFilter:'all',
+    timeOff:[{id:'t1', label:'Thu, Dec 31 – Sat, Jan 2', dates:['2026-12-31','2027-01-01','2027-01-02'], repeat:'none', scope:['all'], note:'New Year trip'}],
+    avail:{mode:'single', month:'2026-12', sel:[], rangeStart:null, repeat:'none', scope:['all'], note:''},
+    prefs:{timing:['1d'], time:'6:00 PM', push:true, email:false, sms:false, nCover:true, nChange:true, alertLead:'3 days before'},
+  };
+}
+let S = initialState();
+
+/* ============================================================
+   Model helpers
+   ============================================================ */
+const G = id => S.groups.find(g => g.id === id);
+const isAdmin = g => S.persona === 'admin' && g.adminInDemo;
+const adminsOf = g => isAdmin(g) ? ['jordan', ...g.admins] : g.admins;
+const membersOf = g => { const set = new Set(g.admins); g.roles.forEach(r => r.roster.forEach(p => set.add(p))); return [...set]; };
+function groupDates(g){ const out = []; let d = g.start; while (D(d) <= D(END_ISO)) { out.push(d); d = addDays(d, g.interval); } return out; }
+/* Rotation = queue per Responsibility. Turn k is the k-th non-skipped Event. Overrides (Time Off route-arounds,
+   Make-up Turns) are keyed by turn number, so a Skip Date carries them forward with the turn. */
+const personAt = (g, r, k) => S.overrides[`${g.id}|${r.id}|${k}`] || r.roster[k % r.roster.length];
+function buildSchedule(g, skips){
+  skips = skips || g.skips; let k = 0;
+  return groupDates(g).map(date => {
+    if (skips[date]) return {gid:g.id, date, skipped:true, reason:skips[date].reason, by:skips[date].by, slots:[]};
+    const slots = g.roles.map(r => ({gid:g.id, date, roleId:r.id, k, person:personAt(g, r, k)}));
+    k++;
+    return {gid:g.id, date, skipped:false, slots};
+  });
+}
+const role = (g, rid) => g.roles.find(r => r.id === rid);
+const keyOf = sl => K(sl.gid, sl.date, sl.roleId, sl.person);
+const OPEN = ['coverage','replace'];
+function st(sl){
+  const g = G(sl.gid), r = role(g, sl.roleId), o = S.slots[keyOf(sl)] || {};
+  let status = o.status;
+  if (!status) status = (r.confirm && daysUntil(sl.date) <= g.confirmWindow) ? 'pending' : r.confirm ? 'scheduled' : 'scheduled';
+  if (!r.confirm && status === 'pending') status = 'scheduled';
+  const assignee = o.guest ? null : (o.coveredBy || (OPEN.includes(status) ? null : sl.person));
+  return Object.assign({}, o, {status, assignee});
+}
+function setSt(sl, patch, hist){
+  const k = keyOf(sl); const cur = S.slots[k] || {};
+  const history = (cur.history || []).concat(hist ? [].concat(hist) : []);
+  S.slots[k] = Object.assign({}, cur, patch, {history});
+}
+function findSlot(k){ const p = k.split('|'); const g = G(p[0]); const day = buildSchedule(g).find(d => d.date === p[1]); return day && day.slots.find(s => s.roleId === p[2] && s.person === p[3]) || {gid:p[0], date:p[1], roleId:p[2], person:p[3], k:-1}; }
+const upcoming = d => daysUntil(d) >= 0;
+function allSchedules(){ return S.groups.map(g => ({g, days: buildSchedule(g)})); }
+function myGroups(){ return S.groups.filter(g => membersOf(g).includes(ME)); }
+function mySlots(includeDeclined){
+  const out = [];
+  for (const {days} of allSchedules()) for (const day of days) for (const sl of day.slots) {
+    if (!upcoming(sl.date)) continue;
+    const s = st(sl);
+    if (s.assignee === ME || (includeDeclined && sl.person === ME && OPEN.includes(s.status))) out.push(sl);
+  }
+  return out.sort((a,b) => a.date.localeCompare(b.date));
+}
+function dutyHolders(g, sl){ return g.settings.duty === 'admins' ? adminsOf(g) : [sl.person]; }
+function groupHealth(g){
+  const days = buildSchedule(g).filter(d => upcoming(d.date));
+  let coverage = 0, replace = 0, pending = 0;
+  days.forEach(d => d.slots.forEach(sl => { const s = st(sl).status; if (s === 'coverage') coverage++; if (s === 'replace') replace++; if (s === 'pending' && daysUntil(sl.date) <= 21) pending++; }));
+  const skips = days.filter(d => d.skipped);
+  const changes = S.activity.filter(a => a.gid === g.id && a.kind === 'change' && a.day !== 'Earlier this week').length;
+  const next = days.find(d => !d.skipped);
+  return {coverage, replace, pending, skips, changes, next, issues: coverage + replace + pending};
+}
+function nextTurnOf(g, r, pid, afterDate){
+  return buildSchedule(g).flatMap(d => d.slots).find(s => s.roleId === r.id && s.date > afterDate && s.person === pid && !OPEN.includes(st(s).status));
+}
+function makeupLine(debt, r){
+  if (!debt) return '';
+  const d = fMD(debt.payDate);
+  if (isMe(debt.debtor)) return `You owe ${esc(first(debt.creditor))} a Make-up Turn: you’ll take ${esc(first(debt.creditor))}’s ${d} ${esc(r.name)} turn.`;
+  if (isMe(debt.creditor)) return `${esc(first(debt.debtor))} owes you a Make-up Turn: they’ll take your ${d} ${esc(r.name)} turn.`;
+  return `${esc(first(debt.debtor))} owes ${esc(first(debt.creditor))} a Make-up Turn (${d} ${esc(r.name)}).`;
+}
+/* Cover by a Group Member. Under Pay It Back the decliner takes the coverer's next turn in that Responsibility. */
+function applyCover(sl, coverer, arrangedBy){
+  const g = G(sl.gid), r = role(g, sl.roleId);
+  let debt = null;
+  if (g.settings.policy === 'payItBack' && coverer !== sl.person) {
+    const t = nextTurnOf(g, r, coverer, sl.date);
+    if (t) {
+      S.overrides[`${g.id}|${r.id}|${t.k}`] = sl.person;
+      debt = {debtor:sl.person, creditor:coverer, payDate:t.date, k:t.k};
+      S.debts.push(Object.assign({gid:g.id, roleId:r.id, coverDate:sl.date}, debt));
+      S.slots[K(g.id, t.date, r.id, sl.person)] = {status: r.confirm ? 'pending' : undefined, makeup:{creditor:coverer, coverDate:sl.date},
+        history:[{t:'Just now', text:`Make-up Turn: ${pname(sl.person)} takes ${pname(coverer)}’s turn (Pay It Back)`, tone:'info'}]};
+    }
+  }
+  const hist = [{t:'Just now', text:`Covered by ${pname(coverer)}${arrangedBy ? ` (arranged by ${pname(arrangedBy)})` : ''}`, tone:'info'}];
+  if (arrangedBy && !r.roster.includes(coverer)) hist.push({t:'Just now', text:`${pname(coverer)} isn’t a Qualified Member for ${r.name}`, tone:''});
+  if (arrangedBy) hist.push({t:'Just now', text:`${pname(coverer)} asked to confirm`, tone:'warn'});
+  if (debt) hist.push({t:'Just now', text:`${pname(sl.person)} owes ${pname(coverer)} a Make-up Turn: ${fShort(debt.payDate)}`, tone:'info'});
+  setSt(sl, {status:'covered', coveredBy:coverer, guest:null, debt}, hist);
+  return debt;
+}
+
+const STATUS = {
+  confirmed:{label:'Confirmed', icon:'checkCircle', cls:'ok'},
+  pending:{label:'Pending', icon:'clock', cls:'warn'},
+  declined:{label:'Declined', icon:'xCircle', cls:'bad'},
+  coverage:{label:'Needs coverage', icon:'alert', cls:'bad'},
+  replace:{label:'Find a replacement', icon:'alert', cls:'bad'},
+  covered:{label:'Covered', icon:'repeat', cls:'info'},
+  skipped:{label:'Skip Date', icon:'calX', cls:'neutral'},
+  scheduled:{label:'Scheduled', icon:'calendar', cls:'neutral'},
+};
+const pill = (status, label) => { const m = STATUS[status]; return `<span class="pill ${m.cls}">${ic(m.icon,15,2)}${label || m.label}</span>`; };
+const gtile = (g, cls='') => `<span class="gtile ${g.acc} ${cls}">${ic(g.icon, cls==='sm'?18:cls==='lg'?28:22)}</span>`;
+
+/* ============================================================
+   Activity / toast
+   ============================================================ */
+function log(gid, icon, tone, kind, html){ S.activity.unshift({day:'Today', t:'Just now', gid, icon, tone, kind, unread:true, html}); }
+let toastTimer;
+function toast(msg, icon='checkCircle'){
+  const el = document.getElementById('toast');
+  el.innerHTML = `${ic(icon,20)}<span>${msg}</span>`; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+/* ============================================================
+   Screens
+   ============================================================ */
+function navbar(title, right=''){
+  return `<div class="navbar"><button class="icon-btn" data-a="back" aria-label="Back">${ic('chevL',26)}</button><div class="title">${esc(title)}</div>${right || '<span style="width:48px"></span>'}</div>`;
+}
+
+/* ---------- HOME ---------- */
+function heroCard(){
+  const sl = mySlots(false)[0];
+  if (!sl) return `<div class="card hero-empty"><div class="bb">You’re all clear</div><div class="muted small">No upcoming Assignments. Enjoy the break.</div></div>`;
+  const g = G(sl.gid), r = role(g, sl.roleId), s = st(sl), k = keyOf(sl);
+  const day = buildSchedule(g).find(d => d.date === sl.date);
+  const others = day.slots.filter(o => o.roleId !== sl.roleId).map(o => st(o).assignee).filter(Boolean);
+  const needs = s.status === 'pending';
+  const statusLabel = s.status === 'covered' ? 'You’re covering' : null;
+  return `<section class="hero fade-in" aria-label="Your next Assignment">
+    <div class="hero-top"><span class="overline">Next up · ${rel(sl.date)}</span>${pill(s.status, statusLabel)}</div>
+    <div class="tap" data-a="open-assignment" data-k="${k}" role="button" tabindex="0">
+      <h3>${esc(r.name)}</h3>
+      <div class="when">${fLong(sl.date)}</div>
+      <div class="when2">${esc(g.time)}</div>
+      ${s.moved ? `<div class="when2" style="margin-top:6px;color:var(--hero-amber)">${esc(s.moved)}</div>` : ''}
+      ${s.makeup ? `<div class="when2" style="margin-top:6px;color:var(--hero-amber)">Make-up Turn: ${esc(first(s.makeup.creditor))} covered you on ${fMD(s.makeup.coverDate)}, so you’re taking ${esc(first(s.makeup.creditor))}’s turn.</div>` : ''}
+      <div class="gname" style="margin-top:12px">${gtile(g,'sm')}${esc(g.name)}</div>
+      ${others.length ? `<div class="with"><span class="av-stack">${others.slice(0,3).map(p => avatar(p,'sm')).join('')}</span><span>With ${others.slice(0,2).map(first).join(', ')}${others.length>2?` & ${others.length-2} more`:''}</span></div>` : ''}
+    </div>
+    ${needs ? `<div class="actions">
+        <button class="btn lg hero-yes" data-a="confirm" data-k="${k}">${ic('check',20,2.25)}Confirm</button>
+        <button class="btn lg hero-no" data-a="decline" data-k="${k}">Can’t make it</button>
+      </div>`
+      : `<div class="done"><span class="ck">${ic('check',18,2.5)}</span><span class="grow">${s.status==='scheduled' && r.confirm ? 'Nothing to do yet. We’ll remind you before the Event.' : `You’re all set. We’ll remind you ${timingText()} at ${esc(S.prefs.time)}.`}</span><button class="btn sm quiet" style="color:#fff" data-a="open-assignment" data-k="${k}">Details</button></div>`}
+  </section>`;
+}
+function timingText(){ const m = {'1w':'a week before','2d':'2 days before','1d':'the day before','0d':'the morning of'}; return S.prefs.timing.length ? m[S.prefs.timing[S.prefs.timing.length-1]] : 'before'; }
+function attentionItems(){
+  const items = [];
+  const hero = mySlots(false)[0]; const heroKey = hero ? keyOf(hero) : null;
+  const card = (tone, icon, title, sub, acts) => `<div class="card att t-${tone} fade-in"><span class="att-ic">${ic(icon,20)}</span><div class="grow"><div class="ttl">${title}</div><div class="sub">${sub}</div><div class="acts">${acts}</div></div></div>`;
+  for (const {g, days} of allSchedules()) {
+    if (!membersOf(g).includes(ME)) continue;
+    for (const d of days) for (const sl of d.slots) {
+      if (!upcoming(sl.date)) continue;
+      const s = st(sl), r = role(g, sl.roleId), k = keyOf(sl);
+      if (s.status === 'coverage' && sl.person !== ME && r.roster.includes(ME))
+        items.push({sort:sl.date, html:card('bad','repeat', `${esc(first(sl.person))} needs someone for ${esc(r.name)}`, `${esc(g.name)} · ${fShort(sl.date)}${s.reason?` · “${esc(s.reason)}”`:''}`,
+          `<button class="btn sm primary" data-a="cover" data-k="${k}">${ic('check',16,2.25)}I can cover</button><button class="btn sm secondary" data-a="open-assignment" data-k="${k}">Details</button>`)});
+      if (s.status === 'replace' && dutyHolders(g, sl).includes(ME)) {
+        const mine = sl.person === ME;
+        items.push({sort:sl.date, html:card('bad','alert', mine ? `Nobody’s free for your ${esc(r.name)} turn` : `Nobody’s free for ${esc(r.name)} (${esc(first(sl.person))})`,
+          `${esc(g.name)} · ${fShort(sl.date)} · ${rel(sl.date).toLowerCase()}. No one volunteered by the alert time, so please find a replacement.`,
+          `<button class="btn sm primary" data-a="mark-covered" data-k="${k}">${ic('userCheck',16)}Mark covered</button><button class="btn sm secondary" data-a="open-assignment" data-k="${k}">Details</button>`)});
+      }
+      if (s.status === 'pending' && s.assignee === ME && k !== heroKey) {
+        let title = `Confirm ${esc(r.name)} for ${esc(g.name)}`, sub = `${fShort(sl.date)} · ${rel(sl.date).toLowerCase()}`, icon = 'clock';
+        if (s.makeup) { title = `Confirm your Make-up Turn`; sub = `${esc(first(s.makeup.creditor))} covered you on ${fMD(s.makeup.coverDate)}, so you’ll take ${esc(first(s.makeup.creditor))}’s ${esc(r.name)} turn on ${fShort(sl.date)}.`; icon = 'handshake'; }
+        else if (s.moved) { title = `Your ${esc(r.name)} turn moved`; sub = `${esc(g.name)} · now ${fShort(sl.date)}. ${esc(s.moved)}. Please confirm again.`; icon = 'calendar'; }
+        items.push({sort:sl.date, html:card('warn', icon, title, sub,
+          `<button class="btn sm positive" data-a="confirm" data-k="${k}">${ic('check',16,2.25)}Confirm</button><button class="btn sm secondary" data-a="decline" data-k="${k}">Can’t make it</button>`)});
+      }
+      if (s.status === 'coverage' && sl.person === ME) {
+        const n = (s.notified||[]).length;
+        items.push({sort:sl.date, html:card('warn','send', `Finding cover for your ${esc(r.name)}`, `${fShort(sl.date)} · ${n} ${n===1?'person':'people'} asked · nobody yet`,
+          `<button class="btn sm secondary" data-a="open-assignment" data-k="${k}">View request</button><button class="btn sm quiet" data-a="undo-decline" data-k="${k}">I can make it after all</button>`)});
+      }
+    }
+  }
+  items.sort((a,b) => a.sort.localeCompare(b.sort));
+  S.notices.forEach(n => items.push({html:card('info', n.icon || 'info', esc(n.title), n.html, `<button class="btn sm secondary" data-a="dismiss-notice" data-id="${n.id}">Got it</button>`)}));
+  return items;
+}
+/* Personal card: no group-level health. Shows next Event + Primary Responsibility + your own next Assignment. */
+function groupCard(g){
+  const h = groupHealth(g), next = h.next;
+  let lead = '';
+  if (next) { const pr = g.roles.find(r => r.primary); const sl = next.slots.find(x => x.roleId === pr.id); lead = `${pr.name}: ${whoLabel(st(sl))}`; }
+  const mine = mySlots(true).find(sl => sl.gid === g.id);
+  const right = mine ? (() => { const s = st(mine); return `<span class="xs muted b">You · ${fMD(mine.date)}</span>${pill(s.status, s.status==='covered'?'Covering':null)}`; })() : `<span class="xs muted b">No turns soon</span>`;
+  return `<div class="card gcard tap" data-a="open-group" data-g="${g.id}" role="button" tabindex="0">
+    ${gtile(g)}
+    <div class="grow"><div class="nm ellip">${esc(g.name)}</div>
+      <div class="meta ellip">${next ? fShort(next.date) : 'No upcoming Events'} · ${esc(lead)}</div></div>
+    <div class="right">${right}</div></div>`;
+}
+/* Managed card: same identity plus Admin-only health stats. */
+function managedCard(g){
+  const h = groupHealth(g), next = h.next;
+  const pr = g.roles.find(r => r.primary); const lead = next ? `${pr.name}: ${whoLabel(st(next.slots.find(x => x.roleId === pr.id)))}` : '';
+  const open = h.coverage + h.replace;
+  return `<div class="card mgcard tap" data-a="open-group" data-g="${g.id}" role="button" tabindex="0">
+    <div class="top">${gtile(g)}<div class="grow"><div class="b ellip" style="font-size:16px">${esc(g.name)}</div><div class="xs muted ellip">${next ? fShort(next.date) : '—'} · ${esc(lead)}</div></div><span class="pill admin">${ic('shield',13,2)}Admin</span></div>
+    <div class="stats">
+      <div class="stat ${open?'bad':''}">${ic('alert',16)}<span><b>${open}</b> open coverage${h.replace?` <span style="font-weight:600">(${h.replace} finding a replacement)</span>`:''}</span></div>
+      <div class="stat ${h.pending?'warn':''}">${ic('clock',16)}<span><b>${h.pending}</b> pending · 3 wks</span></div>
+      <div class="stat ${h.changes?'info':''}">${ic('repeat',16)}<span><b>${h.changes}</b> recent ${h.changes===1?'change':'changes'}</span></div>
+      <div class="stat">${ic('calX',16)}<span>${h.skips.length ? `Skip <b>${h.skips.map(s=>fMD(s.date)).join(', ')}</b>` : 'No Skip Dates'}</span></div>
+    </div></div>`;
+}
+function groupsList(){
+  const admin = S.persona === 'admin';
+  if (!admin) return `<div class="stack pad">${myGroups().map(groupCard).join('')}</div>`;
+  const f = S.homeFilter, managed = myGroups().filter(isAdmin);
+  const needN = managed.filter(g => groupHealth(g).issues > 0).length;
+  const list = myGroups().filter(g => f === 'all' ? true : f === 'mine' ? isAdmin(g) : isAdmin(g) && groupHealth(g).issues > 0);
+  const chip = (v, label, n) => `<button class="chip" aria-pressed="${f===v}" data-a="home-filter" data-v="${v}">${label}${n!=null?` <span class="n">${n}</span>`:''}</button>`;
+  return `<div class="chips scroll" style="margin-bottom:12px">${chip('all','All', myGroups().length)}${chip('mine','Managed by me', managed.length)}${chip('attn','Needs attention', needN)}</div>
+    <div class="stack pad">${list.map(g => isAdmin(g) ? managedCard(g) : groupCard(g)).join('') || `<div class="caught" style="margin:0">${ic('checkCircle',20)}Nothing needs attention in the groups you manage.</div>`}</div>`;
+}
+function screenHome(){
+  const att = attentionItems();
+  return `<div class="greet"><div class="grow"><div class="overline">${fLong(TODAY_ISO)}</div><h1 class="hello">Good morning, ${esc(first(ME))}</h1></div>
+      <button data-a="tab" data-v="profile" aria-label="Profile">${avatar(ME,'')}</button></div>
+    ${heroCard()}
+    <div class="section"><div class="sec-head"><h2>Needs your attention ${att.length?`<span class="count">${att.length}</span>`:''}</h2></div>
+      ${att.length ? `<div class="stack pad">${att.map(a => a.html).join('')}</div>` : `<div class="caught">${ic('checkCircle',20)}You’re all caught up.</div>`}</div>
+    <div class="section"><div class="sec-head"><h2>Your groups</h2><button class="link" data-a="tab" data-v="groups">See all</button></div>${groupsList()}</div>
+    <div class="section"><div class="quick">
+      <button class="card tap" data-a="open-availability"><span class="li-ic">${ic('calOff',20)}</span><span class="b small">Add Time Off</span></button>
+      <button class="card tap" data-a="invite" data-g="${myGroups()[0].id}"><span class="li-ic">${ic('userPlus',20)}</span><span class="b small">Invite someone</span></button>
+    </div></div>`;
+}
+
+/* ---------- GROUPS TAB ---------- */
+function screenGroups(){
+  return `<div class="lt-head"><div><h1>Groups</h1><div class="sub">${myGroups().length} groups</div></div>
+      <button class="icon-btn ghost" data-a="toast" data-msg="Creating a group isn’t in this prototype yet" aria-label="Create group">${ic('plus',26)}</button></div>
+    <div class="stack pad">${myGroups().map(g => isAdmin(g) ? managedCard(g) : groupCard(g)).join('')}</div>
+    <div class="pad" style="margin-top:20px;display:flex;flex-direction:column;gap:10px">
+      <button class="btn secondary block" data-a="toast" data-msg="Creating a group isn’t in this prototype yet">${ic('plus',20)}Create a group</button>
+      <button class="btn quiet block" data-a="toast" data-msg="Joining by link isn’t in this prototype yet">${ic('link',20)}Join with an invite link</button>
+    </div>`;
+}
+
+/* ---------- SCHEDULE TAB ---------- */
+function weekLabel(ws){
+  const n = Math.round((D(ws) - D(weekKey(TODAY_ISO))) / 86400000);
+  if (n === 0) return 'This week'; if (n === 7) return 'Next week';
+  return 'Week of ' + fMD(ws);
+}
+function weekKey(date){ return addDays(date, -D(date).getDay()); }
+function datebox(date, me){ return `<div class="datebox ${me?'me':''}"><div class="m">${fmt(date,{month:'short'})}</div><div class="d">${D(date).getDate()}</div></div>`; }
+function schedItemsMine(){
+  const items = [];
+  mySlots(true).forEach(sl => items.push({date:sl.date, kind:'slot', sl}));
+  myGroups().forEach(g => buildSchedule(g).filter(d => d.skipped && upcoming(d.date)).forEach(d => items.push({date:d.date, kind:'skip', g, d})));
+  return items.sort((a,b) => a.date.localeCompare(b.date) || (a.kind==='skip'?1:-1));
+}
+function skipCard(g, d){
+  return `<div class="skipcard sitem">${datebox(d.date)}<div class="grow"><div class="row" style="gap:8px">${pill('skipped')}<span class="xs muted b ellip">${esc(g.name)}</span></div>
+    <div class="small muted" style="margin-top:6px">No one needed. ${esc(d.reason)}. Turns move forward one Event.</div></div></div>`;
+}
+function mySlotCard(sl){
+  const g = G(sl.gid), r = role(g, sl.roleId), s = st(sl);
+  const lbl = s.status === 'covered' && s.coveredBy === ME ? 'Covering' : null;
+  return `<div class="card sitem tap" data-a="open-assignment" data-k="${keyOf(sl)}" role="button" tabindex="0">${datebox(sl.date, true)}
+    <div class="grow"><div class="b">${s.makeup?'<span class="tag">Make-up Turn</span>':''}${esc(r.name)}</div><div class="small muted ellip"><span class="dot ${g.acc}" style="display:inline-block;margin-right:6px;vertical-align:middle"></span>${esc(g.name)}</div>
+    <div style="margin-top:8px">${pill(s.status, lbl)}</div></div><span class="chev">${ic('chevR',20)}</span></div>`;
+}
+function dayGroupCard(g, d){
+  if (d.skipped) return skipCard(g, d);
+  const meIn = d.slots.some(sl => st(sl).assignee === ME);
+  return `<div class="card" style="padding:14px"><div class="row tap" data-a="open-group" data-g="${g.id}" role="button" tabindex="0">${datebox(d.date, meIn)}<div class="grow"><div class="b ellip">${esc(g.name)}</div><div class="xs muted">${fShort(d.date)}</div></div><span class="chev">${ic('chevR',18)}</span></div>
+    <div class="roles">${d.slots.map(sl => slotRow(g, sl)).join('')}</div></div>`;
+}
+function slotRow(g, sl){
+  const s = st(sl), r = role(g, sl.roleId), a = s.assignee;
+  return `<div class="rrow tap" data-a="open-assignment" data-k="${keyOf(sl)}" role="button" tabindex="0"><span class="rn">${esc(r.name)}</span>
+    <span class="pn ellip" style="${isMe(a)?'color:var(--primary)':''}">${a || s.guest ? esc(whoLabel(s)) : '<span style="color:var(--danger-text)">Open</span>'}</span>
+    <span class="sdot ${STATUS[s.status].cls}" title="${STATUS[s.status].label}"></span></div>`;
+}
+function screenSchedule(){
+  const sc = S.sched;
+  const top = `<div class="lt-head"><div><h1>Schedule</h1><div class="sub">${sc.scope==='me'?'Your Assignments':'All your groups'}</div></div>
+      <button class="icon-btn ghost" data-a="open-availability" aria-label="Time Off">${ic('calOff',24)}</button></div>
+    <div class="seg" role="tablist"><button role="tab" aria-selected="${sc.view==='list'}" data-a="sched-view" data-v="list">${ic('list',18)}List</button><button role="tab" aria-selected="${sc.view==='month'}" data-a="sched-view" data-v="month">${ic('grid',18)}Month</button></div>
+    <div class="chips scroll" style="margin-top:12px"><button class="chip" aria-pressed="${sc.scope==='me'}" data-a="sched-scope" data-v="me">Just me</button><button class="chip" aria-pressed="${sc.scope==='all'}" data-a="sched-scope" data-v="all">Everyone in my groups</button></div>`;
+  return top + (sc.view === 'list' ? schedList() : schedMonth());
+}
+function schedList(){
+  const sc = S.sched; const weeks = new Map();
+  const add = (date, html) => { const wk = weekKey(date); if (!weeks.has(wk)) weeks.set(wk, []); weeks.get(wk).push(html); };
+  if (sc.scope === 'me') schedItemsMine().forEach(it => add(it.date, it.kind === 'skip' ? skipCard(it.g, it.d) : mySlotCard(it.sl)));
+  else {
+    const all = [];
+    myGroups().forEach(g => buildSchedule(g).filter(d => upcoming(d.date)).forEach(d => all.push({g, d})));
+    all.sort((a,b) => a.d.date.localeCompare(b.d.date)).forEach(({g,d}) => add(d.date, dayGroupCard(g, d)));
+  }
+  if (!weeks.size) return `<div class="empty">Nothing scheduled.</div>`;
+  return [...weeks.entries()].map(([wk, cards]) => `<div class="week-h"><h3>${weekLabel(wk)}</h3><span>${fMD(wk)} – ${fMD(addDays(wk,6))}</span></div><div class="stack pad">${cards.join('')}</div>`).join('');
+}
+function monthCells(ym){
+  const [y,m] = ym.split('-').map(Number); const firstD = new Date(y, m-1, 1); const start = addDays(iso(firstD), -firstD.getDay());
+  const cells = []; for (let i = 0; i < 42; i++) { const d = addDays(start, i); cells.push({date:d, out: D(d).getMonth() !== m-1}); }
+  while (cells.length > 35 && cells.slice(-7).every(c => c.out)) cells.splice(-7);
+  return cells;
+}
+const shiftMonth = (ym, n) => { const [y,m] = ym.split('-').map(Number); const d = new Date(y, m-1+n, 1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
+const monthTitle = ym => { const [y,m] = ym.split('-').map(Number); return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'long', year:'numeric'}); };
+function dayInfo(date){
+  const groups = [], mine = [], skips = [];
+  myGroups().forEach(g => { const d = buildSchedule(g).find(x => x.date === date); if (!d) return;
+    if (d.skipped) { skips.push({g,d}); return; }
+    groups.push({g,d}); d.slots.forEach(sl => { if (st(sl).assignee === ME) mine.push(sl); }); });
+  return {groups, mine, skips};
+}
+function schedMonth(){
+  const sc = S.sched; const cells = monthCells(sc.month);
+  const grid = cells.map(c => {
+    const inf = dayInfo(c.date);
+    const cls = ['cday', 'tap', c.out?'out':'', c.date===TODAY_ISO?'today':'', inf.mine.length?'mine':'', (!inf.groups.length && inf.skips.length)?'skip':'', sc.sel===c.date?'sel':''].join(' ');
+    const dots = sc.scope === 'me' ? inf.mine.map(sl => `<i class="dot ${G(sl.gid).acc}"></i>`).join('') : inf.groups.map(x => `<i class="dot ${x.g.acc}"></i>`).join('');
+    return `<button class="${cls}" data-a="cal-pick" data-d="${c.date}" aria-label="${fLong(c.date)}"><span class="num">${D(c.date).getDate()}</span><span class="dots">${dots}</span></button>`;
+  }).join('');
+  let detail = '';
+  const sel = sc.sel;
+  if (sel) {
+    const inf = dayInfo(sel); const cards = [];
+    if (sc.scope === 'me') mySlots(true).filter(sl => sl.date === sel).forEach(sl => cards.push(mySlotCard(sl)));
+    else inf.groups.forEach(({g,d}) => cards.push(dayGroupCard(g,d)));
+    inf.skips.forEach(({g,d}) => cards.push(skipCard(g,d)));
+    detail = `<div class="week-h"><h3>${fLong(sel)}</h3><span>${rel(sel)}</span></div><div class="stack pad">${cards.join('') || `<div class="empty card">Nothing on this day.</div>`}</div>`;
+  } else detail = `<div class="empty small">Tap a day to see who’s serving.</div>`;
+  const short = g => g.name.split(' ')[0] === 'Sunday' ? 'Worship' : g.name.split(' ')[0];
+  return `<div class="card cal" style="margin-top:16px"><div class="cal-head"><button class="icon-btn" data-a="cal-move" data-v="-1" aria-label="Previous month">${ic('chevL',22)}</button><span class="mt">${monthTitle(sc.month)}</span><button class="icon-btn" data-a="cal-move" data-v="1" aria-label="Next month">${ic('chevR',22)}</button></div>
+    <div class="cal-grid">${['S','M','T','W','T','F','S'].map(x => `<div class="cal-dow">${x}</div>`).join('')}${grid}</div>
+    <div class="legend"><span><i class="lg-sw" style="background:var(--primary);border-radius:50%"></i>You’re serving</span><span><i class="lg-sw" style="border:1.5px dashed var(--border-strong)"></i>Skip Date</span>${myGroups().map(g => `<span><i class="dot ${g.acc}"></i>${esc(short(g))}</span>`).join('')}</div></div>${detail}`;
+}
+
+/* ---------- ASSIGNMENT DETAILS ---------- */
+function screenAssignment(route){
+  const sl = findSlot(route.k), g = G(sl.gid), r = role(g, sl.roleId), s = st(sl);
+  const day = buildSchedule(g).find(d => d.date === sl.date) || {slots:[]};
+  const mineNow = s.assignee === ME, iDeclined = sl.person === ME && OPEN.includes(s.status);
+  const adm = isAdmin(g);
+  let controls = '';
+  if (mineNow && s.status === 'pending') controls = `<div class="btn-row"><button class="btn lg positive" data-a="confirm" data-k="${route.k}">${ic('check',20,2.25)}Confirm</button><button class="btn lg secondary" data-a="decline" data-k="${route.k}">Can’t make it</button></div>`;
+  else if (mineNow && (s.status === 'confirmed' || s.status === 'covered')) controls = `<div class="note ok">${ic('checkCircle',20)}<div class="grow"><b>You’re confirmed.</b> We’ll remind you ${timingText()} at ${esc(S.prefs.time)}.</div></div><button class="btn quiet block" style="margin-top:8px" data-a="decline" data-k="${route.k}">I can’t make it after all</button>`;
+  else if (mineNow && s.status === 'scheduled') controls = `<div class="note">${ic('info',20)}<div class="grow">${r.confirm ? 'We’ll ask you to confirm closer to the Event.' : 'This Responsibility doesn’t need confirmation.'}</div></div><div class="btn-row" style="margin-top:12px">${r.confirm?`<button class="btn secondary" data-a="confirm" data-k="${route.k}">Confirm early</button>`:''}<button class="btn secondary" data-a="decline" data-k="${route.k}">Can’t make it</button></div>`;
+  const notices = [];
+  if (s.moved) notices.push(`<div class="note warn" style="margin-top:12px">${ic('calendar',20)}<div class="grow"><b>Date changed.</b> ${esc(s.moved)}.${s.status==='pending'?' Please confirm again.':''}</div></div>`);
+  if (s.makeup) notices.push(`<div class="debt" style="margin-top:12px">${ic('handshake',20)}<div class="grow"><b>Make-up Turn.</b> ${isMe(sl.person)?'You’re':esc(first(sl.person))+' is'} taking ${esc(first(s.makeup.creditor))}’s turn, because ${esc(first(s.makeup.creditor))} covered ${isMe(sl.person)?'you':'them'} on ${fMD(s.makeup.coverDate)}.</div></div>`);
+  if (s.debt && !s.debtCancelled) notices.push(`<div class="debt" style="margin-top:12px">${ic('handshake',20)}<div class="grow">${makeupLine(s.debt, r)}</div></div>`);
+  let coverage = '';
+  if (OPEN.includes(s.status)) {
+    const notified = s.notified || [];
+    const replace = s.status === 'replace';
+    const holders = dutyHolders(g, sl), iHold = holders.includes(ME);
+    const holderText = g.settings.duty === 'admins' ? 'the Admins' : (isMe(sl.person) ? 'you' : first(sl.person));
+    coverage = `<div class="section pad"><div class="card" style="padding:16px">
+      <div class="row">${pill(s.status)}<span class="xs muted b">${s.reason ? '“'+esc(s.reason)+'”' : ''}</span></div>
+      <div class="b" style="margin-top:12px">${replace ? (iHold ? 'Nobody’s free. Please find a replacement.' : `Nobody’s free. ${esc(holderText[0].toUpperCase()+holderText.slice(1))} ${g.settings.duty==='admins'?'are':'is'} finding a replacement.`) : iDeclined ? 'We’re finding someone to cover you' : `${esc(first(sl.person))} can’t make it`}</div>
+      <div class="small muted" style="margin-top:2px">${replace ? `Asked ${notified.length} Qualified ${notified.length===1?'Member':'Members'}; no one volunteered by the alert time. Replacement Duty is on ${esc(holderText)}.${adm && !iHold ? ' You’re informed; no action needed.' : ''}` : `Asked ${notified.length} Qualified ${notified.length===1?'Member':'Members'} for ${esc(r.name)}. The first to accept gets it. We’ll remind them once more at the alert time.`}</div>
+      <div class="row" style="margin-top:12px"><span class="av-stack">${notified.slice(0,5).map(p => avatar(p,'sm')).join('')}</span><span class="xs muted b">${notified.map(p => isMe(p)?'You':first(p)).join(', ')}</span></div>
+      <div class="stack" style="margin-top:16px;gap:8px">
+        ${!iDeclined && r.roster.includes(ME) && !replace ? `<button class="btn primary block" data-a="cover" data-k="${route.k}">${ic('check',18,2.25)}I can cover</button>` : ''}
+        ${(replace && iHold) || adm ? `<button class="btn ${replace&&iHold?'primary':'secondary'} block" data-a="mark-covered" data-k="${route.k}">${ic('userCheck',18)}Mark covered</button>` : ''}
+        ${iDeclined ? `<button class="btn secondary block" data-a="undo-decline" data-k="${route.k}">${ic('undo',18)}I can make it after all</button>` : ''}
+      </div></div></div>`;
+  }
+  const assigneeRow = s.status === 'covered'
+    ? `<div class="kv">${avatarOf(s)}<div class="grow"><div class="k">Covered by</div><div class="v">${esc(whoLabel(s))}</div></div><span class="xs muted">for ${esc(isMe(sl.person)?'you':first(sl.person))}</span></div>`
+    : `<div class="kv">${avatarOf(s)}<div class="grow"><div class="k">Assigned to</div><div class="v">${esc(whoLabel(s))}</div></div>${!s.assignee?`<span class="xs muted">was ${esc(isMe(sl.person)?'you':first(sl.person))}</span>`:''}</div>`;
+  const others = day.slots.filter(o => o.roleId !== sl.roleId);
+  const hist = [{t:'Oct 25', text:'Assigned by Rotation', tone:''}].concat(s.history || []);
+  return navbar('Assignment') + `
+    <div class="card dhead"><div class="row">${gtile(g,'sm')}<span class="b small muted grow ellip">${esc(g.name)}</span>${pill(s.status, s.status==='covered'&&s.coveredBy===ME?'You’re covering':null)}</div>
+      <h1>${esc(r.name)}</h1><div class="b">${fLong(sl.date)}</div><div class="small muted">${esc(g.time)} · ${rel(sl.date)}</div>
+      <div style="margin-top:12px">${assigneeRow}</div>
+      ${notices.join('')}
+      ${controls ? `<div style="margin-top:12px">${controls}</div>` : ''}
+    </div>
+    ${coverage}
+    <div class="section"><div class="sec-head"><h2>Also at this Event</h2></div><div class="list" style="margin:0 16px">
+      ${others.map(o => { const os = st(o); return `<div class="li tap" data-a="open-assignment" data-k="${keyOf(o)}" role="button" tabindex="0">${avatarOf(os,'sm')}<div class="grow"><div class="t ellip">${esc(whoLabel(os))}</div><div class="s">${esc(role(g,o.roleId).name)}</div></div>${pill(os.status)}</div>`; }).join('') || '<div class="empty">Just this Responsibility</div>'}
+    </div></div>
+    <div class="section"><div class="sec-head"><h2>History</h2><span class="xs muted b">Visible to all Members</span></div><div class="pad"><div class="timeline">
+      ${hist.map(h => `<div class="tl ${h.tone}"><div class="small b">${esc(h.text)}</div><div class="xs muted">${esc(h.t)}</div></div>`).join('')}
+    </div></div></div>`;
+}
+
+/* ---------- GROUP ---------- */
+function screenGroup(route){
+  const g = G(route.g), tab = route.tab || 'overview', adm = isAdmin(g);
+  const tabs = [['overview','Overview'],['schedule','Schedule'],['members','Members'],['settings','Settings']];
+  const body = {overview:groupOverview, schedule:groupSchedule, members:groupMembers, settings:groupSettings}[tab](g, adm);
+  return navbar('', `<button class="icon-btn ghost" data-a="invite" data-g="${g.id}" aria-label="Invite people">${ic('userPlus',24)}</button>`) + `
+    <div class="ghead">${gtile(g,'lg')}<div class="grow"><h1>${esc(g.name)}</h1><div class="small muted">${esc(g.cadence)} · ${membersOf(g).length} Members</div>
+      <div style="margin-top:6px">${adm ? `<span class="pill admin">${ic('shield',13,2)}You’re an Admin</span>` : `<span class="pill neutral" style="height:22px;font-size:12px">Member</span>`}</div></div></div>
+    <div class="sticky-seg"><div class="seg" role="tablist">${tabs.map(([v,l]) => `<button role="tab" aria-selected="${tab===v}" data-a="group-tab" data-v="${v}">${l}</button>`).join('')}</div></div>
+    <div class="fade-in">${body}</div>`;
+}
+function groupOverview(g, adm){
+  const h = groupHealth(g); const n = h.next;
+  const recent = S.activity.filter(a => a.gid === g.id);
+  const open = h.coverage + h.replace;
+  return `<div class="pad" style="margin-top:8px">
+    ${n ? `<div class="card" style="padding:16px"><div class="overline">Next Event · ${rel(n.date)}</div><div class="bb" style="font-size:18px;margin-top:2px">${fLong(n.date)}</div><div class="xs muted">${esc(g.time)}</div>
+      <div class="roles" style="margin-top:12px">${n.slots.map(sl => slotRow(g, sl)).join('')}</div></div>` : ''}
+    ${adm ? `<div class="stats" style="margin-top:12px">
+      <div class="stat ${open?'bad':''}">${ic('alert',16)}<span><b>${open}</b> open coverage</span></div>
+      <div class="stat ${h.pending?'warn':''}">${ic('clock',16)}<span><b>${h.pending}</b> pending · 3 wks</span></div></div>` : ''}
+    <button class="btn secondary block" style="margin-top:12px" data-a="skip-open" data-g="${g.id}">${ic('calX',20)}Add a Skip Date</button>
+    ${h.skips.length ? `<div class="field-label">Upcoming Skip Dates</div><div class="stack">${h.skips.map(d => skipCard(g,d)).join('')}</div>` : ''}
+    <div class="field-label" style="display:flex;justify-content:space-between"><span>Schedule history</span><span style="font-weight:600">Visible to all Members</span></div>
+    <div class="list">${recent.length ? recent.map(a => `<div class="act">${actIcon(a)}<div class="grow"><div class="txt small">${a.html}</div><div class="when">${a.day === 'Today' ? a.t : a.day + ' · ' + a.t}</div></div></div>`).join('') : '<div class="empty">No history yet</div>'}</div>
+  </div>`;
+}
+function groupSchedule(g){
+  const days = buildSchedule(g).filter(d => upcoming(d.date));
+  return `<div class="pad stack" style="margin-top:8px">
+    <button class="btn secondary block" data-a="skip-open" data-g="${g.id}">${ic('calX',20)}Add a Skip Date</button>
+    ${days.map(d => d.skipped ? skipCard(g,d) + `<button class="btn sm quiet" style="align-self:flex-start;margin-top:-6px" data-a="unskip" data-g="${g.id}" data-d="${d.date}">${ic('undo',16)}Remove Skip Date</button>` : `<div class="card" style="padding:14px"><div class="row">${datebox(d.date, d.slots.some(sl => st(sl).assignee===ME))}<div class="grow"><div class="b">${fShort(d.date)}</div><div class="xs muted">${rel(d.date)}</div></div></div><div class="roles">${d.slots.map(sl => slotRow(g, sl)).join('')}</div></div>`).join('')}
+  </div>`;
+}
+function groupMembers(g, adm){
+  const days = buildSchedule(g);
+  const rows = membersOf(g).map(p => {
+    let up = 0, covers = 0;
+    days.forEach(d => d.slots.forEach(sl => { const s = st(sl); if (s.assignee === p && upcoming(sl.date)) { up++; if (s.coveredBy === p) covers++; } }));
+    const sv = g.roles.some(r => r.roster.includes(p)) ? served(g.id, p) : 0;
+    return {p, up, covers, sv, total: sv + up, roles: g.roles.filter(r => r.roster.includes(p)).map(r => r.name)};
+  });
+  const admins = adminsOf(g);
+  rows.sort((a,b) => (admins.includes(b.p) - admins.includes(a.p)) || pname(a.p).localeCompare(pname(b.p)));
+  const active = rows.filter(r => r.roles.length); const max = Math.max(...active.map(r => r.total), 1);
+  const lo = Math.min(...active.map(r => r.total)), hi = Math.max(...active.map(r => r.total));
+  const debts = S.debts.filter(d => d.gid === g.id && !d.cancelled);
+  return `<div class="pad" style="margin-top:8px">
+    <div class="note">${ic('scale',20)}<div class="grow"><b>Workload:</b> everyone has ${lo}–${hi} turns across the last 3 months and what’s scheduled. Covering always counts toward the Member who covers.</div></div>
+    ${debts.length ? `<div class="debt" style="margin-top:10px">${ic('handshake',20)}<div class="grow"><b>Make-up Turns owed:</b> ${debts.map(d => makeupLine(d, role(g, d.roleId))).join(' ')}</div></div>` : ''}
+    <div class="legend" style="padding:12px 2px 4px"><span><i class="lg-sw" style="background:var(--primary)"></i>Served (3 mo)</span><span><i class="lg-sw" style="background:color-mix(in srgb,var(--primary) 45%,transparent)"></i>Upcoming</span><span><i class="lg-sw" style="background:var(--success)"></i>Covering</span></div>
+    <div class="list" style="margin-top:8px">${rows.map(r => `<div class="li" style="align-items:flex-start;padding:14px 16px">${avatar(r.p)}<div class="grow">
+      <div class="row" style="gap:8px"><span class="t ellip">${esc(nameMe(r.p))}</span>${admins.includes(r.p) ? `<span class="pill admin">${ic('shield',12,2)}Admin</span>` : ''}</div>
+      <div class="s ellip">${r.roles.length ? 'Qualified: ' + esc(r.roles.join(' · ')) : 'Not in a Rotation'}</div>
+      ${r.roles.length ? `<div class="row" style="margin-top:8px;gap:10px"><div class="bar grow"><i class="b1" style="width:${r.sv/max*100}%"></i><i class="b2" style="width:${(r.up-r.covers)/max*100}%"></i><i class="b3" style="width:${r.covers/max*100}%"></i></div><span class="xs b" style="min-width:56px;text-align:right">${r.total} turns</span></div>` : ''}
+    </div></div>`).join('')}</div>
+    ${adm ? `<button class="btn secondary block" style="margin-top:12px" data-a="invite" data-g="${g.id}">${ic('userPlus',20)}Invite people</button>` : ''}
+  </div>`;
+}
+const POLICY = {payItBack:['Pay It Back','Whoever declines owes the person who covers a Make-up Turn.'], countRealWork:['Count Real Work','Covering counts toward workload; declining creates no debt.']};
+const DUTY = {member:['Assigned Member','If nobody volunteers by the alert time, the Member who declined finds a replacement.'], admins:['Admins','If nobody volunteers by the alert time, the Admins find a replacement.']};
+const TIMEOFF = {route:['Route around','The next person in line takes the Event; the absent Member keeps their place at the front.'], ask:['Ask for a volunteer','The Assignment becomes a Coverage Request.']};
+function groupSettings(g, adm){
+  const s = g.settings;
+  const sw = (on, label, sub, action) => `<div class="set-row"><div class="grow"><div class="b small">${label}</div>${sub?`<div class="xs muted">${sub}</div>`:''}</div><button class="switch" role="switch" aria-checked="${!!on}" aria-label="${esc(label)}" ${adm ? action : 'disabled'}></button></div>`;
+  const choice = (label, pair, key) => `<div class="set-row ${adm?'tap':''}" ${adm?`data-a="set-cycle" data-g="${g.id}" data-v="${key}" role="button" tabindex="0"`:''}><div class="grow"><div class="b small">${label}</div><div class="xs muted">${pair[1]}</div></div><span class="val">${pair[0]}</span>${adm?`<span class="chev">${ic('chevR',18)}</span>`:''}</div>`;
+  const val = (label, v) => `<div class="set-row"><div class="grow b small">${label}</div><span class="val">${esc(v)}</span></div>`;
+  return `<div class="pad" style="margin-top:8px">
+    ${!adm ? `<div class="note" style="margin-bottom:4px">${ic('info',20)}<div class="grow">Only Admins can change settings. Ask ${esc(g.admins.map(pname).join(' or '))}.</div></div>` : ''}
+    <div class="field-label">Events</div><div class="list">${val('Event Series', g.cadence)}${val('Time', g.time)}${val('Primary Responsibility', g.roles.find(r => r.primary).name)}</div>
+    <div class="field-label">Responsibilities</div><div class="list">${g.roles.map(r => sw(r.confirm, esc(r.name) + (r.primary?' <span class="xs muted">· primary</span>':''), `${r.roster.length} Qualified Members · Needs confirmation`, `data-a="role-confirm" data-g="${g.id}" data-v="${r.id}"`)).join('')}
+      ${adm ? `<button class="set-row" style="width:100%;color:var(--primary)" data-a="toast" data-msg="Adding Responsibilities isn’t in this prototype yet">${ic('plus',20)}<span class="b small">Add Responsibility</span></button>` : ''}</div>
+    <div class="field-label">Coverage</div><div class="list">
+      ${choice('Coverage Policy', POLICY[s.policy], 'policy')}
+      ${choice('Replacement Duty', DUTY[s.duty], 'duty')}
+      ${choice('Time Off handling', TIMEOFF[s.timeOff], 'timeOff')}
+      ${sw(s.allowDouble, 'Allow the same person twice at one Event', 'Off: one Assignment per person per Event', `data-a="set-toggle" data-g="${g.id}" data-v="allowDouble"`)}</div>
+    ${adm ? `<div class="field-label">Rotations</div><div class="list"><button class="set-row tap" style="width:100%" data-a="toast" data-msg="Rebalance isn’t in this prototype yet"><span class="li-ic">${ic('scale',20)}</span><div class="grow"><div class="b small">Rebalance a Rotation</div><div class="xs muted">Whoever has served least goes first. Settles that Responsibility’s Make-up Turns.</div></div><span class="chev">${ic('chevR',18)}</span></button></div>` : ''}
+    <div class="field-label">People</div><div class="list">
+      <div class="set-row"><div class="grow"><div class="b small">Admins</div><div class="xs muted">${adminsOf(g).map(nameMe).map(esc).join(', ')}</div></div></div>
+      <div class="set-row"><div class="grow"><div class="b small">Invite link</div><div class="xs muted">Anyone with the link joins directly</div></div>${adm?`<button class="btn sm quiet" data-a="toast" data-msg="Invite link reset. The old link no longer works.">Reset</button>`:''}</div></div>
+    <div class="spacer"></div></div>`;
+}
+
+/* ---------- TIME OFF ---------- */
+function timeOffDates(){ const set = new Set(); S.timeOff.forEach(t => t.dates.forEach(d => set.add(d))); return set; }
+function expandRepeat(dates, repeat){
+  if (repeat === 'none' || !dates.length) return dates.slice();
+  const step = repeat === 'weekly' ? 7 : repeat === 'biweekly' ? 14 : 0;
+  const out = new Set(dates);
+  dates.forEach(d0 => { let d = d0; for (let i = 0; i < 12; i++) { if (step) d = addDays(d, step); else { const x = D(d); x.setMonth(x.getMonth()+1); d = iso(x); } if (D(d) > D(END_ISO)) break; out.add(d); } });
+  return [...out].sort();
+}
+function myRoleNames(){ const set = new Set(); myGroups().forEach(g => g.roles.forEach(r => { if (r.roster.includes(ME)) set.add(r.name); })); return [...set]; }
+function availConflicts(){
+  const a = S.avail; const dates = new Set(expandRepeat(a.sel, a.repeat));
+  return mySlots(false).filter(sl => dates.has(sl.date) && (a.scope.includes('all') || a.scope.includes(role(G(sl.gid), sl.roleId).name)));
+}
+/* Route around: the next in line takes the Event; you take their next turn and keep your place at the front. */
+function routePlan(){
+  const off = new Set(expandRepeat(S.avail.sel, S.avail.repeat)); const used = new Set();
+  return availConflicts().map(sl => {
+    const g = G(sl.gid), r = role(g, sl.roleId);
+    if (g.settings.timeOff === 'ask') return {sl, mode:'ask'};
+    const days = buildSchedule(g); const ev = days.find(d => d.date === sl.date);
+    const cand = days.flatMap(d => d.slots).find(s => {
+      if (s.roleId !== r.id || s.date <= sl.date || s.person === ME || off.has(s.date) || used.has(keyOf(s))) return false;
+      if (!g.settings.allowDouble) {
+        if (ev.slots.some(o => o.roleId !== r.id && o.person === s.person)) return false;
+        const ev2 = days.find(d => d.date === s.date); if (ev2.slots.some(o => o.roleId !== r.id && o.person === ME)) return false;
+      }
+      return true;
+    });
+    if (!cand) return {sl, mode:'ask'};
+    used.add(keyOf(cand));
+    return {sl, mode:'route', other:cand};
+  });
+}
+function screenAvailability(){
+  const a = S.avail, off = timeOffDates(), cells = monthCells(a.month), sel = new Set(a.sel), mineDates = new Set(mySlots(false).map(s => s.date));
+  const grid = cells.map(c => {
+    const cls = ['cday','tap', c.out?'out':'', c.date===TODAY_ISO?'today':'', off.has(c.date)?'unav':'', sel.has(c.date)?'pick':'', a.rangeStart===c.date?'rangestart':''].join(' ');
+    return `<button class="${cls}" data-a="avail-day" data-d="${c.date}" aria-pressed="${sel.has(c.date)}" aria-label="${fLong(c.date)}"><span class="num">${D(c.date).getDate()}</span><span class="dots">${mineDates.has(c.date)?'<i class="dot" style="background:var(--primary)"></i>':''}</span></button>`;
+  }).join('');
+  const plan = routePlan();
+  const repeatOpts = [['none','Doesn’t repeat'],['weekly','Every week'],['biweekly','Every other week'],['monthly','Every month']];
+  const scopeChips = [['all','All Responsibilities'], ...myRoleNames().map(n => [n,n])];
+  const nDays = expandRepeat(a.sel, a.repeat).length;
+  const planHtml = plan.map(p => { const g = G(p.sl.gid), r = role(g, p.sl.roleId);
+    return p.mode === 'route'
+      ? `<li><b>${esc(r.name)}, ${fShort(p.sl.date)}:</b> ${esc(first(p.other.person))} takes it, and you take ${esc(first(p.other.person))}’s turn on ${fShort(p.other.date)}.</li>`
+      : `<li><b>${esc(r.name)}, ${fShort(p.sl.date)}:</b> becomes a Coverage Request${g.settings.timeOff==='ask'?` (${esc(g.name)} asks for a volunteer)`:' (no one free to swap with)'}.</li>`; }).join('');
+  return navbar('Time Off') + `<div class="pad">
+    <div class="note">${ic('route',20)}<div class="grow">Mark days you can’t serve. We route around them: the next person in line takes your turn, and you keep your place at the front.</div></div>
+    <div class="seg" style="margin:16px 0 0" role="tablist"><button role="tab" aria-selected="${a.mode==='single'}" data-a="avail-mode" data-v="single">Single days</button><button role="tab" aria-selected="${a.mode==='range'}" data-a="avail-mode" data-v="range">Date range</button></div>
+  </div>
+  <div class="card cal" style="margin-top:12px"><div class="cal-head"><button class="icon-btn" data-a="avail-move" data-v="-1" aria-label="Previous month">${ic('chevL',22)}</button><span class="mt">${monthTitle(a.month)}</span><button class="icon-btn" data-a="avail-move" data-v="1" aria-label="Next month">${ic('chevR',22)}</button></div>
+    <div class="cal-grid">${['S','M','T','W','T','F','S'].map(x => `<div class="cal-dow">${x}</div>`).join('')}${grid}</div>
+    <div class="legend"><span><i class="lg-sw" style="background:var(--danger)"></i>Selected</span><span><i class="lg-sw" style="background:repeating-linear-gradient(135deg,var(--danger-tint) 0 3px,transparent 3px 6px);border:1px solid var(--danger-tint)"></i>Already off</span><span><i class="dot" style="background:var(--primary)"></i>You’re serving</span></div>
+    ${a.mode==='range' ? `<div class="xs muted b" style="padding:6px 4px 0">${a.rangeStart ? 'Now tap the last day of the range.' : 'Tap the first day, then the last day.'}</div>` : ''}
+  </div>
+  <div class="pad">
+    <div class="field-label">Repeat</div><div class="chips">${repeatOpts.map(([v,l]) => `<button class="chip" aria-pressed="${a.repeat===v}" data-a="avail-repeat" data-v="${v}">${l}</button>`).join('')}</div>
+    <div class="field-label">Applies to</div><div class="chips">${scopeChips.map(([v,l]) => `<button class="chip" aria-pressed="${a.scope.includes(v)}" data-a="avail-scope" data-v="${esc(v)}">${esc(l)}</button>`).join('')}</div>
+    <div class="field-label">Note (optional)</div><input type="text" data-model="avail.note" value="${esc(a.note)}" placeholder="e.g. Family trip">
+    ${plan.length ? `<div class="note warn" style="margin-top:16px">${ic('route',20)}<div class="grow"><b>You’re scheduled on ${plan.length===1?'this day':'these days'}. Saving will:</b><ul style="margin:6px 0 0;padding-left:18px">${planHtml}</ul><div class="xs" style="margin-top:6px">Everyone affected is notified and asked to confirm again.</div></div></div>` : ''}
+    <div class="btn-row" style="margin-top:16px"><button class="btn secondary" data-a="avail-clear" ${a.sel.length?'':'disabled'}>Clear</button><button class="btn primary" data-a="avail-save" ${a.sel.length?'':'disabled'}>Save${nDays ? ` ${nDays} day${nDays>1?'s':''}` : ''}</button></div>
+    <div class="field-label" style="margin-top:28px">Your Time Off</div>
+    <div class="list">${S.timeOff.length ? S.timeOff.map(t => `<div class="li"><span class="li-ic" style="background:var(--danger-tint);color:var(--danger-text)">${ic('calOff',20)}</span><div class="grow"><div class="t">${esc(t.label)}</div><div class="s">${t.scope.includes('all')?'All Responsibilities':esc(t.scope.join(', '))}${t.note?` · ${esc(t.note)}`:''}</div></div><button class="icon-btn" data-a="avail-remove" data-id="${t.id}" aria-label="Remove">${ic('trash',20)}</button></div>`).join('') : '<div class="empty">No Time Off yet</div>'}</div>
+    <div class="spacer"></div></div>`;
+}
+
+/* ---------- ACTIVITY ---------- */
+function actIcon(a){ return `<span class="att-ic t-${a.tone}" style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none">${ic(a.icon,20)}</span>`; }
+function screenActivity(){
+  const f = S.actFilter;
+  const items = S.activity.filter(a => myGroups().some(g => g.id === a.gid) && (f === 'all' || a.kind === f));
+  const days = [...new Set(items.map(a => a.day))];
+  const chip = (v,l) => `<button class="chip" aria-pressed="${f===v}" data-a="act-filter" data-v="${v}">${l}</button>`;
+  return `<div class="lt-head"><div><h1>Activity</h1><div class="sub">Across all your groups</div></div></div>
+    <div class="chips scroll">${chip('all','All')}${chip('coverage','Coverage')}${chip('confirm','Confirmations')}${chip('change','Schedule changes')}</div>
+    ${days.map(d => `<div class="week-h"><h3>${d}</h3></div><div class="list" style="margin:0 16px">${items.filter(a => a.day === d).map(a => { const g = G(a.gid); return `<div class="act tap" data-a="open-group" data-g="${a.gid}" role="button" tabindex="0"><span>${actIcon(a)}</span><div class="grow" style="padding-right:12px"><div class="txt">${a.html}</div><div class="when"><i class="dot ${g.acc}"></i>${esc(g.name)} · ${esc(a.t)}</div></div>${a.unread?'<span class="unread" aria-label="Unread"></span>':''}</div>`; }).join('')}</div>`).join('') || '<div class="empty">Nothing here yet.</div>'}`;
+}
+
+/* ---------- PROFILE ---------- */
+const ALERT_OPTS = ['1 day before','2 days before','3 days before','1 week before'];
+function screenProfile(){
+  const p = S.prefs;
+  const tchip = (v,l) => `<button class="chip" aria-pressed="${p.timing.includes(v)}" data-a="pref-timing" data-v="${v}">${l}</button>`;
+  const sw = (key, icon, label, sub) => `<div class="set-row"><span class="li-ic">${ic(icon,20)}</span><div class="grow"><div class="b small">${label}</div>${sub?`<div class="xs muted">${sub}</div>`:''}</div><button class="switch" role="switch" aria-checked="${p[key]}" aria-label="${esc(label)}" data-a="pref-toggle" data-v="${key}"></button></div>`;
+  return `<div class="lt-head"><h1>Profile</h1></div>
+    <div class="pad"><div class="card row" style="padding:16px">${avatar(ME,'lg')}<div class="grow"><div class="bb" style="font-size:20px">${esc(pname(ME))}</div><div class="small muted">jordan.ellis@example.com</div><div class="xs muted b" style="margin-top:4px">${myGroups().length} groups${S.persona==='admin'?' · Admin of 2':''}</div></div></div>
+    <div class="list" style="margin-top:12px"><button class="li tap" style="width:100%" data-a="open-availability"><span class="li-ic">${ic('calOff',20)}</span><div class="grow"><div class="t">Time Off</div><div class="s">${S.timeOff.length} upcoming</div></div><span class="chev">${ic('chevR',20)}</span></button></div>
+    <div class="field-label">Remind me before an Assignment</div><div class="chips">${tchip('1w','1 week before')}${tchip('2d','2 days before')}${tchip('1d','1 day before')}${tchip('0d','Morning of')}</div>
+    <div class="field-label">Reminder time</div><div class="chips">${['8:00 AM','12:00 PM','6:00 PM','8:00 PM'].map(t => `<button class="chip" aria-pressed="${p.time===t}" data-a="pref-time" data-v="${t}">${t}</button>`).join('')}</div>
+    <div class="field-label">How to reach me</div><div class="list">${sw('push','phone','Push notifications','On by default')}${sw('email','mail','Email','Optional')}${sw('sms','msg','Text message','Optional · standard rates may apply')}</div>
+    <div class="field-label">Tell me about</div><div class="list">${sw('nCover','repeat','Coverage Requests','When someone needs cover for a Responsibility I’m Qualified for')}${sw('nChange','calX','Schedule changes','Skip Dates, Time Off routing and Make-up Turns that affect me')}</div>
+    ${S.persona==='admin' ? `<div class="field-label">As an Admin</div><div class="list"><button class="set-row tap" style="width:100%" data-a="pref-alert"><span class="li-ic">${ic('shield',20)}</span><div class="grow"><div class="b small">Alert me about Unconfirmed / Needs coverage Assignments</div><div class="xs muted">In the groups you manage. Nothing is ever declined automatically.</div></div><span class="val">${esc(p.alertLead)}</span><span class="chev">${ic('chevR',18)}</span></button></div>` : ''}
+    <div class="empty xs">${esc(APP_NAME)} prototype · v0.2</div></div>`;
+}
+
+/* ============================================================
+   Sheets
+   ============================================================ */
+function sheetHTML(){
+  const sh = S.sheet; if (!sh) return '';
+  if (sh.type === 'decline') {
+    const sl = findSlot(sh.k), g = G(sl.gid), r = role(g, sl.roleId);
+    const ask = r.roster.filter(p => p !== ME);
+    const reasons = ['Traveling','Sick','Work conflict','Family commitment','Other'];
+    const s = st(sl);
+    return sheetWrap(`<div class="overline">${esc(g.name)} · ${fShort(sl.date)}</div><h2>Can’t make ${esc(r.name)}?</h2>
+      <div class="small muted">No problem. We’ll send a Coverage Request to everyone Qualified. A reason is optional but helps.</div>
+      <div class="field-label">Reason</div><div class="chips">${reasons.map(x => `<button class="chip" aria-pressed="${sh.reason===x}" data-a="decline-reason" data-v="${x}">${x}</button>`).join('')}</div>
+      <div class="field-label">Note (optional)</div><textarea rows="2" data-model="sheet.note" placeholder="Anything the group should know?">${esc(sh.note||'')}</textarea>
+      <div class="field-label">Who we’ll ask</div>
+      <div class="card" style="padding:12px 14px;box-shadow:none;background:var(--surface-alt)"><div class="row"><span class="av-stack">${ask.map(p => avatar(p,'sm')).join('')}</span><div class="grow small"><b>${ask.map(first).join(', ')}</b>, Qualified for ${esc(r.name)}</div></div>
+      <div class="xs muted" style="margin-top:8px">The first to accept gets it. If nobody does by the alert time, ${g.settings.duty==='admins'?'the Admins will find a replacement':'you’ll be asked to find a replacement'}.</div></div>
+      ${g.settings.policy==='payItBack' ? `<div class="debt" style="margin-top:12px">${ic('handshake',20)}<div class="grow">${esc(g.name)} uses <b>Pay It Back</b>: whoever covers you is owed a Make-up Turn. You’ll take their next ${esc(r.name)} turn.</div></div>` : ''}
+      ${s.makeup ? `<div class="xs muted" style="margin-top:8px">This is a Make-up Turn. Declining it settles your debt to ${esc(first(s.makeup.creditor))}; you’ll owe whoever covers instead.</div>` : ''}`,
+      `<button class="btn lg primary block" data-a="decline-submit">${ic('send',20)}Send Coverage Request</button><button class="btn quiet block" data-a="sheet-close">Never mind</button>`);
+  }
+  if (sh.type === 'cover') {
+    const sl = findSlot(sh.k), g = G(sl.gid), r = role(g, sl.roleId), s = st(sl);
+    const t = g.settings.policy === 'payItBack' ? nextTurnOf(g, r, ME, sl.date) : null;
+    return sheetWrap(`<div class="overline">${esc(g.name)}</div><h2>Cover ${esc(r.name)} for ${esc(first(sl.person))}?</h2>
+      <div class="card row" style="padding:14px;margin-top:12px;box-shadow:none;background:var(--surface-alt)">${datebox(sl.date,true)}<div class="grow"><div class="b">${fLong(sl.date)}</div><div class="small muted">${esc(g.time)}</div>${s.reason?`<div class="xs muted" style="margin-top:4px">“${esc(s.reason)}”</div>`:''}</div></div>
+      <div class="note ok" style="margin-top:12px">${ic('scale',20)}<div class="grow">Thank you! Covering counts toward your workload in ${esc(g.name)}.</div></div>
+      ${t ? `<div class="debt" style="margin-top:10px">${ic('handshake',20)}<div class="grow"><b>Pay It Back:</b> ${esc(first(sl.person))} will owe you a Make-up Turn. They’ll take your ${esc(r.name)} turn on <b>${fShort(t.date)}</b>.</div></div>` : g.settings.policy==='countRealWork' ? `<div class="xs muted" style="margin-top:10px">${esc(g.name)} uses Count Real Work, so no Make-up Turn is owed.</div>` : ''}`,
+      `<button class="btn lg positive block" data-a="cover-submit">${ic('check',20,2.25)}Yes, I’ll cover</button><button class="btn quiet block" data-a="sheet-close">Not this time</button>`);
+  }
+  if (sh.type === 'mark') {
+    const sl = findSlot(sh.k), g = G(sl.gid), r = role(g, sl.roleId);
+    const ev = buildSchedule(g).find(d => d.date === sl.date);
+    const opts = membersOf(g).filter(p => p !== sl.person).map(p => ({p, busy: !g.settings.allowDouble && ev.slots.some(x => x.roleId !== r.id && st(x).assignee === p)}))
+      .sort((a,b) => (a.busy - b.busy) || (r.roster.includes(b.p) - r.roster.includes(a.p)) || pname(a.p).localeCompare(pname(b.p)));
+    return sheetWrap(`<div class="overline">${esc(g.name)} · ${fShort(sl.date)}</div><h2>Who’s covering ${esc(r.name)}?</h2>
+      <div class="small muted">Pick anyone in the group, or record someone from outside it.</div>
+      <div class="stack" style="margin-top:14px;gap:8px">${opts.map(o => `<button class="opt tap" data-a="mark-pick" data-v="${o.p}" ${o.busy?'disabled style="opacity:.5"':''}>${avatar(o.p,'sm')}<div class="grow"><div class="b small">${esc(nameMe(o.p))}</div><div class="xs muted">${o.busy?'Already at this Event':r.roster.includes(o.p)?`Qualified for ${esc(r.name)}`:'Group Member'}</div></div></button>`).join('')}</div>
+      <div class="or">or a Guest Cover</div>
+      <div class="row" style="gap:8px"><input type="text" data-model="sheet.guest" value="${esc(sh.guest||'')}" placeholder="Name, e.g. John Smith" aria-label="Guest name"><button class="btn secondary" data-a="mark-guest" style="flex:none">Save</button></div>
+      <div class="xs muted" style="margin-top:8px">A Guest Cover is recorded by name only. It counts toward no one’s workload and creates no Make-up Turn.</div>`,
+      `<button class="btn quiet block" data-a="sheet-close">Cancel</button>`);
+  }
+  if (sh.type === 'invite') {
+    const g = G(sh.g);
+    let qr = ''; let seed = hue(g.id) + 7;
+    for (let y = 0; y < 21; y++) for (let x = 0; x < 21; x++) {
+      const finder = (cx, cy) => x >= cx && x < cx+7 && y >= cy && y < cy+7 && (x===cx||x===cx+6||y===cy||y===cy+6|| (x>=cx+2&&x<=cx+4&&y>=cy+2&&y<=cy+4));
+      const inFinderArea = (x<8&&y<8)||(x>12&&y<8)||(x<8&&y>12);
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      const on = inFinderArea ? (finder(0,0)||finder(14,0)||finder(0,14)) : (seed % 100) < 48;
+      qr += on ? '<i></i>' : '<b></b>';
+    }
+    return sheetWrap(`<div class="overline">${esc(g.name)}</div><h2>Invite people</h2><div class="small muted">Anyone with this link or code joins the group directly.</div>
+      <div class="qr" aria-label="QR code (illustrative)">${qr}</div>
+      <div class="card row" style="padding:10px 10px 10px 14px;box-shadow:none;background:var(--surface-alt)"><span class="grow small b ellip">${APP_NAME.toLowerCase()}.app/join/${g.id}-7Q4K</span><button class="btn sm primary" data-a="copy-link">${ic('copy',16)}Copy</button></div>`,
+      `<button class="btn quiet block" data-a="sheet-close">Done</button>`);
+  }
+  if (sh.type === 'skip') return skipSheet(sh);
+  return '';
+}
+function sheetWrap(body, foot, tall){
+  return `<div class="scrim" data-a="sheet-close"></div><div class="sheet ${tall?'tall':''}" role="dialog" aria-modal="true"><div class="grab"></div><div class="sheet-body">${body}</div>${foot?`<div class="sheet-foot">${foot}</div>`:''}</div>`;
+}
+function skipPreview(g, date, reason){
+  const before = buildSchedule(g), after = buildSchedule(g, Object.assign({}, g.skips, {[date]:{reason}}));
+  const out = []; const affected = new Set();
+  for (let i = 0; i < before.length && out.length < 5; i++) {
+    const b = before[i], a = after[i];
+    if (b.date < date || b.skipped) continue;
+    const rows = g.roles.map(r => {
+      const bp = (b.slots.find(s => s.roleId === r.id) || {}).person, ap = (a.slots.find(s => s.roleId === r.id) || {}).person;
+      if (bp !== ap) { if (bp) affected.add(bp); if (ap) affected.add(ap); }
+      return {r, bp, ap};
+    });
+    out.push({date: b.date, rows, skip: a.skipped});
+  }
+  return {out, affected};
+}
+/* After a Skip Date is added/removed, every Assignment whose date changed resets to needing confirmation. */
+function markMoved(g, before, after, why){
+  const prevDate = {}; before.forEach(d => d.slots.forEach(s => { prevDate[`${s.roleId}|${s.k}`] = {date:d.date, person:s.person}; }));
+  after.forEach(d => d.slots.forEach(s => {
+    const p = prevDate[`${s.roleId}|${s.k}`]; if (!p || p.date === d.date) return;
+    const r = role(g, s.roleId);
+    S.slots[keyOf(s)] = {status: r.confirm ? 'pending' : undefined, moved:`Moved from ${fShort(p.date)} because ${why}`, history:[{t:'Just now', text:`Moved from ${fShort(p.date)}: ${why}`, tone:'warn'}]};
+  }));
+}
+function skipSheet(sh){
+  const g = G(sh.g);
+  const steps = `<div class="steps">${[1,2,3].map(i => `<i class="${i<=sh.step?'on':''}"></i>`).join('')}</div>`;
+  const hl = (p) => p ? (isMe(p) ? `<span class="me-hl">You</span>` : esc(pname(p))) : '—';
+  if (sh.step === 1) {
+    const days = buildSchedule(g).filter(d => upcoming(d.date) && !d.skipped).slice(0, 8);
+    return sheetWrap(`${steps}<div class="overline">Step 1 of 3 · ${esc(g.name)}</div><h2>Which Event needs no one?</h2><div class="small muted">Holidays, closures, special events.</div>
+      <div class="stack" style="margin-top:14px;gap:8px">${days.map(d => `<button class="opt tap" aria-pressed="${sh.date===d.date}" data-a="skip-date" data-v="${d.date}"><span class="radio"></span><div class="grow"><div class="b small">${fLong(d.date)}</div><div class="xs muted ellip">${d.slots.map(s => first(s.person)).join(', ')}</div></div></button>`).join('')}</div>
+      <button class="btn quiet" style="margin-top:8px" data-a="toast" data-msg="A full date picker would open here">${ic('calendar',18)}Pick another date</button>`,
+      `<button class="btn lg primary block" data-a="skip-next" ${sh.date?'':'disabled'}>Next</button><button class="btn quiet block" data-a="sheet-close">Cancel</button>`, true);
+  }
+  if (sh.step === 2) {
+    const reasons = ['Holiday','Closure','Special event','Other'];
+    return sheetWrap(`${steps}<div class="overline">Step 2 of 3 · ${fShort(sh.date)}</div><h2>Why is it skipped?</h2><div class="small muted">Shown to everyone affected and saved in the schedule history.</div>
+      <div class="field-label">Reason</div><div class="chips">${reasons.map(x => `<button class="chip" aria-pressed="${sh.reason===x}" data-a="skip-reason" data-v="${x}">${x}</button>`).join('')}</div>
+      <div class="field-label">Details (optional)</div><textarea rows="3" data-model="sheet.note" placeholder="e.g. Building closed for the holiday">${esc(sh.note||'')}</textarea>
+      <div class="note" style="margin-top:16px">${ic('bell',20)}<div class="grow">Everyone whose date moves will be notified and asked to confirm again.${isAdmin(g)?'':' Admins aren’t notified separately; it shows in the schedule history.'}</div></div>`,
+      `<div class="btn-row"><button class="btn lg secondary" data-a="skip-back">Back</button><button class="btn lg primary" data-a="skip-next" ${sh.reason?'':'disabled'}>Preview changes</button></div>`, true);
+  }
+  const reasonText = sh.note ? sh.note : sh.reason;
+  const {out, affected} = skipPreview(g, sh.date, reasonText);
+  return sheetWrap(`${steps}<div class="overline">Step 3 of 3 · Preview</div><h2>Here’s what changes</h2>
+    <div class="note" style="margin-top:8px">${ic('repeat',20)}<div class="grow">Nobody serves on <b>${fShort(sh.date)}</b>. Everyone from then on moves forward one Event, so <b>no turn is used up</b>. ${affected.size} people affected.</div></div>
+    <div class="stack" style="margin-top:14px">${out.map(d => `<div class="${d.skip?'skipcard':'card'}" style="padding:12px 14px;${d.skip?'':'box-shadow:none;border:1px solid var(--border)'}">
+      <div class="row" style="justify-content:space-between"><span class="b small">${fShort(d.date)}</span>${d.skip?pill('skipped'):''}</div>
+      ${d.rows.map(x => `<div class="diff"><span class="rn">${esc(x.r.name)}</span>${d.skip ? `<span class="old ellip">${hl(x.bp)}</span>` : x.bp === x.ap ? `<span class="new ellip" style="font-weight:600;color:var(--text-2)">${hl(x.ap)}</span><span class="xs muted">no change</span>` : `<span class="old ellip">${hl(x.bp)}</span><span class="arrow">${ic('arrowR',14)}</span><span class="new ellip">${hl(x.ap)}</span>`}</div>`).join('')}
+    </div>`).join('')}</div>
+    <div class="xs muted" style="margin-top:12px">Later Events continue the same pattern. Anyone in the group can remove the Skip Date later to restore the Rotation.</div>`,
+    `<div class="btn-row"><button class="btn lg secondary" data-a="skip-back">Back</button><button class="btn lg primary" data-a="skip-confirm">${ic('check',20,2.25)}Add Skip Date</button></div>`, true);
+}
+
+/* ============================================================
+   Onboarding (first launch)
+   ============================================================ */
+function onbHTML(){
+  const o = S.onb; if (!o) return '';
+  const dots = `<div class="onb-dots">${[0,1,2,3].map(i => `<i class="${i===o.step?'on':''}"></i>`).join('')}</div>`;
+  const top = `<div class="onb-top">${o.step>0?`<button class="icon-btn" data-a="onb-back" aria-label="Back">${ic('chevL',26)}</button>`:'<span style="width:48px"></span>'}${dots}<button class="btn sm quiet" data-a="onb-close">Close</button></div>`;
+  let body = '', foot = '';
+  if (o.step === 0) {
+    body = `<div class="onb-hero">${ic('loop',44,2)}</div><h1>Welcome to ${esc(APP_NAME)}</h1><p class="lead">Know whose turn it is, know what to do, and handle changes without a group text.</p>
+      <div style="margin-top:20px">
+        <div class="feat"><span class="li-ic">${ic('calendar',20)}</span><div><div class="b">Your next turn, at a glance</div><div class="small muted">Confirm in a tap.</div></div></div>
+        <div class="feat"><span class="li-ic">${ic('repeat',20)}</span><div><div class="b">Find cover fast</div><div class="small muted">Can’t make it? Everyone who can step in hears about it.</div></div></div>
+        <div class="feat"><span class="li-ic">${ic('scale',20)}</span><div><div class="b">Fair, automatically</div><div class="small muted">Rotations keep track so nobody has to.</div></div></div>
+      </div>`;
+    foot = `<button class="btn lg primary block" data-a="onb-next">Get started</button>`;
+  } else if (o.step === 1) {
+    body = `<h1>What’s your name?</h1><p class="lead">So your groups know who’s who.</p>
+      <div class="field-label">First name</div><input type="text" data-model="onb.firstName" value="${esc(o.firstName)}" placeholder="First name" autocomplete="given-name">
+      <div class="field-label">Last name</div><input type="text" data-model="onb.lastName" value="${esc(o.lastName)}" placeholder="Last name" autocomplete="family-name">`;
+    foot = `<button class="btn lg primary block" data-a="onb-next" id="onbNameNext" ${o.firstName.trim()?'':'disabled'}>Continue</button>`;
+  } else if (o.step === 2) {
+    const sw = (key, icon, label, sub) => `<div class="set-row"><span class="li-ic">${ic(icon,20)}</span><div class="grow"><div class="b small">${label}</div><div class="xs muted">${sub}</div></div><button class="switch" role="switch" aria-checked="${o[key]}" aria-label="${esc(label)}" data-a="onb-toggle" data-v="${key}"></button></div>`;
+    body = `<h1>Stay in the loop</h1><p class="lead">We’ll remind you before your turns and let you know when someone needs cover. That’s it: no noise.</p>
+      <div class="list" style="margin-top:20px">${sw('push','bell','Push notifications','Recommended. Reminders and Coverage Requests arrive on this device.')}</div>
+      <div class="field-label">Also reach me by (optional)</div>
+      <div class="list">${sw('email','mail','Email','Optional · you can change this later')}${sw('sms','msg','Text message','Optional · you can change this later')}</div>
+      ${o.sms ? `<div class="field-label">Mobile number</div><input type="text" data-model="onb.phone" value="${esc(o.phone)}" placeholder="(555) 123-4567" inputmode="tel">` : ''}
+      <div class="xs muted" style="margin-top:12px">You can change all of this later in Profile.</div>`;
+    foot = `<button class="btn lg primary block" data-a="onb-next">Continue</button>`;
+  } else {
+    body = `<h1>Join or start a group</h1><p class="lead">A group is anyone who shares recurring Responsibilities: a team, a household, a club.</p>
+      <div class="stack" style="margin-top:20px">
+        <button class="choice tap" aria-pressed="${o.choice==='join'}" data-a="onb-choice" data-v="join"><span class="li-ic" style="background:var(--primary-tint);color:var(--primary)">${ic('link',20)}</span><div class="grow"><div class="b">Join with an invite link</div><div class="small muted">Someone sent you a link or QR code.</div></div></button>
+        ${o.choice==='join' ? `<input type="text" data-model="onb.link" value="${esc(o.link)}" placeholder="Paste invite link">` : ''}
+        <button class="choice tap" aria-pressed="${o.choice==='create'}" data-a="onb-choice" data-v="create"><span class="li-ic" style="background:var(--success-tint);color:var(--success-text)">${ic('plus',20)}</span><div class="grow"><div class="b">Create a group</div><div class="small muted">Name it, add Responsibilities, invite people. You’ll be its first Admin.</div></div></button>
+      </div>`;
+    foot = `<button class="btn lg primary block" data-a="onb-finish" ${o.choice?'':'disabled'}>${o.choice==='create'?'Create group':o.choice==='join'?'Join group':'Continue'}</button><button class="btn quiet block" data-a="onb-finish" data-v="later">I’ll do this later</button>`;
+  }
+  return `${top}<div class="onb-body fade-in">${body}</div><div class="onb-foot">${foot}</div>`;
+}
+function openOnboarding(){ S.onb = {step:0, firstName:'', lastName:'', push:true, email:false, sms:false, phone:'', choice:null, link:''}; S.sheet = null; render(); }
+
+/* ============================================================
+   Render
+   ============================================================ */
+const TABS = [['home','Home','home'],['groups','Groups','users'],['schedule','Schedule','calendar'],['activity','Activity','activity'],['profile','Profile','user']];
+function renderTabbar(){
+  const unread = S.activity.filter(a => a.unread).length;
+  document.getElementById('tabbar').innerHTML = TABS.map(([v,l,i]) => `<button class="tab" data-a="tab" data-v="${v}" ${S.tab===v?'aria-current="page"':''}><span class="tab-ic">${ic(i,24, S.tab===v?2.1:1.75)}</span>${l}${v==='activity'&&unread?`<span class="badge">${unread}</span>`:''}</button>`).join('');
+}
+function render(keepScroll){
+  const view = document.getElementById('view');
+  const top = S.stack[S.stack.length-1];
+  const y = view.scrollTop;
+  let html;
+  if (top) html = top.name === 'assignment' ? screenAssignment(top) : top.name === 'group' ? screenGroup(top) : top.name === 'availability' ? screenAvailability() : '';
+  else html = {home:screenHome, groups:screenGroups, schedule:screenSchedule, activity:screenActivity, profile:screenProfile}[S.tab]();
+  view.innerHTML = html;
+  view.scrollTop = keepScroll ? y : 0;
+  renderTabbar();
+  const layer = document.getElementById('sheetLayer');
+  const wasOpen = layer.classList.contains('open');
+  const sheetBody = layer.querySelector('.sheet-body'); const sy = sheetBody ? sheetBody.scrollTop : 0;
+  if (S.sheet) layer.innerHTML = sheetHTML();
+  if (S.sheet) { if (!wasOpen) requestAnimationFrame(() => requestAnimationFrame(() => layer.classList.add('open'))); else { const nb = layer.querySelector('.sheet-body'); if (nb && S.sheet._keep) nb.scrollTop = sy; } }
+  else layer.classList.remove('open');
+  const onb = document.getElementById('onbLayer');
+  onb.innerHTML = onbHTML(); onb.classList.toggle('open', !!S.onb);
+  if (S.tab === 'activity' && !top) setTimeout(() => { S.activity.forEach(a => a.unread = false); renderTabbar(); }, 1200);
+  document.querySelectorAll('[data-ctl="persona"]').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === S.persona));
+}
+function closeSheet(){
+  const layer = document.getElementById('sheetLayer'); layer.classList.remove('open');
+  S.sheet = null; setTimeout(() => { if (!S.sheet) layer.innerHTML = ''; }, 300);
+}
+function push(route){ S.stack.push(route); render(); }
+
+/* ============================================================
+   Actions
+   ============================================================ */
+function cycle(arr, cur){ return arr[(arr.indexOf(cur) + 1) % arr.length]; }
+const A = {
+  tab(el){ S.tab = el.dataset.v; S.stack = []; render(); },
+  back(){ S.stack.pop(); render(); },
+  'open-assignment'(el){ push({name:'assignment', k:el.dataset.k}); },
+  'open-group'(el){ push({name:'group', g:el.dataset.g, tab:'overview'}); },
+  'open-availability'(){ push({name:'availability'}); },
+  'group-tab'(el){ S.stack[S.stack.length-1].tab = el.dataset.v; render(true); },
+  toast(el){ toast(el.dataset.msg, 'info'); },
+  confirm(el){
+    const sl = findSlot(el.dataset.k), g = G(sl.gid), r = role(g, sl.roleId);
+    setSt(sl, {status:'confirmed'}, {t:'Just now', text:`${pname(ME)} confirmed`, tone:'ok'});
+    log(g.id, 'checkCircle', 'ok', 'confirm', `<b>You</b> confirmed <b>${esc(r.name)}</b> for ${fShort(sl.date)}.`);
+    toast(`Confirmed ${r.name} for ${fShort(sl.date)}. Thank you!`); render(true);
+  },
+  decline(el){ S.sheet = {type:'decline', k:el.dataset.k, reason:null, note:''}; render(true); },
+  'decline-reason'(el){ S.sheet.reason = S.sheet.reason === el.dataset.v ? null : el.dataset.v; S.sheet._keep = true; render(true); },
+  'decline-submit'(){
+    const sh = S.sheet, sl = findSlot(sh.k), g = G(sl.gid), r = role(g, sl.roleId), s = st(sl);
+    const reason = [sh.reason, sh.note].filter(Boolean).join(': ');
+    const notified = r.roster.filter(p => p !== ME);
+    const hist = [{t:'Just now', text:`You declined${reason?`: “${reason}”`:''}`, tone:'bad'}, {t:'Just now', text:`Coverage Request sent to ${notified.map(first).join(', ')}`, tone:'warn'}];
+    if (s.makeup) {
+      hist.push({t:'Just now', text:`Make-up Turn owed to ${pname(s.makeup.creditor)} is settled; you’ll owe whoever covers`, tone:'info'});
+      S.debts.forEach(d => { if (d.gid === g.id && d.debtor === ME && d.payDate === sl.date && d.roleId === r.id) d.cancelled = true; });
+    }
+    setSt(sl, {status:'coverage', reason, notified, coveredBy:null, guest:null}, hist);
+    log(g.id, 'repeat', 'bad', 'coverage', `<b>You</b> can’t make <b>${esc(r.name)}</b> on ${fShort(sl.date)}. Coverage Request sent to ${notified.length} people.`);
+    closeSheet();
+    const top = S.stack[S.stack.length-1];
+    if (!top || top.name !== 'assignment') S.stack.push({name:'assignment', k:sh.k});
+    render(); toast(`Coverage Request sent to ${notified.length} people.`, 'send');
+  },
+  'undo-decline'(el){
+    const sl = findSlot(el.dataset.k), g = G(sl.gid), r = role(g, sl.roleId);
+    setSt(sl, {status:'confirmed', reason:null, notified:[]}, {t:'Just now', text:'You can make it after all; Coverage Request withdrawn', tone:'ok'});
+    log(g.id, 'checkCircle', 'ok', 'confirm', `<b>You</b> can make <b>${esc(r.name)}</b> on ${fShort(sl.date)} after all. Coverage Request withdrawn.`);
+    toast('You’re back on. Coverage Request withdrawn.'); render(true);
+  },
+  cover(el){ S.sheet = {type:'cover', k:el.dataset.k}; render(true); },
+  'cover-submit'(){
+    const sl = findSlot(S.sheet.k), g = G(sl.gid), r = role(g, sl.roleId);
+    const debt = applyCover(sl, ME);
+    log(g.id, 'repeat', 'info', 'coverage', `<b>You</b> are covering <b>${esc(r.name)}</b> for ${esc(first(sl.person))} on ${fShort(sl.date)}.${debt?` ${esc(first(sl.person))} owes you a Make-up Turn: ${fShort(debt.payDate)}.`:''}`);
+    closeSheet(); render(true); toast(`You’re covering ${r.name} on ${fShort(sl.date)}.${debt ? ` ${first(sl.person)} takes your ${fMD(debt.payDate)} turn.` : ''}`);
+  },
+  'mark-covered'(el){ S.sheet = {type:'mark', k:el.dataset.k, guest:''}; render(true); },
+  'mark-pick'(el){
+    const sl = findSlot(S.sheet.k), g = G(sl.gid), r = role(g, sl.roleId), p = el.dataset.v;
+    const debt = applyCover(sl, p, ME);
+    log(g.id, 'userCheck', 'info', 'coverage', `<b>${esc(pname(p))}</b> is covering <b>${esc(r.name)}</b> on ${fShort(sl.date)} (arranged by you).${debt?` ${esc(isMe(sl.person)?'You owe':first(sl.person)+' owes')} ${esc(first(p))} a Make-up Turn: ${fShort(debt.payDate)}.`:''}`);
+    closeSheet(); render(true); toast(`${pname(p)} is covering. They’ve been asked to confirm.`);
+  },
+  'mark-guest'(){
+    const name = (S.sheet.guest || '').trim(); if (!name) { toast('Type the guest’s name first', 'info'); return; }
+    const sl = findSlot(S.sheet.k), g = G(sl.gid), r = role(g, sl.roleId);
+    setSt(sl, {status:'covered', coveredBy:null, guest:name, debt:null}, {t:'Just now', text:`Covered by ${name} (guest), recorded by ${pname(ME)}. No workload, no Make-up Turn.`, tone:'info'});
+    log(g.id, 'userCheck', 'info', 'coverage', `<b>${esc(r.name)}</b> on ${fShort(sl.date)} is covered by ${esc(name)} (guest).`);
+    closeSheet(); render(true); toast(`Covered by ${name} (guest).`);
+  },
+  'sheet-close'(){ closeSheet(); },
+  'dismiss-notice'(el){ S.notices = S.notices.filter(n => n.id !== el.dataset.id); render(true); },
+  'home-filter'(el){ S.homeFilter = el.dataset.v; render(true); },
+  'sched-view'(el){ S.sched.view = el.dataset.v; render(true); },
+  'sched-scope'(el){ S.sched.scope = el.dataset.v; render(true); },
+  'cal-move'(el){ S.sched.month = shiftMonth(S.sched.month, +el.dataset.v); S.sched.sel = null; render(true); },
+  'cal-pick'(el){ S.sched.sel = el.dataset.d; render(true); },
+  invite(el){ S.sheet = {type:'invite', g:el.dataset.g}; render(true); },
+  'copy-link'(){ toast('Invite link copied'); },
+  'skip-open'(el){ S.sheet = {type:'skip', g:el.dataset.g, step:1, date:null, reason:null, note:''}; render(true); },
+  'skip-date'(el){ S.sheet.date = el.dataset.v; S.sheet._keep = true; render(true); },
+  'skip-reason'(el){ S.sheet.reason = el.dataset.v; S.sheet._keep = true; render(true); },
+  'skip-next'(){ S.sheet.step++; S.sheet._keep = false; render(true); },
+  'skip-back'(){ S.sheet.step--; S.sheet._keep = false; render(true); },
+  'skip-confirm'(){
+    const sh = S.sheet, g = G(sh.g), reason = sh.note || sh.reason;
+    const {affected} = skipPreview(g, sh.date, reason);
+    const before = buildSchedule(g);
+    g.skips[sh.date] = {reason, by:ME};
+    markMoved(g, before, buildSchedule(g), `${fShort(sh.date)} became a Skip Date`);
+    log(g.id, 'calX', 'neutral', 'change', `<b>You</b> added a Skip Date on <b>${fShort(sh.date)}</b>: “${esc(reason)}.” ${affected.size} people moved forward one Event and were asked to confirm again.`);
+    closeSheet(); render(true); toast(`${fShort(sh.date)} is a Skip Date. ${affected.size} people notified.`, 'calX');
+  },
+  unskip(el){
+    const g = G(el.dataset.g), d = el.dataset.d; const before = buildSchedule(g);
+    delete g.skips[d];
+    markMoved(g, before, buildSchedule(g), `the Skip Date on ${fShort(d)} was removed`);
+    log(g.id, 'undo', 'info', 'change', `<b>You</b> removed the Skip Date on <b>${fShort(d)}</b>. Rotation restored; affected people were asked to confirm again.`);
+    render(true); toast('Skip Date removed. Rotation restored.', 'undo');
+  },
+  'set-toggle'(el){ const g = G(el.dataset.g); g.settings[el.dataset.v] = !g.settings[el.dataset.v]; render(true); },
+  'role-confirm'(el){ const g = G(el.dataset.g), r = role(g, el.dataset.v); r.confirm = !r.confirm; render(true); },
+  'set-cycle'(el){
+    const g = G(el.dataset.g), key = el.dataset.v, opts = {policy:Object.keys(POLICY), duty:Object.keys(DUTY), timeOff:Object.keys(TIMEOFF)}[key];
+    g.settings[key] = cycle(opts, g.settings[key]);
+    if (key === 'policy' && g.settings.policy === 'countRealWork') {
+      const open = S.debts.filter(d => d.gid === g.id && !d.cancelled);
+      open.forEach(d => { d.cancelled = true; delete S.overrides[`${g.id}|${d.roleId}|${d.k}`]; delete S.slots[K(g.id, d.payDate, d.roleId, d.debtor)];
+        const cov = buildSchedule(g).flatMap(x => x.slots).find(s => s.date === d.coverDate && s.roleId === d.roleId && s.person === d.debtor);
+        if (cov) setSt(cov, {debtCancelled:true}, {t:'Just now', text:'Make-up Turn cancelled: Coverage Policy switched to Count Real Work', tone:''}); });
+      log(g.id, 'scale', 'info', 'change', `<b>You</b> switched ${esc(g.name)} to <b>Count Real Work</b>.${open.length?` ${open.length} outstanding Make-up ${open.length===1?'Turn was':'Turns were'} cancelled.`:''}`);
+    } else if (key === 'policy') log(g.id, 'scale', 'info', 'change', `<b>You</b> switched ${esc(g.name)} to <b>Pay It Back</b>. It starts with no debts.`);
+    render(true);
+  },
+  'avail-mode'(el){ S.avail.mode = el.dataset.v; S.avail.rangeStart = null; render(true); },
+  'avail-move'(el){ S.avail.month = shiftMonth(S.avail.month, +el.dataset.v); render(true); },
+  'avail-day'(el){
+    const a = S.avail, d = el.dataset.d;
+    if (a.mode === 'single') a.sel = a.sel.includes(d) ? a.sel.filter(x => x !== d) : a.sel.concat(d).sort();
+    else if (!a.rangeStart) { a.rangeStart = d; a.sel = [d]; }
+    else { const [s, e] = [a.rangeStart, d].sort(); const out = []; for (let x = s; x <= e; x = addDays(x,1)) out.push(x); a.sel = out; a.rangeStart = null; }
+    render(true);
+  },
+  'avail-repeat'(el){ S.avail.repeat = el.dataset.v; render(true); },
+  'avail-scope'(el){
+    const a = S.avail, v = el.dataset.v;
+    if (v === 'all') a.scope = ['all'];
+    else { a.scope = a.scope.filter(x => x !== 'all'); a.scope = a.scope.includes(v) ? a.scope.filter(x => x !== v) : a.scope.concat(v); if (!a.scope.length) a.scope = ['all']; }
+    render(true);
+  },
+  'avail-clear'(){ S.avail.sel = []; S.avail.rangeStart = null; render(true); },
+  'avail-save'(){
+    const a = S.avail; const dates = expandRepeat(a.sel, a.repeat); const plan = routePlan();
+    const rep = {none:'', weekly:', repeats weekly', biweekly:', every other week', monthly:', monthly'}[a.repeat];
+    const label = (dates.length === 1 ? fShort(dates[0]) : a.mode === 'range' && a.repeat==='none' ? `${fShort(dates[0])} – ${fShort(dates[dates.length-1])}` : `${dates.length} days from ${fShort(dates[0])}`) + rep;
+    S.timeOff.push({id:'t'+Date.now(), label, dates, repeat:a.repeat, scope:a.scope.slice(), note:a.note});
+    const lines = [];
+    plan.forEach(p => {
+      const sl = p.sl, g = G(sl.gid), r = role(g, sl.roleId);
+      if (p.mode === 'route') {
+        const o = p.other;
+        S.overrides[`${g.id}|${r.id}|${sl.k}`] = o.person; S.overrides[`${g.id}|${r.id}|${o.k}`] = ME;
+        const st1 = r.confirm ? 'pending' : undefined;
+        S.slots[K(g.id, sl.date, r.id, o.person)] = {status:st1, moved:`Moved from ${fShort(o.date)} because ${first(ME)} has Time Off on ${fShort(sl.date)}`, history:[{t:'Just now', text:`Routed around Time Off: ${pname(o.person)} takes this Event (was ${fShort(o.date)})`, tone:'warn'}]};
+        S.slots[K(g.id, o.date, r.id, ME)] = {status:st1, moved:`Moved from ${fShort(sl.date)} because of your Time Off`, history:[{t:'Just now', text:`Routed around Time Off: you take ${pname(o.person)}’s turn (was ${fShort(sl.date)})`, tone:'warn'}]};
+        log(g.id, 'route', 'warn', 'change', `Routed around your Time Off: <b>${esc(pname(o.person))}</b> takes <b>${esc(r.name)}</b> on ${fShort(sl.date)}, and you take their turn on ${fShort(o.date)}. Both of you were notified.`);
+        lines.push(`<b>${esc(r.name)}:</b> ${esc(first(o.person))} takes ${fShort(sl.date)}; you take ${fShort(o.date)}. Both of you were notified and asked to confirm.`);
+      } else {
+        const notified = r.roster.filter(x => x !== ME);
+        setSt(sl, {status:'coverage', reason:'Time Off', notified}, {t:'Just now', text:'You have Time Off; Coverage Request sent', tone:'bad'});
+        log(g.id, 'calOff', 'warn', 'coverage', `<b>You</b> have Time Off on ${fShort(sl.date)}. Coverage Request sent for <b>${esc(r.name)}</b>.`);
+        lines.push(`<b>${esc(r.name)}, ${fShort(sl.date)}:</b> Coverage Request sent.`);
+      }
+    });
+    if (lines.length) S.notices.push({id:'n'+Date.now(), icon:'route', title:'Time Off saved, schedule adjusted', html:lines.join('<br>')});
+    S.avail = {mode:a.mode, month:a.month, sel:[], rangeStart:null, repeat:'none', scope:['all'], note:''};
+    render(true); toast(lines.length ? `Time Off saved. Routed around ${lines.length} Assignment${lines.length>1?'s':''}; see Home.` : 'Time Off saved. We’ll schedule around it.', 'route');
+  },
+  'avail-remove'(el){ S.timeOff = S.timeOff.filter(t => t.id !== el.dataset.id); render(true); toast('Time Off removed', 'trash'); },
+  'act-filter'(el){ S.actFilter = el.dataset.v; render(true); },
+  'pref-timing'(el){ const p = S.prefs, v = el.dataset.v; p.timing = p.timing.includes(v) ? p.timing.filter(x => x !== v) : p.timing.concat(v); render(true); },
+  'pref-time'(el){ S.prefs.time = el.dataset.v; render(true); },
+  'pref-toggle'(el){ S.prefs[el.dataset.v] = !S.prefs[el.dataset.v]; render(true); },
+  'pref-alert'(){ S.prefs.alertLead = cycle(ALERT_OPTS, S.prefs.alertLead); render(true); },
+  /* onboarding */
+  'onb-next'(){ S.onb.step++; render(true); },
+  'onb-back'(){ S.onb.step--; render(true); },
+  'onb-close'(){ S.onb = null; render(true); },
+  'onb-toggle'(el){ S.onb[el.dataset.v] = !S.onb[el.dataset.v]; render(true); },
+  'onb-choice'(el){ S.onb.choice = el.dataset.v; render(true); },
+  'onb-finish'(el){
+    const o = S.onb;
+    const full = [o.firstName.trim(), o.lastName.trim()].filter(Boolean).join(' ');
+    if (full) PEOPLE[ME] = full;
+    Object.assign(S.prefs, {push:o.push, email:o.email, sms:o.sms});
+    S.onb = null; S.tab = 'home'; S.stack = []; render();
+    toast(el.dataset.v === 'later' ? `Welcome, ${first(ME)}! Here’s a sample of what your Home looks like.` : o.choice === 'create' ? 'Group setup isn’t in this prototype; showing sample groups.' : 'Joined! (Prototype: showing sample groups.)', 'sparkle' in ICONS ? 'sparkle' : 'checkCircle');
+  },
+};
+
+document.getElementById('screen').addEventListener('click', e => {
+  const el = e.target.closest('[data-a]'); if (!el || el.disabled) return;
+  const fn = A[el.dataset.a]; if (fn) { e.preventDefault(); fn(el); }
+});
+document.getElementById('screen').addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role="button"][data-a]')) { e.preventDefault(); e.target.click(); }
+  if (e.key === 'Escape' && S.sheet) closeSheet();
+});
+document.getElementById('screen').addEventListener('input', e => {
+  const m = e.target.dataset.model; if (!m) return;
+  const [obj, key] = m.split('.');
+  if (obj === 'sheet' && S.sheet) S.sheet[key] = e.target.value;
+  if (obj === 'avail') S.avail[key] = e.target.value;
+  if (obj === 'onb' && S.onb) { S.onb[key] = e.target.value; const b = document.getElementById('onbNameNext'); if (b) b.disabled = !S.onb.firstName.trim(); }
+});
+
+/* Stage controls */
+function setTheme(t){
+  if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+  document.querySelectorAll('[data-ctl="theme"]').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === t));
+  try { localStorage.setItem('rl-theme', t); } catch (_) {}
+}
+function simCover(){
+  const mine = mySlots(true).filter(sl => st(sl).status === 'coverage' && sl.person === ME);
+  if (!mine.length) { toast('First tap “Can’t make it” on one of your Assignments.', 'info'); return; }
+  const sl = mine[0], g = G(sl.gid), r = role(g, sl.roleId);
+  const ev = buildSchedule(g).find(d => d.date === sl.date);
+  const who = r.roster.find(p => p !== ME && !ev.slots.some(x => x.roleId !== r.id && x.person === p));
+  if (!who) { toast('No one Qualified is free for that Event.', 'info'); return; }
+  const debt = applyCover(sl, who);
+  log(g.id, 'repeat', 'info', 'coverage', `<b>${esc(pname(who))}</b> is covering your <b>${esc(r.name)}</b> on ${fShort(sl.date)}.${debt?` You owe ${esc(first(who))} a Make-up Turn: you’ll take ${esc(first(who))}’s ${fMD(debt.payDate)} turn.`:''}`);
+  if (debt) S.notices.push({id:'n'+Date.now(), icon:'handshake', title:`${first(who)} is covering you`, html:`${esc(r.name)}, ${fShort(sl.date)}. ${makeupLine(debt, r)}`});
+  render(true); toast(`${first(who)} is covering your ${r.name}.`, 'repeat');
+}
+function simAlert(){
+  let n = 0;
+  allSchedules().forEach(({g, days}) => days.forEach(d => d.slots.forEach(sl => { if (upcoming(sl.date) && st(sl).status === 'coverage') { n++;
+    setSt(sl, {status:'replace'}, {t:'Just now', text:`Alert time reached with no taker. ${g.settings.duty==='admins'?'Admins are':pname(sl.person)+' is'} finding a replacement (Replacement Duty: ${DUTY[g.settings.duty][0]}).`, tone:'bad'});
+    log(g.id, 'alert', 'bad', 'coverage', `Nobody volunteered for <b>${esc(role(g, sl.roleId).name)}</b> on ${fShort(sl.date)}. ${g.settings.duty==='admins'?'The Admins are':esc(isMe(sl.person)?'You’re':first(sl.person)+' is')} finding a replacement.`); } })));
+  render(true); toast(n ? `${n} Coverage Request${n>1?'s':''} reached the alert time with no taker.` : 'No open Coverage Requests right now.', 'alert');
+}
+document.querySelector('.controls').addEventListener('click', e => {
+  const b = e.target.closest('[data-ctl]'); if (!b) return;
+  const c = b.dataset.ctl;
+  if (c === 'persona') { S.persona = b.dataset.v; const top = S.stack[S.stack.length-1]; render(!!top); toast(S.persona === 'admin' ? 'Viewing as Admin of Sunday Worship Team and AV & Media' : 'Viewing as a regular Member', 'user'); }
+  if (c === 'theme') setTheme(b.dataset.v);
+  if (c === 'onboarding') openOnboarding();
+  if (c === 'sim-cover') simCover();
+  if (c === 'sim-alert') simAlert();
+  if (c === 'reset') { const p = S.persona; PEOPLE = Object.assign({}, SEED_PEOPLE); S = initialState(); S.persona = p; closeSheet(); render(); toast('Demo data reset', 'undo'); }
+});
+
+/* Init. A plain #onboarding hash opens onboarding (survives sandboxed embeds). #key=value deep links are for local testing only. */
+document.title = `${APP_NAME} Prototype`;
+document.getElementById('brandName').textContent = APP_NAME;
+document.getElementById('logo').innerHTML = ic('loop', 20, 2.2);
+document.getElementById('ic-onb').innerHTML = ic('play', 16);
+document.getElementById('ic-cov').innerHTML = ic('handshake', 16);
+document.getElementById('ic-alr').innerHTML = ic('zap', 16);
+document.getElementById('sbIcons').innerHTML = '<svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 4.5a10 10 0 0 1 14 0"/><path d="M3.5 7.2a6.4 6.4 0 0 1 9 0"/><circle cx="8" cy="10.2" r="1" fill="currentColor"/></svg><svg width="26" height="12" viewBox="0 0 26 12"><rect x=".5" y=".5" width="22" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="8" rx="2" fill="currentColor"/><rect x="23.5" y="4" width="1.8" height="4" rx=".9" fill="currentColor" opacity=".4"/></svg>';
+(function init(){
+  const raw = location.hash.slice(1);
+  const h = new URLSearchParams(raw.includes('=') ? raw : '');
+  let theme = 'auto'; try { theme = localStorage.getItem('rl-theme') || 'auto'; } catch (_) {}
+  if (h.get('theme')) theme = h.get('theme');
+  setTheme(theme);
+  if (h.get('persona')) S.persona = h.get('persona');
+  if (h.get('tab')) S.tab = h.get('tab');
+  if (h.get('view')) S.sched.view = h.get('view');
+  if (h.get('scope')) S.sched.scope = h.get('scope');
+  if (h.get('group')) S.stack.push({name:'group', g:h.get('group'), tab:h.get('gtab') || 'overview'});
+  if (h.get('screen') === 'availability') S.stack.push({name:'availability'});
+  if (h.get('screen') === 'assignment') S.stack.push({name:'assignment', k:h.get('k') || K('worship','2026-11-29','lead','jordan')});
+  if (h.get('sheet') === 'skip') S.sheet = {type:'skip', g:h.get('group') || 'worship', step:+(h.get('step')||1), date:h.get('date') || null, reason:h.get('step')>1?'Holiday':null, note:''};
+  if (h.get('sheet') === 'mark') S.sheet = {type:'mark', k:K('hosp','2026-11-22','greeter','jordan'), guest:''};
+  if (h.get('sheet') === 'cover') S.sheet = {type:'cover', k:K('hosp','2026-12-06','greeter','priya')};
+  render();
+  if (raw === 'onboarding' || h.get('onb')) { openOnboarding(); if (h.get('onb')) { S.onb.step = +h.get('onb'); render(); } }
+})();
+</script>
+</body>
+</html>
