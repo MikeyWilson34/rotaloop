@@ -154,7 +154,8 @@ export function FilterChips<T extends string>({
           <Pressable
             key={o.value}
             accessibilityRole="radio"
-            accessibilityState={{ selected }}
+            accessibilityState={{ selected, checked: selected }}
+            aria-checked={selected}
             accessibilityLabel={o.count !== undefined ? `${o.label}, ${o.count}` : o.label}
             onPress={() => onChange(o.value)}
             style={({ pressed }) => ({ minHeight: 48, justifyContent: 'center', transform: [{ scale: pressed ? 0.98 : 1 }] })}>

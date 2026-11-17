@@ -5,6 +5,7 @@ import {
   ThemeProvider,
   router,
   useSegments,
+  type ErrorBoundaryProps,
   type Href,
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -12,6 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
 import { useEffect } from 'react';
 
+import { AppErrorBoundary } from '@/components/AppErrorBoundary';
 import { SignOutButton } from '@/components/SignOutButton';
 import { AppColumn, Button, FormScreen, Notice, ToastHost } from '@/components/ui';
 import { redirectFor } from '@/lib/gate';
@@ -23,6 +25,18 @@ import { useTheme } from '@/theme';
 import { useAppFonts } from '@/theme/fonts';
 
 SplashScreen.preventAutoHideAsync();
+
+/**
+ * Shown instead of a blank page when anything below throws while rendering (or a route's
+ * code fails to load): "Something went wrong" with Try again / Reload.
+ */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  // Rendering it hides the splash screen, which would otherwise cover the message.
+  useEffect(() => {
+    SplashScreen.hideAsync();
+  }, []);
+  return <AppErrorBoundary {...props} />;
+}
 
 export default function RootLayout() {
   const theme = useTheme();

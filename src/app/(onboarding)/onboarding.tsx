@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Bell, Link, Mail, MessageSquare, Plus, type LucideIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { BackHandler, Pressable, View } from 'react-native';
@@ -45,7 +45,9 @@ function deviceTimeZone(): string {
 export default function OnboardingScreen() {
   const profile = useProfile();
   const { updateProfile } = useSession();
-  const [step, setStep] = useState(0);
+  // The step lives in the URL (`?step=join`), so reloading mid-onboarding stays on it.
+  const params = useLocalSearchParams<{ step?: string }>();
+  const step = params.step === 'join' ? 1 : 0;
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -70,7 +72,7 @@ export default function OnboardingScreen() {
 
   function goTo(next: number) {
     setError(null);
-    setStep(next);
+    router.setParams({ step: next === 1 ? 'join' : undefined });
   }
 
   // Android back button steps back through onboarding instead of leaving the app.
@@ -313,6 +315,7 @@ function ChoiceCard({
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ selected, checked: selected }}
+      aria-checked={selected}
       accessibilityLabel={title}
       accessibilityHint={body}
       onPress={onPress}

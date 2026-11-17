@@ -132,6 +132,7 @@ export function SwitchRow({
       accessibilityHint={description}
       accessibilityState={{ checked: value, disabled: !!disabled }}
       aria-checked={value}
+      aria-disabled={!!disabled}
       disabled={disabled}
       onPress={() => onValueChange(!value)}
       style={({ pressed }) => [rowStyle, { opacity: disabled ? 0.55 : pressed ? 0.85 : 1 }]}>

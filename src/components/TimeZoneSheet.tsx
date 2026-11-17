@@ -64,6 +64,7 @@ export function TimeZoneSheet({
               key={item}
               accessibilityRole="radio"
               accessibilityState={{ selected, checked: selected }}
+              aria-checked={selected}
               accessibilityLabel={timeZoneLabel(item)}
               onPress={() => onPick(item)}
               style={({ pressed }) => ({

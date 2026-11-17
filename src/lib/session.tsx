@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { Tables, TablesUpdate } from './database.types';
 import { gateFor, type Gate } from './gate';
 import { runGroupCommand } from './groupCommand';
+import { realtime } from './realtime';
 import { supabase } from './supabase';
 
 export type Profile = Tables<'profiles'>;
@@ -64,9 +65,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // INITIAL_SESSION fires first with the stored session (or null), then every sign-in,
     // sign-out and token refresh. Only set state here: calling Supabase inside this
     // callback can deadlock the auth client.
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => {
+    const { data } = supabase.auth.onAuthStateChange((event, next) => {
       setSession(next);
       setSessionLoading(false);
+      // Drop every live-update channel of the old account (deferred: see above).
+      if (event === 'SIGNED_OUT') setTimeout(() => realtime.removeAll(), 0);
     });
     return () => data.subscription.unsubscribe();
   }, []);

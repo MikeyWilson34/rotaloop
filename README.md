@@ -37,6 +37,7 @@ The app runs without a `.env` for now, because no screen talks to Supabase yet. 
 | `npm test` | Run the Vitest unit tests once (`npm run test:watch` to watch) |
 | `npm run typecheck` | Generates the typed routes (`npm run typegen`, i.e. `expo customize tsconfig.json`: no dev server needed, so it works in a fresh clone and CI), then `tsc --noEmit` |
 | `npm run lint` | `expo lint` (ESLint with eslint-config-expo) |
+| `npm run e2e:nav` | In-app navigation regression test in headless Edge/Chrome (`scripts/e2e-nav.mjs`): signs up a guest, creates a Group, taps the setup checklist, Settings and an Assignment, cycles the tabs; fails on any page error, console error or blank screen. Serves `dist/` locally (run `npm run web:export` first); `npm run e2e:nav -- https://rotaloop.expo.app` checks the live site after a deploy. Creates real data in the configured Supabase project |
 
 Use `npx expo install <package>` rather than `npm install` for anything native, so versions match the SDK. `npx expo-doctor` checks the project's health.
 
@@ -71,6 +72,7 @@ The web build is live at **https://rotaloop.expo.app** for early sharing, with n
 - **Output:** `web.output: 'single'`. EAS Hosting serves `index.html` for any path, so deep links such as `/join/<token>` and `/group/<id>?tab=members` load directly. `scripts/web-postexport.ts` writes `manifest.json` and adds the home-screen meta to `index.html`. The name comes from `APP_NAME`, the colours from the theme tokens, and the icons from `public/icons`.
 - **Layout:** on wide screens the app stays in a centred column (`AppColumn`; the width is `appColumnMaxWidth` in the theme tokens). Bottom sheets and the tab bar use the same width.
 - **Notifications:** the website uses Web Push (VAPID). `public/sw.js` (exported to `/sw.js`, root scope) only shows pushes and opens their link when tapped; there is no offline caching. Profile's push switch subscribes or unsubscribes this browser. On iPhone and iPad it only works in the installed web app (Share > Add to Home Screen, iOS 16.4+), so a Safari tab shows that hint instead of a prompt.
+- **Bundles:** async routes are off for web (`asyncRoutes: { web: false }` in app.config.ts), so a cold load is `index.html`, one JS bundle and the four Nunito Sans weights (6 requests, was 13 plus a chunk per screen visited). EAS Hosting answered bursts of cold loads with 429. If a script still fails to load (a 429, or a tab left open across a redeploy), the inline script from `src/lib/chunkRecovery.ts` reloads once with a cache-busting URL, then shows "Couldn't load" with a Reload button.
 - The first deploy chose the subdomain with `--dev-domain rotaloop`. Expo reserves it for this project permanently.
 
 ## Supabase

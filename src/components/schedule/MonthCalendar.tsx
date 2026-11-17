@@ -126,6 +126,7 @@ function DayCell({ day, selected, onPress }: { day: MonthDay; selected: boolean;
       accessibilityRole="button"
       accessibilityLabel={parts.join(', ')}
       accessibilityState={{ selected }}
+      aria-pressed={selected}
       onPress={onPress}
       style={{
         width: `${100 / 7}%`,

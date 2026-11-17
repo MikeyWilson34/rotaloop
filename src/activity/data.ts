@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { toInstant } from '../db/groupRows';
 import type { AssignmentChange, Cause, Instant, MakeUpTurnChange } from '../engine';
+import { useRealtimeChanges } from '../lib/realtime';
 import { useMySchedule, type MySchedule } from '../lib/schedule';
 import { useSession } from '../lib/session';
 import { supabase } from '../lib/supabase';
@@ -73,25 +74,14 @@ export async function fetchFeed(
 /** Calls `onInsert` (debounced) when history is written for any of the Groups. */
 export function useHistoryRealtime(name: string | null, groupIds: string[], onInsert: () => void) {
   const ids = groupIds.slice(0, 100).sort().join(',');
-  const ref = useRef(onInsert);
-  useEffect(() => {
-    ref.current = onInsert;
-  });
-  useEffect(() => {
-    if (!name || !ids) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const channel = supabase
-      .channel(`${name}:${ids}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'schedule_history', filter: `group_id=in.(${ids})` }, () => {
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(() => ref.current(), 400);
-      })
-      .subscribe();
-    return () => {
-      if (timer) clearTimeout(timer);
-      supabase.removeChannel(channel);
-    };
-  }, [name, ids]);
+  useRealtimeChanges(
+    name ?? 'history',
+    name && ids
+      ? [{ event: 'INSERT', schema: 'public', table: 'schedule_history', filter: `group_id=in.(${ids})` }]
+      : null,
+    onInsert,
+    400,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +140,7 @@ export function useActivityFeed(): ActivityFeed {
     if (schedule.data) void Promise.resolve().then(() => loadFirst(true));
   }, [schedule.data !== null, idsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useHistoryRealtime(userId ? `activity:${userId}` : null, groupIds, () => void loadFirst(false));
+  useHistoryRealtime(userId ? 'activity' : null, groupIds, () => void loadFirst(false));
 
   const loadMore = useCallback(() => {
     if (!next || loadingMore) return;
@@ -235,7 +225,7 @@ export function useActivityUnreadCount(): number {
     if (userId && lastSeen === null) void lastSeenStore.markSeen(userId, new Date().toISOString());
   }, [userId, lastSeen]);
 
-  useHistoryRealtime(userId ? `activity-badge:${userId}` : null, groupIds, () => void recount());
+  useHistoryRealtime(userId ? 'activity-badge' : null, groupIds, () => void recount());
   return count;
 }
 

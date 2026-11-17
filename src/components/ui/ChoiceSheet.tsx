@@ -49,6 +49,7 @@ export function ChoiceSheet<T extends string>({
               key={o.value}
               accessibilityRole="radio"
               accessibilityState={{ checked: selected, selected, disabled: !!busy }}
+              aria-checked={selected}
               accessibilityLabel={o.label}
               accessibilityHint={o.description}
               disabled={busy}

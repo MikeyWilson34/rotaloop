@@ -11,7 +11,7 @@
  * Realtime on `events` and `assignments` for those Groups (and on the person's memberships)
  * reloads it quietly.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   stateFromRows,
@@ -28,6 +28,7 @@ import { addDays, dateIn } from '../schedule/format';
 import type { HistoryRecord } from '../schedule/history';
 import type { ScheduleGroup } from '../schedule/views';
 import { deviceTimeZone, myMember } from './groupViews';
+import { useRealtimeChanges, type PgBinding } from './realtime';
 import { useLoader, type GroupDetails, type Loadable } from './groups';
 import { useSession } from './session';
 import { supabase } from './supabase';
@@ -125,42 +126,21 @@ export async function fetchMySchedule(userId: string, now: Date = new Date()): P
 
 /** Calls `onChange` (debounced) when the given tables change for any of the Groups. */
 function useGroupsRealtime(
-  channelName: string | null,
+  label: string | null,
   groupIds: string[],
   tables: string[],
   onChange: () => void,
   extra?: { table: string; filter: string },
 ) {
-  const ids = groupIds.join(',');
-  const tableList = tables.join(',');
-  const onChangeRef = useRef(onChange);
-  useEffect(() => {
-    onChangeRef.current = onChange;
-  });
-  useEffect(() => {
-    if (!channelName || (!ids && !extra)) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    // One engine write touches many rows: reload once they've all arrived.
-    const changed = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => onChangeRef.current(), 400);
-    };
-    let channel = supabase.channel(`${channelName}:${ids}`);
-    if (ids) {
-      // Realtime's `in` filter takes up to 100 values.
-      for (const table of tableList.split(',')) {
-        channel = channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `group_id=in.(${ids})` }, changed);
-      }
-    }
-    if (extra) {
-      channel = channel.on('postgres_changes', { event: '*', schema: 'public', table: extra.table, filter: extra.filter }, changed);
-    }
-    channel.subscribe();
-    return () => {
-      if (timer) clearTimeout(timer);
-      supabase.removeChannel(channel);
-    };
-  }, [channelName, ids, tableList, extra?.table, extra?.filter]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bindings: PgBinding[] = [];
+  if (label) {
+    const ids = groupIds.join(',');
+    // Realtime's `in` filter takes up to 100 values.
+    if (ids) for (const table of tables) bindings.push({ event: '*', schema: 'public', table, filter: `group_id=in.(${ids})` });
+    if (extra) bindings.push({ event: '*', schema: 'public', table: extra.table, filter: extra.filter });
+  }
+  // One engine write touches many rows: reload once they've all arrived.
+  useRealtimeChanges(label ?? 'groups', label ? bindings : null, onChange, 400);
 }
 
 /** The person's schedule across all their Groups, kept current through Realtime. */
@@ -171,7 +151,7 @@ export function useMySchedule(): Loadable<MySchedule> {
   const result = useLoader(userId, load, SCHEDULE_LOAD_FAILED);
   const groupIds = useMemo(() => (result.data?.groups ?? []).map((g) => g.id).sort().slice(0, 100), [result.data]);
   useGroupsRealtime(
-    userId ? `my-schedule:${userId}` : null,
+    userId ? 'my-schedule' : null,
     groupIds,
     ['events', 'assignments'],
     result.reload,

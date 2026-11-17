@@ -2,6 +2,9 @@
 // - writes the web app manifest (dist/manifest.json),
 // - adds the manifest link, theme colour, iOS "Add to Home Screen" meta and a safe-area
 //   viewport to dist/index.html,
+// - adds an inline script that recovers from a bundle that fails to load (a 429 from EAS
+//   Hosting, or a stale tab after a redeploy): one cache-busting reload, then a "Couldn't
+//   load" screen (src/lib/chunkRecovery.ts),
 // - checks the Web Push service worker (public/sw.js) landed at dist/sw.js: served from the
 //   site root, its scope is the whole app (ticket 11).
 // Name and colours come from APP_NAME and the theme tokens, so they have one source. The icons
@@ -12,6 +15,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { APP_NAME } from '../src/config/app';
+import { chunkRecoveryScript } from '../src/lib/chunkRecovery';
 import { colors } from '../src/theme/tokens';
 
 const dist = join(process.cwd(), 'dist');
@@ -58,6 +62,7 @@ const head = `
       html, body { background-color: ${colors.light.surfaceAlt}; overflow-x: hidden; }
       @media (prefers-color-scheme: dark) { html, body { background-color: ${colors.dark.surfaceAlt}; } }
     </style>
+    <script id="load-recovery">${chunkRecoveryScript()}</script>
 `;
 
 let html = readFileSync(indexPath, 'utf8');

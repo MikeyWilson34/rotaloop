@@ -1,5 +1,6 @@
+import { router } from 'expo-router';
 import { CircleAlert, CircleCheck, Info, Repeat } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { Button, Notice, StatusPill, Text } from '@/components/ui';
@@ -81,6 +82,12 @@ export function AssignmentActions({
     const wanted = SHEETS.find((k) => k === initialSheet);
     return wanted && view?.actions.some((a) => a.command === wanted) ? wanted : null;
   });
+
+  // The sheet has read `?action=`: drop it from the URL, so a reload or the back button doesn't
+  // open it again.
+  useEffect(() => {
+    if (initialSheet) router.setParams({ action: undefined });
+  }, [initialSheet]);
 
   if (!assignment || !view) return null;
 

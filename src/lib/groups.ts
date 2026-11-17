@@ -13,6 +13,7 @@ import type { GroupState } from '../engine';
 import { runGroupCommand, type ClientCommand } from './groupCommand';
 import { groupCommandMessage, groupDetailsMessage, type GroupAction } from './groupErrors';
 import { groupCards, type GroupCardView } from './groupViews';
+import { useRealtimeChanges } from './realtime';
 import { useSession } from './session';
 import { supabase } from './supabase';
 
@@ -140,22 +141,11 @@ export function useMyGroups(): Loadable<GroupCardView[]> {
   const { reload } = result;
 
   // Joining, leaving or being removed elsewhere (another device, an Admin).
-  useEffect(() => {
-    if (!userId) return;
-    const channel = supabase
-      .channel(`my-memberships:${userId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'members', filter: `account_id=eq.${userId}` },
-        () => {
-          reload();
-        },
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId, reload]);
+  useRealtimeChanges(
+    'my-memberships',
+    userId ? [{ event: '*', schema: 'public', table: 'members', filter: `account_id=eq.${userId}` }] : null,
+    reload,
+  );
 
   return result;
 }
@@ -197,26 +187,17 @@ export function useGroup(groupId: string | undefined): Loadable<GroupDetails> {
   const result = useLoader(id, load, GROUP_LOAD_FAILED);
   const { reload } = result;
 
-  useEffect(() => {
-    if (!id) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    // One engine write touches several rows: refresh once they've all arrived.
-    const changed = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        reload();
-      }, 300);
-    };
-    const channel = supabase
-      .channel(`group:${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'groups', filter: `id=eq.${id}` }, changed)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `group_id=eq.${id}` }, changed)
-      .subscribe();
-    return () => {
-      if (timer) clearTimeout(timer);
-      supabase.removeChannel(channel);
-    };
-  }, [id, reload]);
+  // Shared with any other mounted screen for the same Group (see realtimeHub.ts).
+  useRealtimeChanges(
+    'group',
+    id
+      ? [
+          { event: '*', schema: 'public', table: 'groups', filter: `id=eq.${id}` },
+          { event: '*', schema: 'public', table: 'members', filter: `group_id=eq.${id}` },
+        ]
+      : null,
+    reload,
+  );
 
   return result;
 }

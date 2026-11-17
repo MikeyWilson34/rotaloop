@@ -35,7 +35,15 @@ const config: ExpoConfig = {
     favicon: './assets/images/favicon.png',
   },
   plugins: [
-    'expo-router',
+    [
+      'expo-router',
+      {
+        // One main bundle on web instead of a chunk per route: a cold load is a handful of
+        // requests, so EAS Hosting's rate limit can't fail a route chunk mid-session, and a tab
+        // left open across a redeploy never asks for a chunk that no longer exists.
+        asyncRoutes: { web: false },
+      },
+    ],
     'expo-font',
     [
       'expo-camera',

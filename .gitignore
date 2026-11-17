@@ -51,3 +51,4 @@ supabase/functions/_shared/engine/
 supabase/functions/_shared/db/
 supabase/functions/_shared/schedule/
 supabase/functions/_shared/notify/
+e2e-nav-failure.png
