@@ -34,6 +34,7 @@ import { runGroupCommand } from '@/lib/groupCommand';
 import { groupCommandMessage } from '@/lib/groupErrors';
 import { deviceTimeZone } from '@/lib/groupViews';
 import { fetchGroupInviteToken } from '@/lib/inviteLinks';
+import { reminderSummary } from '@/lib/notificationPrefs';
 import { useSession } from '@/lib/session';
 import { useTheme } from '@/theme';
 
@@ -62,7 +63,8 @@ export default function HomeScreen() {
   const viewerTimeZone = data?.viewerTimeZone ?? deviceTimeZone();
   // Statuses depend on the time: recomputed with every load.
   const now = useMemo(() => new Date().toISOString(), [data]); // eslint-disable-line react-hooks/exhaustive-deps
-  const ctx: HomeContext = useMemo(() => ({ now, viewerTimeZone }), [now, viewerTimeZone]);
+  const reminderText = profile ? reminderSummary(profile) : undefined;
+  const ctx: HomeContext = useMemo(() => ({ now, viewerTimeZone, reminderText }), [now, viewerTimeZone, reminderText]);
   const groups = useMemo(() => data?.groups ?? [], [data]);
   const hero = useMemo(() => selectHero(groups, ctx), [groups, ctx]);
   const attention = useMemo(

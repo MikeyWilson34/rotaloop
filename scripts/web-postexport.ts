@@ -1,7 +1,9 @@
 // Finishes the web build after `expo export --platform web` (single-page output, dist/):
 // - writes the web app manifest (dist/manifest.json),
 // - adds the manifest link, theme colour, iOS "Add to Home Screen" meta and a safe-area
-//   viewport to dist/index.html.
+//   viewport to dist/index.html,
+// - checks the Web Push service worker (public/sw.js) landed at dist/sw.js: served from the
+//   site root, its scope is the whole app (ticket 11).
 // Name and colours come from APP_NAME and the theme tokens, so they have one source. The icons
 // are made from assets/images/icon.png and live in public/icons (the export copies them).
 //
@@ -70,4 +72,5 @@ if (html.includes('rel="manifest"')) {
   if (!html.includes('rel="manifest"')) throw new Error('Could not add the web app tags to dist/index.html');
   writeFileSync(indexPath, html);
 }
-console.log('Wrote dist/manifest.json and the web app tags in dist/index.html');
+if (!existsSync(join(dist, 'sw.js'))) throw new Error('dist/sw.js not found: public/sw.js should be copied by the export.');
+console.log('Wrote dist/manifest.json and the web app tags in dist/index.html; dist/sw.js is in place');

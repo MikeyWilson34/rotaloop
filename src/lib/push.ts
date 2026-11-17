@@ -1,3 +1,7 @@
+/**
+ * Push notifications on iOS and Android: Expo push tokens (ticket 05, ticket 11). The
+ * website uses Web Push instead: push.web.ts has the same API (Metro picks it on web).
+ */
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
@@ -6,30 +10,38 @@ import { Platform } from 'react-native';
 
 import { EAS_PROJECT_ID } from '@/config/app';
 
+import type { PushChannelStatus, PushSetupResult } from './pushStatus';
 import { supabase } from './supabase';
 
-/**
- * - `registered`: permission granted and this device's Expo push token is saved.
- * - `denied`: the person (or the OS) said no to notifications.
- * - `unsupported`: no push here (web, a simulator, or Expo Go on Android since SDK 53).
- *   Permission may still have been granted.
- * - `failed`: something went wrong getting or saving the token.
- */
-/** Expo push doesn't reach browsers; web push is a follow-up (iOS needs an installed PWA). */
-export const PUSH_ON_THIS_PLATFORM = Platform.OS !== 'web';
+export type { PushChannelStatus, PushSetupResult } from './pushStatus';
 
-/** Shown on the website where the push setting would be. */
-export const WEB_PUSH_NOTE = "Notifications on the website are coming soon; reminders will show in the app.";
+/** Which channel this build uses: Expo push here, Web Push on the website. */
+export const PUSH_PLATFORM: 'web' | 'native' = 'native';
 
-export type PushSetupResult = 'registered' | 'denied' | 'unsupported' | 'failed';
+/** No push in a simulator, or in Expo Go on Android since SDK 53. */
+function pushUnavailable(): boolean {
+  const inExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+  return !Device.isDevice || (inExpoGo && Platform.OS === 'android');
+}
+
+async function registerToken(): Promise<void> {
+  const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId: EAS_PROJECT_ID });
+  const { error } = await supabase.rpc('register_push_token', {
+    p_token: token,
+    p_platform: Platform.OS === 'ios' ? 'ios' : 'android',
+  });
+  if (error) throw error;
+}
 
 /**
  * Asks for notification permission and registers this device's Expo push token for the
  * signed-in account (`register_push_token`). Never throws: push setup must not block onboarding.
+ * - `registered`: permission granted and the token is saved.
+ * - `denied`: the person (or the OS) said no.
+ * - `unsupported`: no push here (permission may still have been granted).
+ * - `failed`: something went wrong getting or saving the token.
  */
 export async function enablePushNotifications(): Promise<PushSetupResult> {
-  // Web push needs a service worker and VAPID keys; not part of the MVP.
-  if (!PUSH_ON_THIS_PLATFORM) return 'unsupported';
   try {
     if (Platform.OS === 'android') {
       // Android 13+ only shows the permission prompt once a channel exists.
@@ -40,23 +52,44 @@ export async function enablePushNotifications(): Promise<PushSetupResult> {
     }
 
     const current = await Notifications.getPermissionsAsync();
-    const granted = current.granted
-      ? true
-      : (await Notifications.requestPermissionsAsync()).granted;
+    const granted = current.granted ? true : (await Notifications.requestPermissionsAsync()).granted;
     if (!granted) return 'denied';
-
-    const inExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-    if (!Device.isDevice || (inExpoGo && Platform.OS === 'android')) return 'unsupported';
-
-    const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId: EAS_PROJECT_ID });
-    const { error } = await supabase.rpc('register_push_token', {
-      p_token: token,
-      p_platform: Platform.OS === 'ios' ? 'ios' : 'android',
-    });
-    if (error) throw error;
+    if (pushUnavailable()) return 'unsupported';
+    await registerToken();
     return 'registered';
   } catch (error) {
     console.warn('Push notification setup failed', error);
     return 'failed';
+  }
+}
+
+/**
+ * Push off is the account's `push_enabled` flag, which the server checks before sending; the
+ * device keeps its token so turning push back on needs no new prompt.
+ */
+export async function disablePushNotifications(): Promise<void> {}
+
+/** This device's push status, for Profile. */
+export async function getPushStatus(): Promise<PushChannelStatus> {
+  if (pushUnavailable()) return 'unsupported';
+  try {
+    const permission = await Notifications.getPermissionsAsync();
+    if (permission.granted) return 'on';
+    return permission.canAskAgain ? 'off' : 'blocked';
+  } catch {
+    return 'unsupported';
+  }
+}
+
+/**
+ * Re-registers this device's token for whoever is signed in now (tokens can change, and a
+ * device can switch accounts), when permission was already given. Never prompts or throws.
+ */
+export async function refreshPushRegistration(): Promise<void> {
+  try {
+    if (pushUnavailable() || !(await Notifications.getPermissionsAsync()).granted) return;
+    await registerToken();
+  } catch (error) {
+    console.warn('Push token refresh failed', error);
   }
 }

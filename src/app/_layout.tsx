@@ -16,6 +16,7 @@ import { SignOutButton } from '@/components/SignOutButton';
 import { AppColumn, Button, FormScreen, Notice, ToastHost } from '@/components/ui';
 import { redirectFor } from '@/lib/gate';
 import { inviteTokenFromUrl, resumeInviteRoute } from '@/lib/invite';
+import { useNotificationTaps } from '@/lib/notificationTaps';
 import { loadPendingInvite, setPendingInvite, usePendingInvite } from '@/lib/pendingInvite';
 import { SessionProvider, useSession } from '@/lib/session';
 import { useTheme } from '@/theme';
@@ -61,7 +62,7 @@ export default function RootLayout() {
  */
 function RootNavigator() {
   const [fontsLoaded, fontError] = useAppFonts();
-  const { gate } = useSession();
+  const { gate, profile } = useSession();
   const ready = (fontsLoaded || !!fontError) && gate !== 'loading';
   const segments = useSegments();
   const pendingInvite = usePendingInvite();
@@ -73,6 +74,9 @@ function RootNavigator() {
   useEffect(() => {
     loadPendingInvite();
   }, []);
+
+  // A tapped notification opens its Assignment once the person is in the app (ticket 11).
+  useNotificationTaps(ready && gate === 'app', profile?.push_enabled ?? false);
 
   // An invite link opened before the app is usable (a web URL load or a deep link while
   // signed out, mid-onboarding or still loading) is remembered, so it survives sign-in and

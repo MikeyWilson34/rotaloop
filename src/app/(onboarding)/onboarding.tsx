@@ -18,7 +18,9 @@ import {
 import { ONBOARDING_STEPS } from '@/lib/gate';
 import { inviteUrl, NOT_AN_INVITE, parseInviteToken } from '@/lib/invite';
 import { clearPendingInvite, setPendingInvite, usePendingInvite } from '@/lib/pendingInvite';
-import { enablePushNotifications, PUSH_ON_THIS_PLATFORM, WEB_PUSH_NOTE } from '@/lib/push';
+import { enablePushNotifications } from '@/lib/push';
+import { canTogglePush, INSTALL_HINT } from '@/lib/pushStatus';
+import { usePushStatus } from '@/lib/usePushStatus';
 import { useProfile, useSession } from '@/lib/session';
 import { isValidPhone, normalizePhone } from '@/lib/validation';
 import { useTheme, type ColorTokens } from '@/theme';
@@ -49,6 +51,9 @@ export default function OnboardingScreen() {
 
   // Step 0: notifications. Push is on by default.
   const [push, setPush] = useState(profile.push_enabled);
+  const pushStatus = usePushStatus().status;
+  // Ask only where push can work: not in an iPhone browser tab, an old browser or a simulator.
+  const canAsk = pushStatus !== null && canTogglePush(pushStatus);
   const [email, setEmail] = useState(profile.email_enabled);
   const [sms, setSms] = useState(profile.sms_enabled);
   const [phone, setPhone] = useState(profile.phone ?? '');
@@ -95,8 +100,8 @@ export default function OnboardingScreen() {
     setPhoneError(null);
     setBusy(true);
     let pushEnabled = push;
-    // On the website there is no push yet: no permission prompt.
-    if (push && PUSH_ON_THIS_PLATFORM) {
+    // Where push can't work here (see canAsk), there is no prompt; the setting stays as it is.
+    if (push && canAsk) {
       // Ask the OS now, while the reason is on screen. A "no" turns push off here too.
       const result = await enablePushNotifications();
       if (result === 'denied') pushEnabled = false;
@@ -155,7 +160,7 @@ export default function OnboardingScreen() {
         title="Stay in the loop"
         lead="We'll remind you before your turns and let you know when someone needs cover. That's it: no noise."
         footer={<Button label="Continue" size="lg" loading={busy} onPress={saveNotifications} />}>
-        {PUSH_ON_THIS_PLATFORM ? (
+        {pushStatus === null || canAsk ? (
           <SettingsList>
             <SwitchRow
               icon={Bell}
@@ -166,7 +171,13 @@ export default function OnboardingScreen() {
             />
           </SettingsList>
         ) : (
-          <Notice tone="info">{WEB_PUSH_NOTE}</Notice>
+          <Notice tone="info">
+            {pushStatus === 'needsInstall'
+              ? INSTALL_HINT
+              : pushStatus === 'blocked'
+                ? 'Notifications are blocked here. You can allow them later in your settings, and turn them on in Profile.'
+                : "Notifications aren't available here. Everything still shows in the app."}
+          </Notice>
         )}
         <FieldLabel>Also reach me by (optional)</FieldLabel>
         <SettingsList>

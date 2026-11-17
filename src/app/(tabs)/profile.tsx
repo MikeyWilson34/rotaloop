@@ -36,7 +36,9 @@ import {
   normalizeTime,
   toggleReminderDay,
 } from '@/lib/notificationPrefs';
-import { enablePushNotifications, PUSH_ON_THIS_PLATFORM } from '@/lib/push';
+import { disablePushNotifications, enablePushNotifications, PUSH_PLATFORM } from '@/lib/push';
+import { blockedHint, canTogglePush, INSTALL_HINT, pushStatusText, shownPushStatus } from '@/lib/pushStatus';
+import { usePushStatus } from '@/lib/usePushStatus';
 import { useProfile, useSession, type ProfilePatch } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import { initials, isValidPhone, joinName, normalizePhone, splitName } from '@/lib/validation';
@@ -80,6 +82,8 @@ export default function ProfileScreen() {
   const counts = useMembershipCounts(profile.id);
   const [error, setError] = useState<string | null>(null);
   const [pushNote, setPushNote] = useState<string | null>(null);
+  const [pushBusy, setPushBusy] = useState(false);
+  const push = usePushStatus();
   const [phone, setPhone] = useState(profile.phone ?? '');
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [firstName, setFirstName] = useState(() => splitName(profile.display_name).first);
@@ -103,17 +107,29 @@ export default function ProfileScreen() {
     if (result.error) setError(result.error);
   }
 
+  /**
+   * The push switch: on asks for permission and registers this device or browser (Web Push
+   * on the website); off turns push off for the account and, on the website, unsubscribes
+   * this browser.
+   */
   async function setPushEnabled(on: boolean) {
     setPushNote(null);
-    if (!on) return save({ push_enabled: false });
-    const result = await enablePushNotifications();
-    if (result === 'denied') {
-      setPushNote(
-        `Notifications are turned off for ${APP_NAME} in your device settings. Turn them on there, then try again.`,
-      );
-      return;
+    setPushBusy(true);
+    try {
+      if (!on) {
+        await disablePushNotifications();
+        await save({ push_enabled: false });
+        return;
+      }
+      const result = await enablePushNotifications();
+      if (result === 'denied') return setPushNote(blockedHint(PUSH_PLATFORM, APP_NAME));
+      if (result === 'needsInstall') return setPushNote(INSTALL_HINT);
+      if (result === 'failed') return setPushNote("Couldn't turn on notifications here. Please try again.");
+      await save({ push_enabled: true });
+    } finally {
+      setPushBusy(false);
+      push.refresh();
     }
-    await save({ push_enabled: true });
   }
 
   function savePhone() {
@@ -131,6 +147,7 @@ export default function ProfileScreen() {
   }
 
   const reminderTime = normalizeTime(profile.reminder_time);
+  const pushStatus = push.status === null ? null : shownPushStatus(push.status, profile.push_enabled);
   const name = profile.display_name || 'Add your name';
   const meta =
     counts === null
@@ -267,10 +284,10 @@ export default function ProfileScreen() {
             <SwitchRow
               icon={Smartphone}
               label="Push notifications"
-              description={PUSH_ON_THIS_PLATFORM ? 'On by default' : 'Not available on the website yet. Coming soon.'}
-              value={PUSH_ON_THIS_PLATFORM && profile.push_enabled}
+              description={pushStatus ? pushStatusText(pushStatus, PUSH_PLATFORM) : 'Checking…'}
+              value={profile.push_enabled && pushStatus === 'on'}
               onValueChange={setPushEnabled}
-              disabled={!PUSH_ON_THIS_PLATFORM}
+              disabled={pushBusy || pushStatus === null || !canTogglePush(pushStatus)}
             />
             <SwitchRow
               icon={Mail}
@@ -290,7 +307,13 @@ export default function ProfileScreen() {
               }}
             />
           </SettingsList>
-          {pushNote ? <Notice tone="info">{pushNote}</Notice> : null}
+          {pushNote ? (
+            <Notice tone="info">{pushNote}</Notice>
+          ) : pushStatus === 'needsInstall' ? (
+            <Notice tone="info">{INSTALL_HINT}</Notice>
+          ) : pushStatus === 'blocked' ? (
+            <Notice tone="info">{blockedHint(PUSH_PLATFORM, APP_NAME)}</Notice>
+          ) : null}
           {profile.sms_enabled ? (
             <TextField
               label="Mobile number"

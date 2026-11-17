@@ -35,7 +35,7 @@ The app runs without a `.env` for now, because no screen talks to Supabase yet. 
 | `npm run deploy:web:preview` | Export, then deploy a preview to EAS Hosting (a `https://rotaloop--<id>.expo.app` URL) |
 | `npm run deploy:web` | Export, then deploy to production: https://rotaloop.expo.app |
 | `npm test` | Run the Vitest unit tests once (`npm run test:watch` to watch) |
-| `npm run typecheck` | `tsc --noEmit` |
+| `npm run typecheck` | Generates the typed routes (`npm run typegen`, i.e. `expo customize tsconfig.json`: no dev server needed, so it works in a fresh clone and CI), then `tsc --noEmit` |
 | `npm run lint` | `expo lint` (ESLint with eslint-config-expo) |
 
 Use `npx expo install <package>` rather than `npm install` for anything native, so versions match the SDK. `npx expo-doctor` checks the project's health.
@@ -67,10 +67,10 @@ supabase/
 The web build is live at **https://rotaloop.expo.app** for early sharing, with no app-store builds needed.
 
 - Run `npm run deploy:web:preview` to try a build at its own preview URL, then `npm run deploy:web` for production. Both use `npx eas-cli`, logged in to the Expo account that owns the project (run `npx eas-cli login` once).
-- **Environment:** `EXPO_PUBLIC_*` values are baked into the bundle at export time, from `.env`. Before deploying, `.env` needs `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` and `EXPO_PUBLIC_WEB_URL=https://rotaloop.expo.app` (invite links and QR codes use it). After changing `.env`, export and deploy again.
+- **Environment:** `EXPO_PUBLIC_*` values are baked into the bundle at export time, from `.env`. Before deploying, `.env` needs `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_WEB_URL=https://rotaloop.expo.app` (invite links and QR codes use it) and `EXPO_PUBLIC_VAPID_PUBLIC_KEY` (Web Push; public by design). After changing `.env`, export and deploy again.
 - **Output:** `web.output: 'single'`. EAS Hosting serves `index.html` for any path, so deep links such as `/join/<token>` and `/group/<id>?tab=members` load directly. `scripts/web-postexport.ts` writes `manifest.json` and adds the home-screen meta to `index.html`. The name comes from `APP_NAME`, the colours from the theme tokens, and the icons from `public/icons`.
 - **Layout:** on wide screens the app stays in a centred column (`AppColumn`; the width is `appColumnMaxWidth` in the theme tokens). Bottom sheets and the tab bar use the same width.
-- **Notifications:** the website has no push yet, because Expo push doesn't reach browsers. Reminders show in the app (Home and Activity). Web push is a follow-up; on iOS it needs the site added to the Home Screen (iOS 16.4+).
+- **Notifications:** the website uses Web Push (VAPID). `public/sw.js` (exported to `/sw.js`, root scope) only shows pushes and opens their link when tapped; there is no offline caching. Profile's push switch subscribes or unsubscribes this browser. On iPhone and iPad it only works in the installed web app (Share > Add to Home Screen, iOS 16.4+), so a Safari tab shows that hint instead of a prompt.
 - The first deploy chose the subdomain with `--dev-domain rotaloop`. Expo reserves it for this project permanently.
 
 ## Supabase
@@ -82,6 +82,8 @@ npx supabase login
 npx supabase link --project-ref <your-project-ref>
 npx supabase db push        # apply migrations to the hosted database
 ```
+
+**Edge Functions:** `group-command` (every schedule write) and `notify` (push notifications: Expo push for the app, Web Push for the website). `npm run functions:check` type-checks both with Deno, `npm run functions:deploy` deploys both. Secrets live only in Supabase: the function secret `VAPID_KEYS` (the Web Push key pair) and the Vault secrets `group_command_url`, `notify_url` and `group_command_service_key` used by the pg_cron jobs (`extend-event-horizons` daily, `run-notifications` every 15 minutes).
 
 ## Owner to-do (not yet done)
 

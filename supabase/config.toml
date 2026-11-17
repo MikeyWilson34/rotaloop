@@ -434,3 +434,7 @@ enabled = true
 # JWT secrets and the new signing keys, so the gateway check is off.
 [functions.group-command]
 verify_jwt = false
+
+# Service role only (the function checks the key itself): group-command and the pg_cron job call it.
+[functions.notify]
+verify_jwt = false

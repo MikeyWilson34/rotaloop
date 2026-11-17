@@ -2,6 +2,7 @@
  * Profile notification preferences: the options the prototype's Profile offers and how they
  * map to the `profiles` columns. Pure: unit-tested under Node.
  */
+import { MORNING_OF_TIME } from '../notify/plan';
 
 /** "Remind me before an Assignment" chips → `reminder_days_before` values (schema allows 0, 1, 2, 7). */
 export const REMINDER_DAY_OPTIONS = [
@@ -57,4 +58,41 @@ export function alertLeadLabel(ms: number): string {
   if (option) return option.label;
   const days = Math.round(ms / DAY_MS);
   return days === 1 ? '1 day before' : `${days} days before`;
+}
+
+// ---------------------------------------------------------------------------
+// "We'll remind you…" (Home's hero, ticket 11)
+
+/** The morning time "Morning of" reminders use (the notify planner's rule). */
+function morningOfTime(reminderTime: string): string {
+  const time = normalizeTime(reminderTime);
+  return time < '12:00' ? time : MORNING_OF_TIME;
+}
+
+const OFFSET_PHRASE: Record<number, string> = { 7: 'a week before', 2: '2 days before', 1: 'the day before', 0: 'the morning of' };
+
+function joinAnd(parts: string[]): string {
+  return parts.length <= 1 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
+/**
+ * The person's reminder settings as one sentence, e.g. "We'll remind you the day before at
+ * 6:00 PM." or "We'll remind you a week before and the day before at 6:00 PM, and the morning
+ * of at 7:00 AM." Matches what the notify planner sends (src/notify/plan.ts).
+ */
+export function reminderSummary(prefs: { push_enabled: boolean; reminder_days_before: readonly number[]; reminder_time: string }): string {
+  if (!prefs.push_enabled) return 'Reminders are off: turn on push notifications in Profile to get them.';
+  const days = [...new Set(prefs.reminder_days_before)].filter((d) => d in OFFSET_PHRASE).sort((a, b) => b - a);
+  if (days.length === 0) return 'You have no reminders set. Choose some in Profile.';
+  const time = formatTime(prefs.reminder_time);
+  const morning = formatTime(morningOfTime(prefs.reminder_time));
+  const before = days.filter((d) => d > 0).map((d) => OFFSET_PHRASE[d]);
+  const groups: string[] = [];
+  if (days.includes(0) && morning === time) {
+    groups.push(`${joinAnd([...before, OFFSET_PHRASE[0]])} at ${time}`);
+  } else {
+    if (before.length) groups.push(`${joinAnd(before)} at ${time}`);
+    if (days.includes(0)) groups.push(`${OFFSET_PHRASE[0]} at ${morning}`);
+  }
+  return `We'll remind you ${groups.join(', and ')}.`;
 }

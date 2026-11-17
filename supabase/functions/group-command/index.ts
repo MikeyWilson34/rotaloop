@@ -7,6 +7,9 @@
 // Event Series' missing Events up to the rolling horizon. It is refused unless the caller
 // presents the project's service role key.
 //
+// After each successful command (or join) it asks the notify function, in the background,
+// to send the push notifications the command caused (ticket 11).
+//
 // _shared/engine, _shared/db and _shared/schedule are generated copies of src/:
 // run `npm run functions:sync` (functions:deploy does it for you).
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -31,6 +34,32 @@ function json(body: unknown, status = 200): Response {
 }
 
 const fail = (body: Extract<GroupCommandResponse, { ok: false }>, status: number) => json(body, status);
+
+/** Supabase Edge Runtime: keeps background work running after the response is sent. */
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void } | undefined;
+
+/**
+ * Hands a successful command's history to the notify function without delaying the reply.
+ * A failure here never fails the command (notifications are best effort).
+ */
+function notifyInBackground(response: GroupCommandResponse): void {
+  if (!response.ok || response.history.length === 0) return;
+  const task = fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/notify`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'afterCommand',
+      groupId: response.groupId,
+      stateVersion: response.stateVersion,
+      history: response.history,
+    }),
+  })
+    .then(async (r) => {
+      if (!r.ok) console.error('notify failed', r.status, await r.text());
+    })
+    .catch((error) => console.error('notify failed', error));
+  if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(task);
+}
 
 // The service role key is provided to Edge Functions by Supabase; it never reaches the app.
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -142,6 +171,8 @@ Deno.serve(async (req) => {
       now: () => new Date().toISOString(),
       newId: () => crypto.randomUUID(),
     });
+    // A new Group has no one else to tell.
+    if ((body as { action?: unknown }).action !== 'createGroup') notifyInBackground(response);
     return json(response);
   } catch (error) {
     console.error('group-command failed', error);

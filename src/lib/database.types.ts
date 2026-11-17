@@ -215,6 +215,24 @@ export type Database = {
           },
         ]
       }
+      expo_push_tickets: {
+        Row: {
+          created_at: string
+          id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          token?: string
+        }
+        Relationships: []
+      }
       groups: {
         Row: {
           allow_doubling: boolean
@@ -431,6 +449,62 @@ export type Database = {
           },
         ]
       }
+      notification_log: {
+        Row: {
+          account_id: string
+          assignment_id: string | null
+          body: string
+          dedupe_key: string
+          delivered: number
+          event_id: string | null
+          group_id: string | null
+          id: number
+          kind: Database["public"]["Enums"]["notification_kind"]
+          offset_key: string
+          sent_at: string
+          title: string
+          url: string
+        }
+        Insert: {
+          account_id: string
+          assignment_id?: string | null
+          body: string
+          dedupe_key: string
+          delivered?: number
+          event_id?: string | null
+          group_id?: string | null
+          id?: never
+          kind: Database["public"]["Enums"]["notification_kind"]
+          offset_key?: string
+          sent_at?: string
+          title: string
+          url: string
+        }
+        Update: {
+          account_id?: string
+          assignment_id?: string | null
+          body?: string
+          dedupe_key?: string
+          delivered?: number
+          event_id?: string | null
+          group_id?: string | null
+          id?: never
+          kind?: Database["public"]["Enums"]["notification_kind"]
+          offset_key?: string
+          sent_at?: string
+          title?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           admin_alert_lead_time_ms: number
@@ -489,22 +563,28 @@ export type Database = {
         Row: {
           account_id: string
           created_at: string
+          kind: Database["public"]["Enums"]["push_kind"]
           last_seen_at: string
           platform: Database["public"]["Enums"]["push_platform"]
+          subscription: Json | null
           token: string
         }
         Insert: {
           account_id?: string
           created_at?: string
+          kind?: Database["public"]["Enums"]["push_kind"]
           last_seen_at?: string
           platform: Database["public"]["Enums"]["push_platform"]
+          subscription?: Json | null
           token: string
         }
         Update: {
           account_id?: string
           created_at?: string
+          kind?: Database["public"]["Enums"]["push_kind"]
           last_seen_at?: string
           platform?: Database["public"]["Enums"]["push_platform"]
+          subscription?: Json | null
           token?: string
         }
         Relationships: []
@@ -707,6 +787,7 @@ export type Database = {
         Args: { p_group_id: string; p_member_id: string }
         Returns: string
       }
+      claim_notifications: { Args: { p_items: Json }; Returns: string[] }
       group_invite_link: { Args: { p_group_id: string }; Returns: string }
       group_state_rows: { Args: { p_group_id: string }; Returns: Json }
       invite_link_preview: {
@@ -729,8 +810,11 @@ export type Database = {
         }
         Returns: undefined
       }
+      register_web_push: { Args: { p_subscription: Json }; Returns: undefined }
       request_event_horizon_extension: { Args: never; Returns: number }
+      request_notification_run: { Args: never; Returns: number }
       reset_invite_link: { Args: { p_group_id: string }; Returns: string }
+      unregister_push_token: { Args: { p_token: string }; Returns: undefined }
       update_group_details: {
         Args: { p_group_id: string; p_name: string; p_time_zone: string }
         Returns: undefined
@@ -755,6 +839,18 @@ export type Database = {
         | "coverWithdrawn"
         | "responsibilityRemoved"
       make_up_turn_status: "outstanding" | "paid" | "settled" | "cancelled"
+      notification_kind:
+        | "coverageRequest"
+        | "coverageFollowUp"
+        | "covered"
+        | "coverWithdrawn"
+        | "askedToConfirmCover"
+        | "confirmationRequested"
+        | "scheduleChange"
+        | "reminder"
+        | "replacementDuty"
+        | "adminAlert"
+      push_kind: "expo" | "web"
       push_platform: "ios" | "android" | "web"
       replacement_duty: "assignedMember" | "admins"
       time_off_handling: "routeAround" | "askVolunteer"
@@ -905,6 +1001,19 @@ export const Constants = {
         "responsibilityRemoved",
       ],
       make_up_turn_status: ["outstanding", "paid", "settled", "cancelled"],
+      notification_kind: [
+        "coverageRequest",
+        "coverageFollowUp",
+        "covered",
+        "coverWithdrawn",
+        "askedToConfirmCover",
+        "confirmationRequested",
+        "scheduleChange",
+        "reminder",
+        "replacementDuty",
+        "adminAlert",
+      ],
+      push_kind: ["expo", "web"],
       push_platform: ["ios", "android", "web"],
       replacement_duty: ["assignedMember", "admins"],
       time_off_handling: ["routeAround", "askVolunteer"],

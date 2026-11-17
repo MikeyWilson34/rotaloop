@@ -43,7 +43,15 @@ export type HomeGroup = ScheduleGroup & {
   history: HistoryRecord[];
 };
 
-export type HomeContext = { now: Instant; viewerTimeZone: string };
+export type HomeContext = {
+  now: Instant;
+  viewerTimeZone: string;
+  /**
+   * The person's reminder settings as a sentence (notificationPrefs' reminderSummary), for the
+   * hero's "You're all set." line. Defaults to "We'll remind you before the Event."
+   */
+  reminderText?: string;
+};
 
 function me(group: ScheduleGroup) {
   return group.state.members.find((m) => m.id === group.myMemberId && m.leftAt === null) ?? null;
@@ -243,7 +251,7 @@ export function selectHero(groups: HomeGroup[], ctx: HomeContext): HeroView | nu
   const doneText =
     mode === 'later'
       ? "Nothing to do yet. We'll ask you to confirm closer to the Event."
-      : "You're all set. We'll remind you before the Event.";
+      : `You're all set. ${ctx.reminderText ?? "We'll remind you before the Event."}`;
 
   return {
     key: slot.key,

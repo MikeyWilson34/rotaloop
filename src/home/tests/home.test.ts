@@ -124,7 +124,10 @@ describe('selectHero', () => {
     const confirmed = selectHero([home(b)], ctx)!;
     expect(confirmed.mode).toBe('allSet');
     expect(confirmed.status).toBe('confirmed');
-    expect(confirmed.doneText).toMatch(/^You're all set/);
+    expect(confirmed.doneText).toBe("You're all set. We'll remind you before the Event.");
+    // Ticket 11: the person's real reminder settings.
+    const withPrefs = selectHero([home(b)], { ...ctx, reminderText: "We'll remind you the day before at 6:00 PM." })!;
+    expect(withPrefs.doneText).toBe("You're all set. We'll remind you the day before at 6:00 PM.");
   });
 
   it('A Responsibility without confirmation is all set', () => {
