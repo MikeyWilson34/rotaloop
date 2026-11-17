@@ -329,6 +329,8 @@ class SeatFiller {
       reason,
       requestedBy: memberId,
       requestedAt: this.input.state.rotatedThrough ?? this.input.event.startsAt,
+      // The reason shown on the Cover sheet; the Member's own Time Off note stays private.
+      note: reason === 'timeOff' ? 'Time Off' : null,
       cover: null,
     };
     this.seats.push(this.planned(memberId, memberId, null, request));

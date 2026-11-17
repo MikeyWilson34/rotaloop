@@ -16,7 +16,7 @@
  *   must be an active Member (or be joining, adding themselves as a plain Member).
  *   Admins may do everything. Members may manage their own Time Off, name and
  *   membership (leave), add and remove Skip Dates, confirm and Decline their own
- *   Assignments, Cover, and mark covered when they hold Replacement Duty. The last
+ *   Assignments (with an optional reason) and withdraw an open Decline, Cover, and mark covered when they hold Replacement Duty. The last
  *   active Admin can't step down, leave or be removed (`lastAdmin`).
  * - `assignmentStatus`, `isUnconfirmed`, `replacementDutyHolder` are status helpers.
  * - `workload(state, responsibilityId, now)` gives served / covered / upcoming counts.

@@ -126,6 +126,8 @@ export interface AssignmentRow {
   coverage_reason: CoverageRequest['reason'] | null;
   coverage_requested_by: string | null;
   coverage_requested_at: string | null;
+  /** CoverageRequest.note (migration 20261120000000). Optional so older payloads still type. */
+  coverage_note?: string | null;
   cover_kind: 'member' | 'guest' | null;
   cover_member_id: string | null;
   cover_guest_name: string | null;
@@ -271,6 +273,7 @@ function assignmentRow(a: Assignment, position: number): AssignmentRow {
     coverage_reason: request?.reason ?? null,
     coverage_requested_by: request?.requestedBy ?? null,
     coverage_requested_at: request?.requestedAt ?? null,
+    coverage_note: request?.note ?? null,
     cover_kind: cover?.kind ?? null,
     cover_member_id: cover?.kind === 'member' ? cover.memberId : null,
     cover_guest_name: cover?.kind === 'guest' ? cover.guestName : null,
@@ -386,6 +389,7 @@ function coverageRequestFromRow(r: AssignmentRow): CoverageRequest | null {
     reason: r.coverage_reason,
     requestedBy: r.coverage_requested_by,
     requestedAt: toInstant(r.coverage_requested_at),
+    note: r.coverage_note ?? null,
     cover: coverFromRow(r),
   };
 }

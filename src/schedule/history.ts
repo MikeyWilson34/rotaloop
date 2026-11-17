@@ -17,7 +17,7 @@ import type {
   MakeUpTurnChange,
   MemberId,
 } from '../engine/types';
-import { dateIn, formatDayShort, formatMonthDay } from './format';
+import { dateIn, formatDayShort, formatMonthDay, formatTimeIn } from './format';
 
 /** A stored history entry (`schedule_history`), with its row id. */
 export type HistoryRecord = HistoryEntry & { id: string };
@@ -183,15 +183,27 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
         return { text: `${actor} can no longer cover ${assignmentPhrase(ctx, a)}. It needs coverage again.`, tone: 'bad' };
       }
       const holder = change?.before?.memberId ?? a?.memberId ?? null;
+      const why = quoted(cause.reason);
       if (holder && entry.actorId !== null && holder !== entry.actorId) {
         // An Admin declining for someone else (e.g. a Placeholder Member).
         const name = nameOf(ctx, holder);
         return {
-          text: `${actor} said ${object(name)} can't make ${assignmentPhrase(ctx, a)}. Coverage requested.`,
+          text: `${actor} said ${object(name)} can't make ${assignmentPhrase(ctx, a)}${why}. Coverage requested.`,
           tone: 'bad',
         };
       }
-      return { text: `${actor} can't make ${assignmentPhrase(ctx, a)}. Coverage requested.`, tone: 'bad' };
+      return { text: `${actor} can't make ${assignmentPhrase(ctx, a)}${why}. Coverage requested.`, tone: 'bad' };
+    }
+    case 'withdrawDecline': {
+      // Ticket 16: "Ana can make Sound on Sun, Nov 22 after all; Coverage Request withdrawn."
+      const change = entry.changes.find((c) => c.assignmentId === cause.assignmentId);
+      const a = assignmentIn(entry, ctx, cause.assignmentId);
+      const holder = change?.after?.memberId ?? a?.memberId ?? null;
+      const phrase = `can make ${assignmentPhrase(ctx, a)} after all; Coverage Request withdrawn.`;
+      if (holder && entry.actorId !== null && holder !== entry.actorId) {
+        return { text: `${actor} said ${object(nameOf(ctx, holder))} ${phrase}`, tone: 'ok' };
+      }
+      return { text: `${actor} ${phrase}`, tone: 'ok' };
     }
     case 'cover': {
       const a = assignmentIn(entry, ctx, cause.assignmentId);
@@ -300,7 +312,7 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
 }
 
 /** Causes about one Assignment, where "1 Assignment changed" adds nothing. */
-const SINGLE_ASSIGNMENT = new Set(['confirm', 'decline', 'cover', 'markCovered', 'requestConfirmation']);
+const SINGLE_ASSIGNMENT = new Set(['confirm', 'decline', 'withdrawDecline', 'cover', 'markCovered', 'requestConfirmation']);
 
 function makeUpTurnText(ctx: HistoryContext, changes: MakeUpTurnChange[]): string[] {
   const out: string[] = [];
@@ -354,6 +366,21 @@ function coverLabel(ctx: HistoryContext, a: Assignment): string | null {
   return cover.kind === 'guest' ? `${cover.guestName} (guest)` : object(nameOf(ctx, cover.memberId));
 }
 
+/** A Decline reason as ': “Traveling”', or nothing (ticket 16). */
+function quoted(reason: string | null | undefined): string {
+  const text = reason?.trim();
+  return text ? `: “${text}”` : '';
+}
+
+/** "Moved from 9:00 AM to 10:30 AM on Sun, Nov 22" when only the time changed (ticket 16). */
+function sameDayMove(ctx: HistoryContext, fromEventId: string, toEventId: string): string | null {
+  const from = ctx.state.events.find((e) => e.id === fromEventId);
+  const to = ctx.state.events.find((e) => e.id === toEventId);
+  if (!from || !to) return null;
+  const date = formatDayShort(dateIn(to.startsAt, ctx.timeZone));
+  return `Moved from ${formatTimeIn(from.startsAt, ctx.timeZone)} to ${formatTimeIn(to.startsAt, ctx.timeZone)} on ${date}`;
+}
+
 /** What one change did to its Assignment, e.g. "Moved from Sun, Nov 22 to Sun, Nov 29". */
 export function describeAssignmentChange(change: AssignmentChange, ctx: HistoryContext): { text: string; tone: HistoryTone } {
   const { before, after } = change;
@@ -369,6 +396,8 @@ export function describeAssignmentChange(change: AssignmentChange, ctx: HistoryC
   if (before.eventId !== after.eventId) {
     const from = eventDate(ctx, before.eventId);
     const to = eventDate(ctx, after.eventId);
+    const sameDay = from && from === to ? sameDayMove(ctx, before.eventId, after.eventId) : null;
+    if (sameDay) return { text: sameDay, tone: 'warn' };
     return { text: from && to ? `Moved from ${from} to ${to}` : to ? `Moved to ${to}` : 'Moved to another Event', tone: 'warn' };
   }
   const coverBefore = before.coverageRequest?.cover ?? null;
@@ -378,7 +407,7 @@ export function describeAssignmentChange(change: AssignmentChange, ctx: HistoryC
   if (!before.coverageRequest && after.coverageRequest) {
     const who = nameOf(ctx, after.coverageRequest.requestedBy ?? after.memberId);
     const reason = after.coverageRequest.reason;
-    if (reason === 'declined') return { text: `${who} can't make it. Needs coverage`, tone: 'bad' };
+    if (reason === 'declined') return { text: `${who} can't make it${quoted(after.coverageRequest.note)}. Needs coverage`, tone: 'bad' };
     if (reason === 'timeOff') return { text: `${who} ${who === 'You' ? 'are' : 'is'} on Time Off. Needs coverage`, tone: 'bad' };
     return { text: 'No one available. Needs coverage', tone: 'bad' };
   }

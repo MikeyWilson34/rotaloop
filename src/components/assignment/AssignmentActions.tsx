@@ -38,7 +38,7 @@ export type AssignmentActionsProps = {
 };
 
 /**
- * The Assignment screen's actions (ticket 09): Confirm / Can't make it for the assigned Member,
+ * The Assignment screen's actions (ticket 09; "I can make it after all" and Decline reasons, ticket 16): Confirm / Can't make it for the assigned Member,
  * "I can cover" for Qualified Members on a Coverage Request, and "Mark covered" for whoever holds
  * Replacement Duty (and any Admin). Buttons are disabled while a command runs; an inline
  * confirmation shows when it worked, and Realtime plus the reload bring the final state.
@@ -101,6 +101,13 @@ export function AssignmentActions({
       else setError(result.message);
       return;
     }
+    if (action.command === 'withdrawDecline') {
+      // "I can make it after all": no sheet, it only undoes the Decline.
+      const result = await send({ type: 'withdrawDecline', assignmentId: slot.assignmentId }, 'withdrawDecline');
+      if (result.ok) setDone(successMessage('withdrawDecline', slot.responsibilityName, event.date));
+      else setError(result.message);
+      return;
+    }
     setSheetError(null);
     setSheet(action.command);
   }
@@ -119,7 +126,15 @@ export function AssignmentActions({
 
   return (
     <View style={{ gap: space.md, marginTop: space.md }}>
-      {panel ? <CoveragePanel status={slot.status} headline={panel.headline} detail={panel.detail} asked={panel.asked} /> : null}
+      {panel ? (
+        <CoveragePanel
+          status={slot.status}
+          headline={panel.headline}
+          detail={panel.detail}
+          asked={panel.asked}
+          reason={panel.reason}
+        />
+      ) : null}
       {note ? (
         <Note icon={note.tone === 'success' ? CircleCheck : note.tone === 'primary' ? Repeat : Info} tone={note.tone}>
           {note.text}
@@ -140,10 +155,10 @@ export function AssignmentActions({
           busy={busy}
           error={sheetError}
           onClose={closeSheet}
-          onSubmit={() =>
+          onSubmit={(reason) =>
             submit(
               'decline',
-              { type: 'decline', assignmentId: slot.assignmentId },
+              { type: 'decline', assignmentId: slot.assignmentId, ...(reason ? { reason } : {}) },
               successMessage(coveringNow ? 'withdrawCover' : 'decline', slot.responsibilityName, event.date),
             )
           }
@@ -249,11 +264,14 @@ function CoveragePanel({
   headline,
   detail,
   asked,
+  reason,
 }: {
   status: SlotView['status'];
   headline: string;
   detail: string;
   asked: string[];
+  /** The Decline reason, quoted beside the pill (prototype). */
+  reason: string | null;
 }) {
   const { colors, radii, space } = useTheme();
   return (
@@ -266,7 +284,14 @@ function CoveragePanel({
         borderColor: colors.border,
         backgroundColor: colors.surfaceAlt,
       }}>
-      <StatusPill status={status === 'findReplacement' ? 'findReplacement' : 'needsCoverage'} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' }}>
+        <StatusPill status={status === 'findReplacement' ? 'findReplacement' : 'needsCoverage'} />
+        {reason ? (
+          <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
+            {`“${reason}”`}
+          </Text>
+        ) : null}
+      </View>
       <View style={{ flexDirection: 'row', gap: space.sm, alignItems: 'flex-start' }}>
         {status === 'findReplacement' ? <CircleAlert size={18} color={colors.dangerText} strokeWidth={2} /> : null}
         <Text variant="bodyStrong" style={{ flex: 1 }}>
@@ -289,7 +314,12 @@ type HostBase = {
   onClose: () => void;
 };
 
-function DeclineSheetHost({ ctx, assignmentId, onSubmit, ...base }: HostBase & { onSubmit: () => void }) {
+function DeclineSheetHost({
+  ctx,
+  assignmentId,
+  onSubmit,
+  ...base
+}: HostBase & { onSubmit: (reason: string | null) => void }) {
   const view = declineSheetView(ctx, assignmentId);
   if (!view) return null;
   return <DeclineSheet visible view={view} onSubmit={onSubmit} {...base} />;

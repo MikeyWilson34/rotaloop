@@ -56,6 +56,22 @@ describe('parseRequest', () => {
     expect(() => parseClientCommand({ type: 'addTimeOff', timeOff: { ...timeOff, note: 'x'.repeat(201) } })).toThrow();
   });
 
+  it('parses Decline reasons and withdrawDecline', () => {
+    expect(parseClientCommand({ type: 'decline', assignmentId: 'a1', reason: ' Traveling: back on the 10th ' })).toEqual({
+      type: 'decline',
+      assignmentId: 'a1',
+      reason: 'Traveling: back on the 10th',
+    });
+    expect(parseClientCommand({ type: 'decline', assignmentId: 'a1', reason: ' ' })).toEqual({ type: 'decline', assignmentId: 'a1' });
+    expect(parseClientCommand({ type: 'decline', assignmentId: 'a1', reason: null })).toEqual({ type: 'decline', assignmentId: 'a1' });
+    expect(() => parseClientCommand({ type: 'decline', assignmentId: 'a1', reason: 'x'.repeat(301) })).toThrow();
+    expect(parseClientCommand({ type: 'confirm', assignmentId: 'a1', reason: 'x' })).toEqual({ type: 'confirm', assignmentId: 'a1' });
+    expect(parseClientCommand({ type: 'withdrawDecline', assignmentId: ' a1 ', extra: 1 })).toEqual({
+      type: 'withdrawDecline',
+      assignmentId: 'a1',
+    });
+  });
+
   it('parses the setup commands, keeping only known fields', () => {
     const repeat = {
       frequency: 'monthly',

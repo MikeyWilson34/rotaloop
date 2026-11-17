@@ -34,7 +34,7 @@ supabase/.branches/
 supabase/.temp/
 
 # test / typescript output
-coverage/
+/coverage/
 *.tsbuildinfo
 
 # logs

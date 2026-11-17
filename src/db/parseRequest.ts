@@ -21,7 +21,7 @@ export class InvalidRequest extends Error {}
 const MAX_ID = 64;
 const MAX_NAME = 80;
 const MAX_LIST = 500;
-/** Skip Date reasons and Time Off notes (the engine accepts reasons up to 300). */
+/** Skip Date and Decline reasons, and Time Off notes (the engine accepts reasons up to 300). */
 const MAX_REASON = 300;
 const MAX_NOTE = 200;
 
@@ -272,8 +272,14 @@ export function parseClientCommand(value: unknown): ClientCommand {
       return { type: 'removeTimeOff', timeOffId: id(o.timeOffId, f('timeOffId')) };
     case 'requestConfirmation':
       return { type: 'requestConfirmation', assignmentIds: ids(o.assignmentIds, f('assignmentIds')) };
+    case 'decline': {
+      const reason = optional(o.reason, (v) => nullable(v, (x) => optionalText(x, f('reason'), MAX_REASON)));
+      const command: Extract<ClientCommand, { type: 'decline' }> = { type: 'decline', assignmentId: id(o.assignmentId, f('assignmentId')) };
+      if (reason) command.reason = reason;
+      return command;
+    }
     case 'confirm':
-    case 'decline':
+    case 'withdrawDecline':
     case 'cover':
       return { type: o.type, assignmentId: id(o.assignmentId, f('assignmentId')) };
     case 'markCovered':

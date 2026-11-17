@@ -34,6 +34,8 @@ export type GroupAction =
   | 'decline'
   | 'cover'
   | 'markCovered'
+  /** "I can make it after all" (ticket 16). */
+  | 'withdrawDecline'
   /** Time Off and Skip Dates (ticket 10). */
   | 'addTimeOff'
   | 'removeTimeOff'
@@ -65,6 +67,7 @@ const LAST_ADMIN: Record<GroupAction, string> = {
   decline: 'The group needs at least one Admin. Make someone else an Admin first.',
   cover: 'The group needs at least one Admin. Make someone else an Admin first.',
   markCovered: 'The group needs at least one Admin. Make someone else an Admin first.',
+  withdrawDecline: 'The group needs at least one Admin. Make someone else an Admin first.',
   addTimeOff: 'The group needs at least one Admin. Make someone else an Admin first.',
   removeTimeOff: 'The group needs at least one Admin. Make someone else an Admin first.',
   addSkipDate: 'The group needs at least one Admin. Make someone else an Admin first.',
@@ -85,6 +88,7 @@ const INVALID: Partial<Record<GroupAction, string>> = {
   changeSettings: "That setting isn't available. Pull down to refresh, then try again.",
   groupDetails: 'Check the group name and time zone, then try again.',
   addTimeOff: 'Check the days you picked, then try again.',
+  decline: 'Keep the reason under 300 characters, then try again.',
   addSkipDate: "That Event is already a Skip Date, or the reason is too long. Pull down to refresh, then try again.",
 };
 
@@ -118,6 +122,13 @@ const ASSIGNMENT: Partial<Record<GroupAction, Partial<Record<string, string>>>> 
     noCoverageRequest: "This doesn't need coverage anymore. Pull down to refresh.",
     alreadyAssignedAtEvent: "You already have an Assignment at this Event, so you can't cover this one too.",
     invalid: "You asked for coverage on this one, so you can't cover it yourself.",
+  },
+  withdrawDecline: {
+    alreadyCovered: 'Someone already covered this, so it’s theirs now. Pull down to refresh.',
+    noCoverageRequest: "You're already back on this one. Pull down to refresh.",
+    notPermitted: 'Only the person who said they can’t make it can take it back.',
+    invalid:
+      'The Rotation changed since you said you can’t make it, so this turn has moved on. Ask an Admin, or cover someone else’s turn.',
   },
   markCovered: {
     notPermitted: 'Only whoever is finding a replacement, or an Admin, can mark this covered.',

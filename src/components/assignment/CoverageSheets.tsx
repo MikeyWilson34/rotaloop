@@ -8,6 +8,8 @@ import { Button, Chip, ChipGroup, FieldLabel, Notice, Sheet, Text, TextField } f
 import {
   DECLINE_REASON_SAVED,
   DECLINE_REASONS,
+  declineReasonText,
+  MAX_DECLINE_REASON,
   nameList,
   type CoverSheetView,
   type DeclineSheetView,
@@ -27,8 +29,15 @@ type SheetBase = {
   error: string | null;
 };
 
-/** "Can't make Sound?": who we'll ask, the deadline, Pay It Back. Sends `decline`. */
-export function DeclineSheet({ view, onSubmit, ...base }: SheetBase & { view: DeclineSheetView; onSubmit: () => void }) {
+/**
+ * "Can't make Sound?": an optional reason, who we'll ask, the deadline, Pay It Back. Sends
+ * `decline` with the reason composed as "Traveling: back on the 10th" (none when withdrawing a Cover).
+ */
+export function DeclineSheet({
+  view,
+  onSubmit,
+  ...base
+}: SheetBase & { view: DeclineSheetView; onSubmit: (reason: string | null) => void }) {
   const { colors, radii, space } = useTheme();
   const [reason, setReason] = useState<string | null>(null);
   const [note, setNote] = useState('');
@@ -42,7 +51,12 @@ export function DeclineSheet({ view, onSubmit, ...base }: SheetBase & { view: De
       message={view.message}
       footer={
         <>
-          <Button label={view.submitLabel} size="lg" loading={base.busy} onPress={onSubmit} />
+          <Button
+            label={view.submitLabel}
+            size="lg"
+            loading={base.busy}
+            onPress={() => onSubmit(view.withdrawingCover ? null : declineReasonText(reason, note))}
+          />
           <Button label="Never mind" variant="quiet" disabled={base.busy} onPress={base.onClose} />
         </>
       }>
@@ -54,7 +68,13 @@ export function DeclineSheet({ view, onSubmit, ...base }: SheetBase & { view: De
               <Chip key={r} label={r} selected={reason === r} onPress={() => setReason(reason === r ? null : r)} />
             ))}
           </ChipGroup>
-          <TextField label="Note (optional)" value={note} onChangeText={setNote} placeholder="Anything the group should know?" />
+          <TextField
+            label="Note (optional)"
+            value={note}
+            onChangeText={setNote}
+            maxLength={MAX_DECLINE_REASON - 20}
+            placeholder="e.g. back on the 10th"
+          />
         </>
       ) : null}
       <FieldLabel>{"Who we'll ask"}</FieldLabel>
@@ -128,6 +148,11 @@ export function CoverSheet({
           <Text variant="subhead" color="textSecondary">
             {eventTimeText(view.startsAt, groupTimeZone, viewerTimeZone)}
           </Text>
+          {view.reason ? (
+            <Text variant="caption" color="textSecondary" style={{ marginTop: 2 }}>
+              {`“${view.reason}”`}
+            </Text>
+          ) : null}
         </View>
       </View>
       <Note icon={Scale} tone="success">

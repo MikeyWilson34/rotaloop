@@ -63,7 +63,8 @@ describe('apply_group_command_result round trip', () => {
     // A Decline and a Member Cover (creates a Make-up Turn under Pay It Back).
     const w2 = sound('w2');
     const decliner = holder(state, w2);
-    await step(run(state, { type: 'decline', assignmentId: w2 }, decliner));
+    await step(run(state, { type: 'decline', assignmentId: w2, reason: 'Traveling: back on the 10th' }, decliner));
+    expect(state.assignments.find((x) => x.id === w2)?.coverageRequest?.note).toBe('Traveling: back on the 10th');
     await step(run(state, { type: 'cover', assignmentId: w2 }, freeAt(state, 'w2', [decliner])));
     expect(state.makeUpTurns).toHaveLength(1);
 
@@ -71,6 +72,13 @@ describe('apply_group_command_result round trip', () => {
     const w3 = sound('w3');
     await step(run(state, { type: 'decline', assignmentId: w3 }, holder(state, w3)));
     await step(run(state, { type: 'markCovered', assignmentId: w3, by: { guestName: 'Pat (guest)' } }, 'ana'));
+
+    // A Decline taken back ("I can make it after all").
+    const w4 = sound('w4');
+    const w4Holder = holder(state, w4);
+    await step(run(state, { type: 'decline', assignmentId: w4, reason: 'Sick' }, w4Holder));
+    await step(run(state, { type: 'withdrawDecline', assignmentId: w4 }, w4Holder));
+    expect(state.assignments.find((x) => x.id === w4)).toMatchObject({ memberId: w4Holder, coverageRequest: null });
 
     // Repeating, Responsibility-scoped Time Off, then a Skip Date, then removing the Time Off.
     await step(

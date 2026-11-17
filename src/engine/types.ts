@@ -193,6 +193,12 @@ export interface CoverageRequest {
   reason: 'declined' | 'timeOff' | 'noOneAvailable';
   requestedBy: MemberId | null;
   requestedAt: Instant;
+  /**
+   * Why, in the Member's words, shown on the Cover sheet and in history, e.g. "Traveling: back
+   * on the 10th" (at most 300 characters). "Time Off" for a `timeOff` request. Absent or `null`
+   * when none was given.
+   */
+  note?: string | null;
   cover: Cover | null;
 }
 
@@ -306,7 +312,13 @@ export type Command =
   | { type: 'removeTimeOff'; timeOffId: TimeOffId }
   | { type: 'requestConfirmation'; assignmentIds: AssignmentId[] }
   | { type: 'confirm'; assignmentId: AssignmentId }
-  | { type: 'decline'; assignmentId: AssignmentId }
+  /** `reason`: optional, at most 300 characters; stored as the Coverage Request's `note`. */
+  | { type: 'decline'; assignmentId: AssignmentId; reason?: string | null }
+  /**
+   * "I can make it after all": the Member who declined takes the seat back while no one has
+   * covered it yet (an Admin may do it for a Placeholder Member). See commands.ts.
+   */
+  | { type: 'withdrawDecline'; assignmentId: AssignmentId }
   | { type: 'cover'; assignmentId: AssignmentId }
   | { type: 'markCovered'; assignmentId: AssignmentId; by: CoverTarget }
   | { type: 'changeSettings'; settings: Partial<GroupSettings> }

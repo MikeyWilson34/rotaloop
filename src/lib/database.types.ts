@@ -21,6 +21,7 @@ export type Database = {
           cover_guest_name: string | null
           cover_kind: Database["public"]["Enums"]["cover_kind"] | null
           cover_member_id: string | null
+          coverage_note: string | null
           coverage_reason:
             | Database["public"]["Enums"]["coverage_request_reason"]
             | null
@@ -42,6 +43,7 @@ export type Database = {
           cover_guest_name?: string | null
           cover_kind?: Database["public"]["Enums"]["cover_kind"] | null
           cover_member_id?: string | null
+          coverage_note?: string | null
           coverage_reason?:
             | Database["public"]["Enums"]["coverage_request_reason"]
             | null
@@ -63,6 +65,7 @@ export type Database = {
           cover_guest_name?: string | null
           cover_kind?: Database["public"]["Enums"]["cover_kind"] | null
           cover_member_id?: string | null
+          coverage_note?: string | null
           coverage_reason?:
             | Database["public"]["Enums"]["coverage_request_reason"]
             | null

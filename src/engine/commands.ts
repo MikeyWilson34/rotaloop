@@ -45,6 +45,8 @@ import type {
 } from './types';
 /** The longest Skip Date reason accepted. */
 export const MAX_SKIP_REASON = 300;
+/** The longest Decline reason accepted (stored as the Coverage Request's `note`). */
+export const MAX_DECLINE_REASON = 300;
 
 type Outcome = { ok: true; state: GroupState } | { ok: false; reason: RejectionReason; message: string };
 
@@ -80,6 +82,10 @@ export function applyCommand(state: GroupState, command: Command, context: Comma
   const outcome = handle(before, command, ctx);
   if (!outcome.ok) return outcome;
   const after = schedule(outcome.state, before.events, now);
+  if (command.type === 'withdrawDecline') {
+    const lost = seatLost(before, after, command.assignmentId);
+    if (lost) return lost;
+  }
 
   const changes = diffAssignments(before.assignments, after.assignments, command);
   history.push({
@@ -147,6 +153,7 @@ function permissionError(state: GroupState, command: Command, ctx: Context): Rej
     case 'removeSkipDate':
     case 'confirm':
     case 'decline':
+    case 'withdrawDecline':
     case 'cover':
     case 'markCovered':
       return null;
@@ -184,7 +191,9 @@ function handle(state: GroupState, command: Command, ctx: Context): Outcome {
     case 'confirm':
       return confirm(state, command.assignmentId, ctx);
     case 'decline':
-      return decline(state, command.assignmentId, ctx);
+      return decline(state, command.assignmentId, command.reason ?? null, ctx);
+    case 'withdrawDecline':
+      return withdrawDecline(state, command.assignmentId, ctx);
     case 'cover':
       return cover(state, command.assignmentId, ctx);
     case 'markCovered':
@@ -473,14 +482,17 @@ function confirm(state: GroupState, assignmentId: string, ctx: Context): Outcome
   return done(updateAssignment(state, assignmentId, (a) => ({ ...a, confirmation: 'confirmed' })));
 }
 
-function decline(state: GroupState, assignmentId: string, ctx: Context): Outcome {
+function decline(state: GroupState, assignmentId: string, rawReason: string | null, ctx: Context): Outcome {
   const found = futureAssignment(state, assignmentId, ctx);
   if (!found.ok) return found;
   const { assignment } = found;
   const request = assignment.coverageRequest;
+  const note = rawReason?.trim() || null;
+  if (note !== null && note.length > MAX_DECLINE_REASON) return reject('invalid', 'The reason is too long');
 
   if (request?.cover) {
-    // Declining a Cover withdraws it: the Coverage Request opens again.
+    // Declining a Cover withdraws it: the Coverage Request opens again, keeping the
+    // original Decline's reason (the coverer's reason is only in the history cause).
     const arranger = request.cover.kind === 'guest' ? request.cover.arrangedBy : null;
     if (!actsFor(state, ctx, assignment.memberId) && ctx.actorId !== arranger) {
       return reject('notPermitted', 'Only the coverer can decline this Assignment');
@@ -493,13 +505,78 @@ function decline(state: GroupState, assignmentId: string, ctx: Context): Outcome
 
   let next = updateAssignment(state, assignmentId, (a) => ({
     ...a,
-    coverageRequest: { reason: 'declined', requestedBy: a.memberId, requestedAt: ctx.now, cover: null },
+    coverageRequest: { reason: 'declined', requestedBy: a.memberId, requestedAt: ctx.now, note, cover: null },
   }));
   // Declining a Make-up Turn settles it; whoever covers is owed instead.
   if (assignment.makeUpTurnId) {
     next = closeMakeUpTurns(next, (t) => t.id === assignment.makeUpTurnId, 'settled', 'movedAlong', ctx.now);
   }
   return done(next);
+}
+
+/**
+ * "I can make it after all": undoes a Decline while its Coverage Request is still open.
+ *
+ * - Who: the Member who declined, or an Admin (or the system) for a Placeholder Member.
+ * - When: before the Event starts and before anyone (Member or guest) covers it. The "find a
+ *   replacement by" deadline doesn't matter: taking the seat back ends Replacement Duty too.
+ * - Only a Decline: a Time Off Coverage Request goes away by removing the Time Off.
+ * - Confirmation follows the Cover rule: saying "I can make it" yourself is a confirmation
+ *   (like volunteering to Cover); an Admin speaking for a Placeholder leaves it `requested`
+ *   (like Mark covered). It is `notRequired` when the Responsibility needs no confirmation.
+ * - A Make-up Turn the Decline settled ("moved along") owes again, since no one covered.
+ *
+ * The Assignment is no longer pinned, so the schedule step re-plans it; `seatLost` then makes
+ * sure the Rotation still gives this seat to the Member (an Admin may have reordered it).
+ */
+function withdrawDecline(state: GroupState, assignmentId: string, ctx: Context): Outcome {
+  const found = futureAssignment(state, assignmentId, ctx);
+  if (!found.ok) return found;
+  const { assignment } = found;
+  const request = assignment.coverageRequest;
+  if (!request) return reject('noCoverageRequest', 'The Assignment is not a Coverage Request');
+  if (request.cover) return reject('alreadyCovered', 'Someone already covered this Assignment');
+  if (request.reason !== 'declined' || request.requestedBy === null) {
+    return reject('invalid', 'Only a Decline can be withdrawn; remove the Time Off instead');
+  }
+  const memberId = request.requestedBy;
+  const member = findMember(state, memberId);
+  const self = ctx.actorId === memberId;
+  const forPlaceholder = ctx.actorId === null || (isAdmin(state, ctx.actorId) && member?.accountId === null);
+  if (!self && !forPlaceholder) return reject('notPermitted', 'Only the Member who declined can take it back');
+  if (!isActiveMember(state, memberId)) return reject('notFound', 'No such Member');
+
+  const responsibility = findResponsibility(state, assignment.responsibilityId);
+  const confirmation = !responsibility?.requiresConfirmation ? 'notRequired' : self ? 'confirmed' : 'requested';
+  let next = updateAssignment(state, assignmentId, (a) => ({ ...a, memberId, confirmation, coverageRequest: null }));
+  if (assignment.makeUpTurnId) {
+    next = {
+      ...next,
+      makeUpTurns: next.makeUpTurns.map((t) =>
+        t.id === assignment.makeUpTurnId && t.status === 'settled' && t.closedReason === 'movedAlong'
+          ? { ...t, status: 'outstanding', closedAt: null, closedReason: null }
+          : t,
+      ),
+    };
+  }
+  return done(next);
+}
+
+/** After `withdrawDecline`: the re-planned schedule must seat the Member at that Event again. */
+function seatLost(before: GroupState, after: GroupState, assignmentId: string): Rejection | null {
+  const old = before.assignments.find((a) => a.id === assignmentId);
+  const memberId = old?.coverageRequest?.requestedBy;
+  if (!old || !memberId) return null;
+  const back = after.assignments.some(
+    (a) =>
+      a.eventId === old.eventId &&
+      a.responsibilityId === old.responsibilityId &&
+      a.memberId === memberId &&
+      a.coverageRequest === null,
+  );
+  return back
+    ? null
+    : reject('invalid', 'The Rotation changed since the Decline, so this seat is no longer theirs to take back');
 }
 
 function cover(state: GroupState, assignmentId: string, ctx: Context): Outcome {
