@@ -78,26 +78,52 @@ export interface Rotation {
 // ---------------------------------------------------------------------------
 // Scheduling
 
-export type RepeatFrequency = 'weekly' | 'biweekly' | 'monthly' | 'custom';
+export type RepeatFrequency = 'weekly' | 'biweekly' | 'monthly' | 'custom' | 'daily';
 
 /**
  * When an Event Series' Events happen, in local time. The engine only stores and
  * validates it: expanding it into Events is a server job, which adds them with
  * `addEvents` (or `editEventSeries` with `replaceFutureEvents`).
+ *
+ * The optional fields came later (feedback round 1). A missing one means the original
+ * behaviour: every month, by weekday, never ending. Parsers and the row mapping only
+ * write them when they say something, so older patterns round-trip unchanged.
  */
 export interface RepeatPattern {
   frequency: RepeatFrequency;
   /** `custom` only: weeks between occurrences (weekly is 1, biweekly is 2). Otherwise `null`. */
   intervalWeeks: number | null;
-  /** Days of the week it happens on: 0 = Sunday ... 6 = Saturday (the server parser sorts them). */
+  /**
+   * Days of the week it happens on: 0 = Sunday ... 6 = Saturday (the server parser sorts them).
+   * Empty for `daily` and for `monthly` on a date.
+   */
   daysOfWeek: number[];
-  /** `monthly` only: which of the month's matching days, 1-4, or -1 for the last. Otherwise `null`. */
+  /**
+   * `monthly` by weekday only: which of the month's matching days, 1-4, or -1 for the last.
+   * Otherwise `null`.
+   */
   weekOfMonth: number | null;
+  /** `daily` only: days between occurrences, 1-365, counted from `startsOn`. */
+  intervalDays?: number | null;
+  /**
+   * `monthly` on a date only: the day of the month, 1-31. Months without that day use their
+   * last day (the 31st is Apr 30 and Feb 28 or 29).
+   */
+  dayOfMonth?: number | null;
+  /** `monthly` only: months between occurrences, 1-12, phased from `startsOn`'s month. Missing means 1. */
+  intervalMonths?: number | null;
+  /** The last local date ("YYYY-MM-DD", inclusive) it can happen on. At most one of the two ends. */
+  endsOn?: string | null;
+  /**
+   * How many Events it makes in all, counted from `startsOn` by the pattern alone. Events
+   * made, skipped or moved later don't change the count, so a rolling horizon never adds more.
+   */
+  endsAfter?: number | null;
   /** Local start time, "HH:MM" (24-hour). */
   startTime: string;
   /** IANA time zone of `startTime`, e.g. "America/Chicago". */
   timeZone: string;
-  /** Local date "YYYY-MM-DD" the pattern counts from (sets the phase of biweekly and custom). */
+  /** Local date "YYYY-MM-DD" the pattern counts from (sets the phase of biweekly, custom, daily and every N months). */
   startsOn: string;
 }
 

@@ -157,10 +157,14 @@ export function toInstant(value: string): Instant {
 
 const instantOrNull = (value: string | null): Instant | null => (value === null ? null : toInstant(value));
 
-/** A copy of the repeat pattern with only its known fields, in a fixed order. */
+/**
+ * A copy of the repeat pattern with only its known fields, in a fixed order. The optional
+ * fields are left out when unset (or, for `intervalMonths`, 1), so patterns stored before
+ * they existed round-trip exactly and their rows don't change.
+ */
 function copyRepeat(p: RepeatPattern | null): RepeatPattern | null {
   if (p === null) return null;
-  return {
+  const copy: RepeatPattern = {
     frequency: p.frequency,
     intervalWeeks: p.intervalWeeks ?? null,
     daysOfWeek: [...p.daysOfWeek],
@@ -169,6 +173,12 @@ function copyRepeat(p: RepeatPattern | null): RepeatPattern | null {
     timeZone: p.timeZone,
     startsOn: p.startsOn,
   };
+  if (p.intervalDays != null) copy.intervalDays = p.intervalDays;
+  if (p.dayOfMonth != null) copy.dayOfMonth = p.dayOfMonth;
+  if (p.intervalMonths != null && p.intervalMonths !== 1) copy.intervalMonths = p.intervalMonths;
+  if (p.endsOn != null) copy.endsOn = p.endsOn;
+  if (p.endsAfter != null) copy.endsAfter = p.endsAfter;
+  return copy;
 }
 
 // ---------------------------------------------------------------------------

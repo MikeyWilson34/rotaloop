@@ -113,6 +113,63 @@ describe('parseRequest', () => {
     for (const [input, expected] of cases) expect(parseClientCommand(input)).toEqual(expected);
   });
 
+  describe('the newer repeat options', () => {
+    const base = { intervalWeeks: null, weekOfMonth: null, startTime: '09:00', timeZone: 'America/Chicago', startsOn: '2027-01-03' };
+    const parse = (repeat: unknown) => {
+      const command = parseClientCommand({ type: 'addEventSeries', series: { id: 's', name: 'S', responsibilityIds: ['v'], repeat } });
+      return command.type === 'addEventSeries' ? command.series.repeat : undefined;
+    };
+
+    it('parses every N days, a date, every N months and an end', () => {
+      expect(parse({ ...base, frequency: 'daily', intervalDays: 10, daysOfWeek: [], endsAfter: 6 })).toEqual({
+        ...base,
+        frequency: 'daily',
+        intervalDays: 10,
+        daysOfWeek: [],
+        endsAfter: 6,
+      });
+      expect(parse({ ...base, frequency: 'monthly', dayOfMonth: 15, daysOfWeek: [], intervalMonths: 3, endsOn: '2027-06-30', endsAfter: null })).toEqual({
+        ...base,
+        frequency: 'monthly',
+        dayOfMonth: 15,
+        daysOfWeek: [],
+        intervalMonths: 3,
+        endsOn: '2027-06-30',
+      });
+    });
+
+    it('keeps older patterns exactly as they were, dropping unset or default new fields', () => {
+      const old = { ...base, frequency: 'monthly', weekOfMonth: 1, daysOfWeek: [2] };
+      expect(parse(old)).toStrictEqual(old);
+      expect(parse({ ...old, intervalMonths: 1, endsOn: null, endsAfter: null, dayOfMonth: null })).toStrictEqual(old);
+      // Fields that don't belong to the frequency are dropped, as intervalWeeks always was.
+      expect(parse({ ...base, frequency: 'weekly', daysOfWeek: [0], intervalDays: 3, intervalMonths: 2 })).toStrictEqual({
+        ...base,
+        frequency: 'weekly',
+        daysOfWeek: [0],
+      });
+    });
+
+    it.each([
+      [{ ...base, frequency: 'daily', daysOfWeek: [] }],
+      [{ ...base, frequency: 'daily', intervalDays: 0, daysOfWeek: [] }],
+      [{ ...base, frequency: 'daily', intervalDays: 366, daysOfWeek: [] }],
+      [{ ...base, frequency: 'daily', intervalDays: 2, daysOfWeek: [1] }],
+      [{ ...base, frequency: 'monthly', dayOfMonth: 32, daysOfWeek: [] }],
+      [{ ...base, frequency: 'monthly', dayOfMonth: 0, daysOfWeek: [] }],
+      [{ ...base, frequency: 'monthly', dayOfMonth: 15, daysOfWeek: [0] }],
+      [{ ...base, frequency: 'monthly', weekOfMonth: 1, daysOfWeek: [0], intervalMonths: 13 }],
+      [{ ...base, frequency: 'weekly', daysOfWeek: [0], endsOn: '2026-12-31' }],
+      [{ ...base, frequency: 'weekly', daysOfWeek: [0], endsOn: '2027-02-30x' }],
+      [{ ...base, frequency: 'weekly', daysOfWeek: [0], endsAfter: 0 }],
+      [{ ...base, frequency: 'weekly', daysOfWeek: [0], endsAfter: 501 }],
+      [{ ...base, frequency: 'weekly', daysOfWeek: [0], endsAfter: 2.5 }],
+      [{ ...base, frequency: 'weekly', daysOfWeek: [0], endsOn: '2027-06-30', endsAfter: 3 }],
+    ])('rejects %j', (repeat) => {
+      expect(() => parse(repeat)).toThrow();
+    });
+  });
+
   it.each([
     [{ type: 'editResponsibility', responsibilityId: 'v', changes: { headcount: 0 } }],
     [{ type: 'setAdmin', memberId: 'm1', isAdmin: 'yes' }],

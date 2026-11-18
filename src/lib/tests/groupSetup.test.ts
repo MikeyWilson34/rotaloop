@@ -10,6 +10,8 @@ import {
   daysToMs,
   deadlineDays,
   deadlineLabel,
+  dayOfMonthHint,
+  describeEnd,
   describeRepeat,
   firstUnstaffedResponsibility,
   formatDate,
@@ -17,6 +19,7 @@ import {
   moveItem,
   newId,
   newSeriesForm,
+  ordinal,
   outstandingMakeUpTurns,
   parseDate,
   parseTime,
@@ -212,12 +215,123 @@ describe('Event Series form', () => {
       name: '',
       frequency: 'weekly',
       intervalWeeks: '3',
+      intervalDays: '2',
       daysOfWeek: [0],
+      monthlyBy: 'weekday',
       weekOfMonth: 1,
+      dayOfMonth: '15',
+      intervalMonths: '1',
       time: '9:00 AM',
       timeZone: 'America/Chicago',
       startsOn: '2026-11-15',
+      ends: 'never',
+      endsOn: '',
+      endsAfter: '10',
       responsibilityIds: ['sound', 'greeter'],
+    });
+  });
+
+  describe('the newer repeat options', () => {
+    const repeatOf = (f: Partial<SeriesForm>) => {
+      const result = validateSeriesForm(form(f), ['sound']);
+      return result.ok ? result.value.repeat : result.errors;
+    };
+
+    it('every N days has no weekdays', () => {
+      expect(repeatOf({ frequency: 'daily', intervalDays: '10' })).toEqual({
+        ...sundays,
+        frequency: 'daily',
+        intervalDays: 10,
+        daysOfWeek: [],
+      });
+      expect(repeatOf({ frequency: 'daily', intervalDays: '0' })).toEqual({ interval: 'Enter a number of days from 1 to 365.' });
+      expect(repeatOf({ frequency: 'daily', intervalDays: '1', daysOfWeek: [] })).toMatchObject({ intervalDays: 1 });
+    });
+
+    it('monthly on a date, every N months', () => {
+      expect(repeatOf({ frequency: 'monthly', monthlyBy: 'date', dayOfMonth: '31', intervalMonths: '3' })).toEqual({
+        ...sundays,
+        frequency: 'monthly',
+        daysOfWeek: [],
+        dayOfMonth: 31,
+        intervalMonths: 3,
+      });
+      expect(repeatOf({ frequency: 'monthly', monthlyBy: 'date', dayOfMonth: '32' })).toEqual({
+        dayOfMonth: 'Enter a day of the month from 1 to 31.',
+      });
+      // Every 1 month is stored as plain monthly, exactly like patterns made before.
+      expect(repeatOf({ frequency: 'monthly', weekOfMonth: 1, intervalMonths: '1' })).toStrictEqual({
+        ...sundays,
+        frequency: 'monthly',
+        weekOfMonth: 1,
+      });
+      expect(repeatOf({ frequency: 'monthly', intervalMonths: '13' })).toEqual({ interval: 'Enter a number of months from 1 to 12.' });
+    });
+
+    it('ends on a date or after a number of Events', () => {
+      expect(repeatOf({ ends: 'onDate', endsOn: '2027-06-30' })).toEqual({ ...sundays, endsOn: '2027-06-30' });
+      expect(repeatOf({ ends: 'onDate', endsOn: '' })).toEqual({ endsOn: 'Enter a date like 2027-06-30.' });
+      expect(repeatOf({ ends: 'onDate', endsOn: '2026-11-01' })).toEqual({ endsOn: 'The end date must be on or after the start date.' });
+      expect(repeatOf({ ends: 'afterCount', endsAfter: '6' })).toEqual({ ...sundays, endsAfter: 6 });
+      expect(repeatOf({ ends: 'afterCount', endsAfter: '0' })).toEqual({ endsAfter: 'Enter a number of Events from 1 to 500.' });
+      // A hidden end field is ignored.
+      expect(repeatOf({ ends: 'never', endsOn: 'junk', endsAfter: 'junk' })).toStrictEqual(sundays);
+    });
+
+    it('fills the form back from a stored pattern', () => {
+      const state = sample();
+      const repeat: RepeatPattern = { ...sundays, frequency: 'monthly', daysOfWeek: [], dayOfMonth: 15, intervalMonths: 3, endsOn: '2027-06-30' };
+      const f = seriesFormFrom({ name: 'Q', responsibilityIds: ['sound'], repeat }, state, 'America/Chicago', NOW);
+      expect(f).toMatchObject({ monthlyBy: 'date', dayOfMonth: '15', intervalMonths: '3', ends: 'onDate', endsOn: '2027-06-30', daysOfWeek: [0] });
+      const v = validateSeriesForm(f, ['sound']);
+      expect(v.ok && v.value.repeat).toEqual(repeat);
+      const daily: RepeatPattern = { ...sundays, frequency: 'daily', intervalDays: 10, daysOfWeek: [], endsAfter: 6 };
+      const g = seriesFormFrom({ name: 'D', responsibilityIds: ['sound'], repeat: daily }, state, 'America/Chicago', NOW);
+      expect(g).toMatchObject({ frequency: 'daily', intervalDays: '10', ends: 'afterCount', endsAfter: '6' });
+      expect(validateSeriesForm(g, ['sound'])).toMatchObject({ ok: true, value: { repeat: daily } });
+    });
+
+    it('describes them in plain language', () => {
+      expect(describeRepeat({ ...sundays, frequency: 'daily', intervalDays: 10, daysOfWeek: [] })).toBe('Every 10 days at 9:00 AM');
+      expect(describeRepeat({ ...sundays, frequency: 'daily', intervalDays: 1, daysOfWeek: [], startTime: '19:00' })).toBe('Every day at 7:00 PM');
+      expect(describeRepeat({ ...sundays, frequency: 'monthly', daysOfWeek: [], dayOfMonth: 15 })).toBe('Monthly on the 15th at 9:00 AM');
+      expect(describeRepeat({ ...sundays, frequency: 'monthly', daysOfWeek: [], dayOfMonth: 15, intervalMonths: 3, endsOn: '2026-12-31' })).toBe(
+        'Every 3 months on the 15th at 9:00 AM, until Dec 31',
+      );
+      expect(describeRepeat({ ...sundays, frequency: 'monthly', daysOfWeek: [], dayOfMonth: 1, intervalMonths: 3, endsOn: '2027-06-30' })).toBe(
+        'Every 3 months on the 1st at 9:00 AM, until Jun 30, 2027',
+      );
+      expect(describeRepeat({ ...sundays, frequency: 'monthly', weekOfMonth: 1, daysOfWeek: [2], intervalMonths: 3 })).toBe(
+        'Every 3 months on the 1st Tuesday at 9:00 AM',
+      );
+      expect(describeRepeat({ ...sundays, frequency: 'monthly', weekOfMonth: -1, intervalMonths: 2 })).toBe(
+        'Every 2 months on the last Sunday at 9:00 AM',
+      );
+      expect(describeRepeat({ ...sundays, endsAfter: 6 })).toBe('Every Sunday at 9:00 AM, 6 times');
+      expect(describeRepeat({ ...sundays, endsAfter: 1 })).toBe('Every Sunday at 9:00 AM, once');
+    });
+
+    it('says when the last Event is, and explains short months', () => {
+      expect(describeEnd(sundays)).toBeNull();
+      expect(describeEnd({ ...sundays, endsAfter: 6 })).toBe('The last of 6 Events is on Sun, Dec 20, 2026.');
+      expect(describeEnd({ ...sundays, endsOn: '2026-12-10' })).toBe('The last Event is on Sun, Dec 6, 2026.');
+      expect(dayOfMonthHint('15')).toBe('From 1 to 31. Months without that day use their last day.');
+      expect(dayOfMonthHint('31')).toBe('Months without a 31st use their last day, like Apr 30 or Feb 28.');
+      expect(dayOfMonthHint('30')).toBe('Months without a 30th use their last day, like Feb 28.');
+      expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 31].map(ordinal)).toEqual([
+        '1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd', '31st',
+      ]);
+    });
+
+    it('previews an every-N-months pattern and stops at the end', () => {
+      const p = validateSeriesForm(form({ frequency: 'monthly', monthlyBy: 'date', dayOfMonth: '31', ends: 'afterCount', endsAfter: '3' }), ['sound']);
+      const got = p.ok ? previewInstants(p.value.repeat, NOW, 4) : [];
+      expect(got.map((i) => i.slice(0, 10))).toEqual(['2026-11-30', '2026-12-31', '2027-01-31']);
+    });
+
+    it('changing only the end moves Events', () => {
+      const current = { name: 'Sundays', responsibilityIds: ['sound'], repeat: sundays };
+      expect(seriesEdit(current, { ...current, repeat: { ...sundays, endsAfter: 4 } })?.movesEvents).toBe(true);
     });
   });
 

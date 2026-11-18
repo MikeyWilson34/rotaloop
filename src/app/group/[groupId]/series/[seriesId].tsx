@@ -25,8 +25,12 @@ import { formatEventTime, myMember, timeZoneLabel } from '@/lib/groupViews';
 import { useGroup, useRunCommand, type GroupDetails } from '@/lib/groups';
 import {
   andList,
+  dayOfMonthHint,
+  describeEnd,
   describeRepeat,
+  END_OPTIONS,
   FREQUENCY_OPTIONS,
+  MONTHLY_BY_OPTIONS,
   NAME_MAX,
   newId,
   newSeriesForm,
@@ -47,6 +51,8 @@ import { useTheme } from '@/theme';
 type RunCommand = ReturnType<typeof useRunCommand>;
 
 const PREVIEW_COUNT = 4;
+
+const digits = (text: string) => text.replace(/[^0-9]/g, '');
 
 function back(groupId: string) {
   if (router.canGoBack()) router.back();
@@ -202,7 +208,7 @@ function SeriesEditor({ group, series, run }: { group: GroupDetails; series: Eve
         <TextField
           label="Every how many weeks"
           value={form.intervalWeeks}
-          onChangeText={(intervalWeeks) => update({ intervalWeeks: intervalWeeks.replace(/[^0-9]/g, '') }, 'interval')}
+          onChangeText={(intervalWeeks) => update({ intervalWeeks: digits(intervalWeeks) }, 'interval')}
           error={errors.interval}
           inputMode="numeric"
           maxLength={2}
@@ -210,7 +216,53 @@ function SeriesEditor({ group, series, run }: { group: GroupDetails; series: Eve
         />
       ) : null}
 
+      {form.frequency === 'daily' ? (
+        <TextField
+          label="Every how many days"
+          value={form.intervalDays}
+          onChangeText={(intervalDays) => update({ intervalDays: digits(intervalDays) }, 'interval')}
+          error={errors.interval}
+          inputMode="numeric"
+          maxLength={3}
+          hint="1 for every day, 10 for every tenth day. Counted from the start date."
+        />
+      ) : null}
+
       {form.frequency === 'monthly' ? (
+        <>
+          <TextField
+            label="Every how many months"
+            value={form.intervalMonths}
+            onChangeText={(intervalMonths) => update({ intervalMonths: digits(intervalMonths) }, 'interval')}
+            error={errors.interval}
+            inputMode="numeric"
+            maxLength={2}
+            hint="1 for every month, 3 for every quarter. Counted from the start date's month."
+          />
+          <View style={{ gap: space.sm }}>
+            <FieldLabel>Each time on</FieldLabel>
+            <ChipGroup>
+              {MONTHLY_BY_OPTIONS.map((o) => (
+                <Chip key={o.value} label={o.label} selected={form.monthlyBy === o.value} onPress={() => update({ monthlyBy: o.value })} />
+              ))}
+            </ChipGroup>
+          </View>
+        </>
+      ) : null}
+
+      {form.frequency === 'monthly' && form.monthlyBy === 'date' ? (
+        <TextField
+          label="Day of the month"
+          value={form.dayOfMonth}
+          onChangeText={(dayOfMonth) => update({ dayOfMonth: digits(dayOfMonth) }, 'dayOfMonth')}
+          error={errors.dayOfMonth}
+          inputMode="numeric"
+          maxLength={2}
+          hint={dayOfMonthHint(form.dayOfMonth)}
+        />
+      ) : null}
+
+      {form.frequency === 'monthly' && form.monthlyBy === 'weekday' ? (
         <View style={{ gap: space.sm }}>
           <FieldLabel>Which week of the month</FieldLabel>
           <ChipGroup>
@@ -221,24 +273,26 @@ function SeriesEditor({ group, series, run }: { group: GroupDetails; series: Eve
         </View>
       ) : null}
 
-      <View style={{ gap: space.sm }}>
-        <FieldLabel>{form.frequency === 'monthly' ? 'On' : 'Days'}</FieldLabel>
-        <ChipGroup>
-          {WEEKDAY_SHORT.map((label, day) => (
-            <Chip
-              key={label}
-              label={label}
-              selected={form.daysOfWeek.includes(day)}
-              onPress={() => update({ daysOfWeek: (toggle(form.daysOfWeek, day) as number[]).sort((a, b) => a - b) }, 'days')}
-            />
-          ))}
-        </ChipGroup>
-        {errors.days ? (
-          <Text variant="subhead" color="dangerText">
-            {errors.days}
-          </Text>
-        ) : null}
-      </View>
+      {form.frequency !== 'daily' && !(form.frequency === 'monthly' && form.monthlyBy === 'date') ? (
+        <View style={{ gap: space.sm }}>
+          <FieldLabel>{form.frequency === 'monthly' ? 'On' : 'Days'}</FieldLabel>
+          <ChipGroup>
+            {WEEKDAY_SHORT.map((label, day) => (
+              <Chip
+                key={label}
+                label={label}
+                selected={form.daysOfWeek.includes(day)}
+                onPress={() => update({ daysOfWeek: (toggle(form.daysOfWeek, day) as number[]).sort((a, b) => a - b) }, 'days')}
+              />
+            ))}
+          </ChipGroup>
+          {errors.days ? (
+            <Text variant="subhead" color="dangerText">
+              {errors.days}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
 
       <TextField
         label="Start time"
@@ -275,6 +329,38 @@ function SeriesEditor({ group, series, run }: { group: GroupDetails; series: Eve
       />
 
       <View style={{ gap: space.sm }}>
+        <FieldLabel>Ends</FieldLabel>
+        <ChipGroup>
+          {END_OPTIONS.map((o) => (
+            <Chip key={o.value} label={o.label} selected={form.ends === o.value} onPress={() => update({ ends: o.value })} />
+          ))}
+        </ChipGroup>
+      </View>
+      {form.ends === 'onDate' ? (
+        <TextField
+          label="Last date"
+          value={form.endsOn}
+          onChangeText={(endsOn) => update({ endsOn }, 'endsOn')}
+          error={errors.endsOn}
+          hint="Year-month-day, e.g. 2027-06-30. Events on this day still happen."
+          autoCapitalize="none"
+          autoCorrect={false}
+          inputMode="numeric"
+        />
+      ) : null}
+      {form.ends === 'afterCount' ? (
+        <TextField
+          label="How many Events"
+          value={form.endsAfter}
+          onChangeText={(endsAfter) => update({ endsAfter: digits(endsAfter) }, 'endsAfter')}
+          error={errors.endsAfter}
+          inputMode="numeric"
+          maxLength={3}
+          hint="Counted from the start date, including any marked as Skip Dates."
+        />
+      ) : null}
+
+      <View style={{ gap: space.sm }}>
         <FieldLabel>Responsibilities these Events need</FieldLabel>
         {responsibilities.length === 0 ? (
           <Text variant="subhead" color="textSecondary">
@@ -299,11 +385,16 @@ function SeriesEditor({ group, series, run }: { group: GroupDetails; series: Eve
         ) : null}
       </View>
 
-      <PreviewCard pattern={pattern ? describeRepeat(pattern) : null} instants={preview} timeZone={form.timeZone} />
+      <PreviewCard
+        pattern={pattern ? describeRepeat(pattern) : null}
+        end={pattern ? describeEnd(pattern) : null}
+        instants={preview}
+        timeZone={form.timeZone}
+      />
 
       {edit?.movesEvents ? (
         <Notice tone="info">
-          {"Changing the days or time moves this series' upcoming Events. People's turns follow them to the new dates, and they'll be asked to confirm again."}
+          {"Changing when this series repeats moves its upcoming Events. People's turns follow them to the new dates, and they'll be asked to confirm again."}
         </Notice>
       ) : null}
       {error && confirm === null ? <Notice>{error}</Notice> : null}
@@ -335,7 +426,7 @@ function SeriesEditor({ group, series, run }: { group: GroupDetails; series: Eve
       <ConfirmSheet
         visible={confirm === 'move'}
         title="Move the upcoming Events?"
-        message={`From now on this series runs ${pattern ? describeRepeat(pattern).replace(/^E/, 'e') : 'on the new pattern'}. Upcoming Events that no longer fit are replaced. People's turns follow them to the new dates, and they'll be asked to confirm again. Past Events don't change.`}
+        message={`From now on this series runs ${pattern ? describeRepeat(pattern).replace(/^[A-Z]/, (c) => c.toLowerCase()) : 'on the new pattern'}. Upcoming Events that no longer fit are replaced. People's turns follow them to the new dates, and they'll be asked to confirm again. Past Events don't change.`}
         confirmLabel="Move Events"
         loading={busy}
         error={error}
@@ -357,7 +448,17 @@ function SeriesEditor({ group, series, run }: { group: GroupDetails; series: Eve
   );
 }
 
-function PreviewCard({ pattern, instants, timeZone }: { pattern: string | null; instants: string[]; timeZone: string }) {
+function PreviewCard({
+  pattern,
+  end,
+  instants,
+  timeZone,
+}: {
+  pattern: string | null;
+  end: string | null;
+  instants: string[];
+  timeZone: string;
+}) {
   const { space, colors } = useTheme();
   return (
     <Card style={{ gap: space.sm }} accessibilityLabel="Preview of the next dates">
@@ -374,9 +475,16 @@ function PreviewCard({ pattern, instants, timeZone }: { pattern: string | null; 
         ))
       ) : (
         <Text variant="subhead" color="textSecondary">
-          {pattern ? 'No dates coming up. Check the start date.' : 'Pick at least one day, a time and a start date to see the dates.'}
+          {pattern
+            ? 'No dates coming up. Check the start and end dates.'
+            : 'Fill in the days, time and dates above to see the next dates.'}
         </Text>
       )}
+      {end ? (
+        <Text variant="subhead" color="textSecondary">
+          {end}
+        </Text>
+      ) : null}
     </Card>
   );
 }
@@ -399,7 +507,7 @@ function ViewSeries({ group, series }: { group: GroupDetails; series: EventSerie
       </SettingsList>
       {series.repeat ? (
         <View style={{ gap: space.sm }}>
-          <PreviewCard pattern={null} instants={upcoming} timeZone={series.repeat.timeZone} />
+          <PreviewCard pattern={null} end={describeEnd(series.repeat)} instants={upcoming} timeZone={series.repeat.timeZone} />
         </View>
       ) : null}
     </FormScreen>

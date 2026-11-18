@@ -15,7 +15,15 @@
  *   matching day on or after `startsOn` (so "every other Sunday from Wed Nov 18" starts on
  *   Sun Nov 22).
  * - `monthly` is the `weekOfMonth`-th matching weekday of each month (1-4), or the last
- *   one (-1), for each of `daysOfWeek`.
+ *   one (-1), for each of `daysOfWeek`; or, with `dayOfMonth`, that date, using the last day
+ *   of months that don't have it (the 31st is Apr 30 and Feb 28 or 29). With
+ *   `intervalMonths` it is every that many months, counting from `startsOn`'s month (which
+ *   counts even when its matching day falls before `startsOn`).
+ * - `daily` is every `intervalDays` days from `startsOn` itself.
+ * - `endsOn` is the last local date an occurrence can fall on. `endsAfter` stops after that
+ *   many occurrences, counted from `startsOn` by the pattern alone, whatever Events exist:
+ *   so expanding again on a later horizon never makes more, and an Event marked as a Skip
+ *   Date still counts as one of them.
  * - A local time that doesn't exist (the hour skipped when clocks go forward) moves forward
  *   by the gap, e.g. 2:30 becomes 3:30. A local time that happens twice (clocks go back)
  *   uses the first one. This matches Temporal's "compatible" disambiguation.
@@ -144,9 +152,12 @@ function stepWeeks(pattern: RepeatPattern): number | null {
     case 'custom':
       return pattern.intervalWeeks ?? 1;
     case 'monthly':
+    case 'daily':
       return null;
   }
 }
+
+const monthIndex = (year: number, month: number) => year * 12 + (month - 1);
 
 /** The day number of the Sunday starting the pattern's first week. */
 function anchorWeek(pattern: RepeatPattern): number {
@@ -157,18 +168,91 @@ function anchorWeek(pattern: RepeatPattern): number {
   return start - weekdayOf(start);
 }
 
-/** Whether the pattern happens on this local calendar day (ignoring `startsOn`). */
+/** Whether the pattern happens on this local calendar day (ignoring `startsOn` and the end). */
 function happensOn(pattern: RepeatPattern, day: number, anchor: number): boolean {
+  if (pattern.frequency === 'daily') {
+    const since = day - dayNumber(pattern.startsOn);
+    return since >= 0 && since % (pattern.intervalDays ?? 1) === 0;
+  }
   const weekday = weekdayOf(day);
-  if (!pattern.daysOfWeek.includes(weekday)) return false;
   const step = stepWeeks(pattern);
   if (step !== null) {
+    if (!pattern.daysOfWeek.includes(weekday)) return false;
     const weeks = Math.floor((day - weekday - anchor) / 7);
     return weeks >= 0 && weeks % step === 0;
   }
   const [year, month, dom] = dateOf(day).split('-').map(Number);
+  const [startYear, startMonth] = pattern.startsOn.split('-').map(Number);
+  const months = monthIndex(year, month) - monthIndex(startYear, startMonth);
+  if (months < 0 || months % (pattern.intervalMonths ?? 1) !== 0) return false;
+  if (pattern.dayOfMonth != null) return dom === Math.min(pattern.dayOfMonth, daysInMonth(year, month));
+  if (!pattern.daysOfWeek.includes(weekday)) return false;
   if (pattern.weekOfMonth === -1) return dom + 7 > daysInMonth(year, month);
   return Math.floor((dom - 1) / 7) + 1 === pattern.weekOfMonth;
+}
+
+/** The days (day numbers, in order) the pattern happens on in one calendar month. */
+function daysInMonthOf(pattern: RepeatPattern, year: number, month: number): number[] {
+  const first = dayNumber(`${year}-${String(month).padStart(2, '0')}-01`);
+  const length = daysInMonth(year, month);
+  if (pattern.dayOfMonth != null) return [first + Math.min(pattern.dayOfMonth, length) - 1];
+  return pattern.daysOfWeek
+    .map((weekday) => {
+      const firstDom = 1 + ((weekday - weekdayOf(first) + 7) % 7);
+      const dom = pattern.weekOfMonth === -1 ? firstDom + 7 * Math.floor((length - firstDom) / 7) : firstDom + 7 * ((pattern.weekOfMonth ?? 1) - 1);
+      return first + dom - 1;
+    })
+    .sort((a, b) => a - b);
+}
+
+/**
+ * The day of the pattern's `n`-th occurrence (1-based), counting from `startsOn`. Steps a
+ * week or a month at a time, so even "every 12 months, 500 times" is quick.
+ */
+function nthOccurrenceDay(pattern: RepeatPattern, n: number): number {
+  const start = dayNumber(pattern.startsOn);
+  if (pattern.frequency === 'daily') return start + (n - 1) * (pattern.intervalDays ?? 1);
+  // A malformed pattern with no days never happens (the engine rejects it anyway).
+  if (pattern.dayOfMonth == null && pattern.daysOfWeek.length === 0) return start - 1;
+  let seen = 0;
+  const step = stepWeeks(pattern);
+  if (step !== null) {
+    const days = [...pattern.daysOfWeek].sort((a, b) => a - b);
+    for (let week = anchorWeek(pattern); ; week += 7 * step) {
+      for (const d of days) {
+        if (week + d >= start && ++seen === n) return week + d;
+      }
+    }
+  }
+  const [startYear, startMonth] = pattern.startsOn.split('-').map(Number);
+  for (let m = monthIndex(startYear, startMonth); ; m += pattern.intervalMonths ?? 1) {
+    for (const day of daysInMonthOf(pattern, Math.floor(m / 12), (m % 12) + 1)) {
+      if (day >= start && ++seen === n) return day;
+    }
+  }
+}
+
+/** The last local day the pattern can happen on, or null when it never ends. */
+function endDay(pattern: RepeatPattern): number | null {
+  if (pattern.endsOn != null) return dayNumber(pattern.endsOn);
+  if (pattern.endsAfter != null) return nthOccurrenceDay(pattern, pattern.endsAfter);
+  return null;
+}
+
+/**
+ * The local date ("YYYY-MM-DD") of the pattern's last Event, or null when it never ends
+ * (or ends before it starts). For the editor's preview.
+ */
+export function lastOccurrenceDate(pattern: RepeatPattern): string | null {
+  const end = endDay(pattern);
+  if (end === null) return null;
+  const start = dayNumber(pattern.startsOn);
+  const anchor = anchorWeek(pattern);
+  // The longest gap between two occurrences is a year (every 12 months, or 52 weeks).
+  for (let day = end; day >= start && day > end - 400; day--) {
+    if (happensOn(pattern, day, anchor)) return dateOf(day);
+  }
+  return null;
 }
 
 /**
@@ -180,7 +264,8 @@ export function occurrencesBetween(pattern: RepeatPattern, after: Instant, until
   if (!(to > from)) return [];
   const anchor = anchorWeek(pattern);
   const first = Math.max(dayNumber(localDate(after, pattern.timeZone)) - 1, dayNumber(pattern.startsOn));
-  const last = dayNumber(localDate(until, pattern.timeZone)) + 1;
+  const end = endDay(pattern);
+  const last = Math.min(dayNumber(localDate(until, pattern.timeZone)) + 1, end ?? Infinity);
   const result: Instant[] = [];
   for (let day = first; day <= last; day++) {
     if (!happensOn(pattern, day, anchor)) continue;
@@ -191,11 +276,17 @@ export function occurrencesBetween(pattern: RepeatPattern, after: Instant, until
   return result;
 }
 
-/** The next `count` occurrences after `after` (looking up to about two years ahead). For previews. */
+/**
+ * The next `count` occurrences after `after`, for previews. Looks up to about two years
+ * ahead, or ten for patterns that repeat every few months.
+ */
 export function nextOccurrences(pattern: RepeatPattern, after: Instant, count: number): Instant[] {
   const result: Instant[] = [];
+  const end = endDay(pattern);
+  const chunks = pattern.frequency === 'monthly' && (pattern.intervalMonths ?? 1) > 1 ? 40 : 8;
   let from = after;
-  for (let i = 0; i < 8 && result.length < count; i++) {
+  for (let i = 0; i < chunks && result.length < count; i++) {
+    if (end !== null && dayNumber(localDate(from, pattern.timeZone)) > end + 1) break;
     const until = new Date(Date.parse(from) + 13 * WEEK_MS).toISOString();
     result.push(...occurrencesBetween(pattern, from, until));
     from = until;
@@ -275,6 +366,11 @@ export function samePattern(a: RepeatPattern | null, b: RepeatPattern | null): b
     a.frequency === b.frequency &&
     a.intervalWeeks === b.intervalWeeks &&
     a.weekOfMonth === b.weekOfMonth &&
+    (a.intervalDays ?? null) === (b.intervalDays ?? null) &&
+    (a.dayOfMonth ?? null) === (b.dayOfMonth ?? null) &&
+    (a.intervalMonths ?? 1) === (b.intervalMonths ?? 1) &&
+    (a.endsOn ?? null) === (b.endsOn ?? null) &&
+    (a.endsAfter ?? null) === (b.endsAfter ?? null) &&
     a.startTime === b.startTime &&
     a.timeZone === b.timeZone &&
     a.startsOn === b.startsOn &&
