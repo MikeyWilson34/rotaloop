@@ -29,6 +29,9 @@
   --acc-blue:#3A6894; --acc-blue-t:#E5EDF5; --acc-plum:#7A5A8C; --acc-plum-t:#EFE7F3;
   --acc-clay:#A0603E; --acc-clay-t:#F6E8DF; --acc-teal:#2F7C7A; --acc-teal-t:#DFF0EE;
   --av-s:45%; --av-l:88%; --av-fs:38%; --av-fl:30%;
+  --acc-moss:#5F7A2E; --acc-moss-t:#EAF0DC;
+  /* v0.3: duty vs RSVP emphasis. Duty = filled, RSVP invite = outlined. */
+  --duty:#3A6894; --on-duty:#FFFFFF; --on-duty-2:#DCE7F2; --duty-raise:#2F5679; --on-duty-raise:#FFFFFF; --rsvp-line:#948A7D;
   --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px;
   color-scheme: light;
 }
@@ -48,6 +51,8 @@
     --acc-blue:#86AEDB; --acc-blue-t:#1F2E42; --acc-plum:#C3A6D3; --acc-plum-t:#2E2436;
     --acc-clay:#E3A88A; --acc-clay-t:#382820; --acc-teal:#86CBC8; --acc-teal-t:#1A3332;
     --av-s:25%; --av-l:27%; --av-fs:55%; --av-fl:82%;
+    --acc-moss:#B5CF83; --acc-moss-t:#26301A;
+    --duty:#86AEDB; --on-duty:#0F1A2A; --on-duty-2:#1F2E42; --duty-raise:#A8C6E8; --on-duty-raise:#0F1A2A; --rsvp-line:#5D6B80;
     color-scheme: dark;
   }
 }
@@ -66,6 +71,8 @@
   --acc-blue:#86AEDB; --acc-blue-t:#1F2E42; --acc-plum:#C3A6D3; --acc-plum-t:#2E2436;
   --acc-clay:#E3A88A; --acc-clay-t:#382820; --acc-teal:#86CBC8; --acc-teal-t:#1A3332;
   --av-s:25%; --av-l:27%; --av-fs:55%; --av-fl:82%;
+  --acc-moss:#B5CF83; --acc-moss-t:#26301A;
+  --duty:#86AEDB; --on-duty:#0F1A2A; --on-duty-2:#1F2E42; --duty-raise:#A8C6E8; --on-duty-raise:#0F1A2A; --rsvp-line:#5D6B80;
   color-scheme: dark;
 }
 
@@ -193,7 +200,8 @@ svg{display:block;flex:none}
 .acc-clay{background:var(--acc-clay-t);color:var(--acc-clay)}
 .acc-teal{background:var(--acc-teal-t);color:var(--acc-teal)}
 .dot{width:8px;height:8px;border-radius:50%;flex:none}
-.dot.acc-blue{background:var(--acc-blue)}.dot.acc-plum{background:var(--acc-plum)}.dot.acc-clay{background:var(--acc-clay)}.dot.acc-teal{background:var(--acc-teal)}
+.acc-moss{background:var(--acc-moss-t);color:var(--acc-moss)}
+.dot.acc-blue{background:var(--acc-blue)}.dot.acc-plum{background:var(--acc-plum)}.dot.acc-clay{background:var(--acc-clay)}.dot.acc-teal{background:var(--acc-teal)}.dot.acc-moss{background:var(--acc-moss)}
 
 /* Home */
 .greet{padding:8px 16px 16px;display:flex;align-items:center;gap:12px}
@@ -279,8 +287,9 @@ svg{display:block;flex:none}
 .datebox{width:52px;flex:none;text-align:center;border-radius:12px;background:var(--surface-alt);padding:6px 0}
 .datebox .m{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-2)}
 .datebox .d{font-size:22px;line-height:26px;font-weight:800}
-.datebox.me{background:var(--primary-tint);color:var(--primary)}
-.datebox.me .m{color:var(--primary)}
+.datebox.me{background:var(--duty);color:var(--on-duty)}
+.datebox.me .m{color:var(--on-duty-2)}
+.datebox.rsvp{background:transparent;border:1.5px solid var(--rsvp-line);color:var(--text)}
 .skipcard{border:1.5px dashed var(--border-strong);background:repeating-linear-gradient(135deg,transparent 0 10px,color-mix(in srgb,var(--surface-alt) 70%,transparent) 10px 20px);border-radius:var(--r-lg);box-shadow:none}
 .skipcard .datebox{background:transparent;border:1.5px dashed var(--border-strong);color:var(--text-3)}
 .skipcard .datebox .d{text-decoration:line-through;text-decoration-thickness:2px}
@@ -373,7 +382,7 @@ svg{display:block;flex:none}
 .sheet-foot{padding:12px 20px 28px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;flex:none}
 .sheet h2{font-size:22px;line-height:28px;margin:4px 0 6px;font-weight:800}
 .field-label{font-size:13px;font-weight:800;color:var(--text-2);margin:20px 0 8px}
-textarea,input[type=text]{width:100%;border:1.5px solid var(--border-strong);background:var(--surface-alt);border-radius:12px;padding:12px 14px;font:inherit;font-size:16px;color:var(--text);resize:none}
+textarea,input[type=text],input[type=date],input[type=time]{width:100%;border:1.5px solid var(--border-strong);background:var(--surface-alt);border-radius:12px;padding:12px 14px;font:inherit;font-size:16px;color:var(--text);resize:none}
 .steps{display:flex;gap:6px;margin:6px 0 10px}
 .steps i{flex:1;height:4px;border-radius:2px;background:var(--border)}
 .steps i.on{background:var(--primary)}
@@ -431,13 +440,60 @@ textarea,input[type=text]{width:100%;border:1.5px solid var(--border-strong);bac
 .feat .li-ic{background:var(--primary-tint);color:var(--primary)}
 .choice{display:flex;gap:14px;align-items:flex-start;padding:16px;border-radius:var(--r-lg);border:1.5px solid var(--border);background:var(--surface);width:100%;text-align:left}
 .choice[aria-pressed="true"]{border-color:var(--primary);background:var(--primary-tint)}
+
+/* ===== v0.3: one-off Events, RSVP, duty vs invite emphasis =====
+   Duty (an Assignment: you're on a Responsibility) = FILLED --duty card, 800 weight, clipboard-check icon, "Your duty" label, shadow.
+   Invite (RSVP only) = OUTLINED, transparent, no shadow, 700 weight, mail icon, "Invite" label. Never colour alone. */
+.evduty{background:var(--duty);color:var(--on-duty);border-radius:var(--r-lg);padding:16px;box-shadow:var(--shadow-2);position:relative}
+.evduty .ovl,.evrsvp .ovl{font-size:12px;line-height:16px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.evduty .ovl{color:var(--on-duty-2)}
+.evduty .evt{font-size:20px;line-height:26px;font-weight:800;margin-top:10px;letter-spacing:-.005em}
+.evduty .evs{font-size:14px;line-height:20px;color:var(--on-duty-2);margin-top:2px}
+.evduty .evic{width:36px;height:36px;border-radius:11px;background:var(--duty-raise);color:var(--on-duty-raise);display:grid;place-items:center;flex:none}
+.evduty .pill{background:var(--duty-raise);color:var(--on-duty-raise)}
+.evduty .btn:focus-visible,.evduty [tabindex]:focus-visible{outline-color:var(--on-duty)}
+.btn.duty-yes{background:var(--on-duty);color:var(--duty)}
+.btn.duty-no{background:var(--duty-raise);color:var(--on-duty-raise)}
+.evrsvp{background:transparent;border:1.5px solid var(--rsvp-line);border-radius:var(--r-lg);padding:14px 16px;box-shadow:none}
+.evrsvp .ovl{color:var(--text-2)}
+.evrsvp .evt{font-size:16px;line-height:22px;font-weight:700;margin-top:8px;color:var(--text)}
+.evrsvp .evs{font-size:14px;line-height:20px;color:var(--text-2);margin-top:2px}
+.evrsvp .evic{width:36px;height:36px;border-radius:11px;border:1.5px solid var(--rsvp-line);color:var(--text-2);display:grid;place-items:center;flex:none}
+.evdl{display:inline-flex;align-items:center;gap:5px;margin-top:8px;font-size:13px;font-weight:700;color:var(--text-2)}
+.evdl.warn{color:var(--warning-text)}
+.sitem.evrsvp{padding:14px}
+.sitem.duty{position:relative;overflow:hidden}
+.sitem.duty::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--duty)}
+.dlabel,.ilabel{display:flex;align-items:center;gap:4px;font-size:12px;line-height:16px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
+.dlabel{color:var(--primary)}
+.ilabel{color:var(--text-2)}
+.dot.ring{background:transparent!important;box-shadow:inset 0 0 0 1.5px currentColor}
+/* Event page */
+.rsvp-btn[aria-pressed="true"].going{background:var(--success);color:var(--on-success);border-color:var(--success)}
+.rsvp-btn[aria-pressed="true"].cant{background:var(--neutral-tint);color:var(--text);border:2px solid var(--text-2)}
+.hc-bar{height:10px;border-radius:5px;background:var(--surface-alt);overflow:hidden;display:flex;margin:12px 0 4px;gap:2px}
+.hc-bar i{display:block;height:100%}
+.hc-bar .g{background:var(--success)}.hc-bar .c{background:var(--text-3)}
+.hc-ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex:none;background:var(--neutral-tint);color:var(--text-2)}
+.hc-ic.going{background:var(--success-tint);color:var(--success-text)}
+.hc-names{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;padding:4px 16px 14px}
+.hc-name{display:flex;align-items:center;gap:8px;min-width:0}
+.seat{display:flex;align-items:center;gap:10px;min-height:48px}
+.seat+.seat{border-top:1px solid var(--border)}
+/* Event form */
+.two{display:grid;grid-template-columns:1.4fr 1fr;gap:10px}
+.dutyrow{display:flex;align-items:center;gap:10px;padding:12px 12px 12px 14px;border:1.5px solid var(--border);border-radius:14px;background:var(--surface)}
+.stepper{display:flex;align-items:center;gap:2px;background:var(--surface-alt);border-radius:12px;flex:none}
+.stepper button{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:var(--text)}
+.stepper button[disabled]{opacity:.35}
+.stepper .n{min-width:28px;text-align:center;font-weight:800}
 </style>
 </head>
 <body>
 <div class="stage">
   <aside class="controls" aria-label="Prototype controls">
     <h1><span class="logo" id="logo"></span><span id="brandName">Rotaloop</span></h1>
-    <p>Clickable draft (v0.2, approved domain model). Use these controls to see how the app adapts. Everything resets on reload.</p>
+    <p>Clickable draft (v0.3: adds one-off Events with RSVPs, and duties that stand out from invites). Use these controls to see how the app adapts. Everything resets on reload.</p>
     <div class="ctl-group">
       <div class="ctl-label">Viewing as</div>
       <div class="ctl-seg" role="group" aria-label="Persona">
@@ -528,6 +584,15 @@ const ICONS = {
   route:'<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
   handshake:'<path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="m21 3 1 11h-2"/><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/>',
   play:'<polygon points="6 3 20 12 6 21 6 3"/>',
+  clipboardCheck:'<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
+  mapPin:'<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+  pencil:'<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+  dice:'<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/>',
+  chevDown:'<path d="m6 9 6 6 6-6"/>',
+  minus:'<path d="M5 12h14"/>',
+  fileText:'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  lock:'<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  help:'<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
   zap:'<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
 };
 function ic(name, size=20, sw=1.75){
@@ -612,6 +677,39 @@ function seedGroups(){
         {id:'helper', name:'Helper', confirm:true, roster:['jordan','daniel','olivia','sam']},
         {id:'checkin', name:'Check-in', confirm:false, roster:['george','hannah']},
       ], skips:{}, settings:{policy:'countRealWork', duty:'member', timeOff:'route', allowDouble:false} },
+    /* A friend group with no Event Series: it only has one-off Events (RSVP), some with Responsibilities. */
+    { id:'gnc', name:'Game Night Crew', short:'Game Night', icon:'dice', acc:'acc-moss', start:null, interval:0, cadence:'One-off Events only',
+      time:'Set per Event', admins:['sam'], adminInDemo:false, confirmWindow:14,
+      members:['jordan','sam','leah','chris','priya','ben','ana','ethan','olivia','maria','daniel','hannah','tom'],
+      roles:[
+        {id:'host', name:'Host', primary:true, confirm:true, eventOnly:true, roster:['leah','sam','ana','jordan']},
+        {id:'food', name:'Bring food', confirm:true, eventOnly:true, roster:['jordan','ana','priya','maria','hannah','ben']},
+        {id:'drinks', name:'Bring drinks', confirm:true, eventOnly:true, roster:['chris','sam','ben','ethan']},
+        {id:'games', name:'Bring games', confirm:true, eventOnly:true, roster:['sam','tom','daniel']},
+      ], skips:{}, settings:{policy:'countRealWork', duty:'member', timeOff:'route', allowDouble:true} },
+  ];
+}
+/* One-off Events: everyone in the Group is invited and answers Going / Can't. Optional Responsibilities (duties)
+   are filled from that Responsibility's team. Times are 24h "HH:MM". */
+function seedEvents(){
+  return [
+    {id:'gn1', gid:'gnc', title:'Game Night', date:'2026-11-20', time:'19:00', location:'Sam’s place, 18 Birch Lane',
+      notes:'Catan and Codenames on the table. Pizza at 7, first game at 7:30.', by:'sam', reminder:'1d', deadline:{date:'2026-11-19', time:'21:00'},
+      rsvp:{sam:'going', leah:'going', chris:'going', priya:'going', ben:'going', ana:'going', ethan:'going', olivia:'cant', maria:'cant'}, duties:[]},
+    {id:'gn2', gid:'gnc', title:'Escape room', date:'2026-11-28', time:'14:00', location:'Lockbox Escape Rooms, 210 Main St',
+      notes:'The room fits 8 and it’s booked, so RSVPs are closed. $25 each at the door.', by:'jordan', reminder:'2h', deadline:{date:'2026-11-18', time:'18:00'},
+      rsvp:{jordan:'going', sam:'going', leah:'going', ben:'going', ana:'going', priya:'going', ethan:'going', chris:'cant', tom:'cant', olivia:'cant'}, duties:[]},
+    {id:'gn3', gid:'gnc', title:'Friendsgiving potluck', date:'2026-12-05', time:'18:00', location:'Leah’s apartment, 44 Elm St, Apt 3B',
+      notes:'Leah’s cooking the turkey. Bring a side or a dessert that serves 6.', by:'leah', reminder:'2d', deadline:{date:'2026-11-30', time:'18:00'},
+      rsvp:{leah:'going', ana:'going', sam:'going', ben:'going', priya:'going', daniel:'cant'},
+      duties:[
+        {roleId:'host', count:1, seats:[{p:'leah', status:'confirmed'}]},
+        {roleId:'food', count:2, seats:[{p:'jordan', status:'pending'},{p:'ana', status:'confirmed'}]},
+        {roleId:'drinks', count:1, seats:[{p:'chris', status:'pending'}]},
+      ]},
+    {id:'w1', gid:'worship', title:'Christmas volunteer dinner', date:'2026-12-18', time:'18:30', location:'Fellowship Hall',
+      notes:'A thank-you dinner for everyone who served this year. Dinner is provided.', by:'grace', reminder:'1d', deadline:null,
+      rsvp:{jordan:'going', grace:'going', maria:'going', hannah:'going', ben:'cant'}, duties:[]},
   ];
 }
 const K = (gid,date,role,person) => `${gid}|${date}|${role}|${person}`;
@@ -626,14 +724,16 @@ function seedSlots(){
   set(K('av','2026-11-29','sound','leah'), c);
   set(K('av','2026-11-29','slides','ruth'), c);
   set(K('av','2027-01-03','slides','jordan'), {status:'pending', moved:'Moved from Sun, Dec 27 because Dec 27 became a Skip Date', history:[{t:'Yesterday', text:'Moved from Sun, Dec 27: Tom Becker added a Skip Date', tone:'warn'}]});
-  set(K('hosp','2026-11-22','greeter','jordan'), {status:'replace', reason:'Work trip', notified:['olivia','priya','hannah','maria','george','ruth'], history:[{t:'Sun', text:'You declined: “Work trip”', tone:'bad'},{t:'Sun', text:'Coverage Request sent to 6 Qualified Members', tone:'warn'},{t:'Today, 8:00 AM', text:'Alert time reached with no taker. You’re finding a replacement (Replacement Duty: Assigned Member).', tone:'bad'}]});
+  set(K('hosp','2026-11-22','greeter','jordan'), {status:'replace', reason:'Work trip', notified:['olivia','priya','hannah','maria','george','ruth'], history:[{t:'Sun', text:'You declined: “Work trip”', tone:'bad'},{t:'Sun', text:'Coverage Request sent to the Greeter team (6 people)', tone:'warn'},{t:'Today, 8:00 AM', text:'Alert time reached with no taker. You’re finding a replacement (Replacement Duty: Assigned Member).', tone:'bad'}]});
   set(K('hosp','2026-11-22','coffee','ruth'), c);
   set(K('hosp','2026-11-29','greeter','olivia'), c);
-  set(K('hosp','2026-12-06','greeter','priya'), {status:'coverage', reason:'Visiting family', notified:['jordan','olivia','hannah','maria','george','ruth'], history:[{t:'1h ago', text:'Priya Shah declined: “Visiting family”', tone:'bad'},{t:'1h ago', text:'Coverage Request sent to 6 Qualified Members', tone:'warn'}]});
+  set(K('hosp','2026-12-06','greeter','priya'), {status:'coverage', reason:'Visiting family', notified:['jordan','olivia','hannah','maria','george','ruth'], history:[{t:'1h ago', text:'Priya Shah declined: “Visiting family”', tone:'bad'},{t:'1h ago', text:'Coverage Request sent to the Greeter team (6 people)', tone:'warn'}]});
   return s;
 }
 function seedActivity(){
   return [
+    {day:'Today', t:'7:45 AM', gid:'gnc', ev:'gn1', icon:'mail', tone:'info', kind:'event', unread:true, html:'<b>Sam Carter</b> invited everyone to <b>Game Night</b> on Fri, Nov 20. RSVPs close tonight at 9:00 PM.'},
+    {day:'Yesterday', t:'9:10 PM', gid:'gnc', ev:'gn3', icon:'clipboardCheck', tone:'info', kind:'event', unread:true, html:'<b>Leah Nguyen</b> created <b>Friendsgiving potluck</b> on Sat, Dec 5. <b>You’re on Bring food</b> with Ana Silva.'},
     {day:'Today', t:'1h ago', gid:'hosp', icon:'repeat', tone:'bad', kind:'coverage', unread:true, html:'<b>Priya Shah</b> can’t make <b>Greeter</b> on Sun, Dec 6. Coverage Request sent.'},
     {day:'Today', t:'8:00 AM', gid:'hosp', icon:'alert', tone:'bad', kind:'coverage', unread:true, html:'Nobody volunteered for your <b>Greeter</b> turn on Sun, Nov 22. Please find a replacement.'},
     {day:'Today', t:'8:00 AM', gid:'av', icon:'alert', tone:'bad', kind:'coverage', unread:false, html:'Nobody volunteered for <b>Livestream</b> on Sun, Nov 22. <b>Ethan Brooks</b> is finding a replacement.'},
@@ -653,6 +753,7 @@ function initialState(){
     persona:'admin', tab:'home', stack:[], sheet:null, onb:null,
     groups: seedGroups(), slots: seedSlots(), activity: seedActivity(), overrides:{}, debts:[],
     notices:[],
+    events: seedEvents(), evPtr:{'gnc|host':1, 'gnc|food':2, 'gnc|drinks':1, 'gnc|games':0}, evExpand:{}, draft:null,
     homeFilter:'all', sched:{view:'list', scope:'me', month:'2026-11', sel:null},
     actFilter:'all',
     timeOff:[{id:'t1', label:'Thu, Dec 31 – Sat, Jan 2', dates:['2026-12-31','2027-01-01','2027-01-02'], repeat:'none', scope:['all'], note:'New Year trip'}],
@@ -668,8 +769,9 @@ let S = initialState();
 const G = id => S.groups.find(g => g.id === id);
 const isAdmin = g => S.persona === 'admin' && g.adminInDemo;
 const adminsOf = g => isAdmin(g) ? ['jordan', ...g.admins] : g.admins;
-const membersOf = g => { const set = new Set(g.admins); g.roles.forEach(r => r.roster.forEach(p => set.add(p))); return [...set]; };
-function groupDates(g){ const out = []; let d = g.start; while (D(d) <= D(END_ISO)) { out.push(d); d = addDays(d, g.interval); } return out; }
+const membersOf = g => { const set = new Set(g.admins.concat(g.members || [])); g.roles.forEach(r => r.roster.forEach(p => set.add(p))); return [...set]; };
+const seriesRoles = g => g.roles.filter(r => !r.eventOnly);
+function groupDates(g){ if (!g.start || !g.interval) return []; const out = []; let d = g.start; while (D(d) <= D(END_ISO)) { out.push(d); d = addDays(d, g.interval); } return out; }
 /* Rotation = queue per Responsibility. Turn k is the k-th non-skipped Event. Overrides (Time Off route-arounds,
    Make-up Turns) are keyed by turn number, so a Skip Date carries them forward with the turn. */
 const personAt = (g, r, k) => S.overrides[`${g.id}|${r.id}|${k}`] || r.roster[k % r.roster.length];
@@ -677,7 +779,7 @@ function buildSchedule(g, skips){
   skips = skips || g.skips; let k = 0;
   return groupDates(g).map(date => {
     if (skips[date]) return {gid:g.id, date, skipped:true, reason:skips[date].reason, by:skips[date].by, slots:[]};
-    const slots = g.roles.map(r => ({gid:g.id, date, roleId:r.id, k, person:personAt(g, r, k)}));
+    const slots = seriesRoles(g).map(r => ({gid:g.id, date, roleId:r.id, k, person:personAt(g, r, k)}));
     k++;
     return {gid:g.id, date, skipped:false, slots};
   });
@@ -746,7 +848,7 @@ function applyCover(sl, coverer, arrangedBy){
     }
   }
   const hist = [{t:'Just now', text:`Covered by ${pname(coverer)}${arrangedBy ? ` (arranged by ${pname(arrangedBy)})` : ''}`, tone:'info'}];
-  if (arrangedBy && !r.roster.includes(coverer)) hist.push({t:'Just now', text:`${pname(coverer)} isn’t a Qualified Member for ${r.name}`, tone:''});
+  if (arrangedBy && !r.roster.includes(coverer)) hist.push({t:'Just now', text:`${pname(coverer)} isn’t on the ${r.name} team`, tone:''});
   if (arrangedBy) hist.push({t:'Just now', text:`${pname(coverer)} asked to confirm`, tone:'warn'});
   if (debt) hist.push({t:'Just now', text:`${pname(sl.person)} owes ${pname(coverer)} a Make-up Turn: ${fShort(debt.payDate)}`, tone:'info'});
   setSt(sl, {status:'covered', coveredBy:coverer, guest:null, debt}, hist);
@@ -765,6 +867,224 @@ const STATUS = {
 };
 const pill = (status, label) => { const m = STATUS[status]; return `<span class="pill ${m.cls}">${ic(m.icon,15,2)}${label || m.label}</span>`; };
 const gtile = (g, cls='') => `<span class="gtile ${g.acc} ${cls}">${ic(g.icon, cls==='sm'?18:cls==='lg'?28:22)}</span>`;
+
+/* ============================================================
+   One-off Events (RSVP) model
+   ============================================================ */
+const NOW_MIN = 8 * 60; // prototype "now": 8:00 AM on TODAY_ISO
+const fTime = hm => { const [h,m] = String(hm || '00:00').split(':').map(Number); return `${(h % 12) || 12}:${String(m).padStart(2,'0')} ${h < 12 ? 'AM' : 'PM'}`; };
+const fDow = s => fmt(s, {weekday:'short'});
+const minsUntil = (date, hm) => { const [h,m] = String(hm || '00:00').split(':').map(Number); return daysUntil(date) * 1440 + h * 60 + m - NOW_MIN; };
+const REMINDERS = [['2h','2 hours before'],['0d','Morning of'],['1d','1 day before'],['2d','2 days before'],['1w','1 week before']];
+const REMIND_PHRASE = {'2h':'2 hours before','0d':'the morning of','1d':'1 day before','2d':'2 days before','1w':'1 week before'};
+const DEADLINES = [['1d','1 day before'],['2d','2 days before'],['1w','1 week before']];
+const DL_DAYS = {'1d':1, '2d':2, '1w':7};
+const EV = id => S.events.find(e => e.id === id);
+function myEvents(){
+  const ids = new Set(myGroups().map(g => g.id));
+  return S.events.filter(e => ids.has(e.gid) && minsUntil(e.date, e.time) > 0).sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time));
+}
+const groupEvents = g => myEvents().filter(e => e.gid === g.id);
+function mySeat(ev){ for (const d of ev.duties) for (const s of d.seats) if (s.p === ME) return {d, s}; return null; }
+function headcount(ev){
+  const going = [], cant = [], none = [];
+  membersOf(G(ev.gid)).forEach(p => { const a = ev.rsvp[p]; (a === 'going' ? going : a === 'cant' ? cant : none).push(p); });
+  return {going, cant, none, total: going.length + cant.length + none.length};
+}
+const hcText = h => `${h.going.length} going · ${h.cant.length} can’t · ${h.none.length} haven’t answered`;
+const canManage = ev => ev.by === ME || isAdmin(G(ev.gid));
+function deadlineState(ev){
+  if (!ev.deadline) return {kind:'open', label:'RSVPs open', short:'Open', sub:'No deadline. Answer any time before the Event.'};
+  const dl = ev.deadline, mins = minsUntil(dl.date, dl.time), when = `${fShort(dl.date)}, ${fTime(dl.time)}`;
+  if (mins <= 0) return {kind:'closed', label:'RSVPs closed', short:'RSVPs closed', sub:`Closed ${when}.`};
+  if (mins < 48 * 60) { const h = Math.max(1, Math.round(mins / 60)); const day = daysUntil(dl.date) === 0 ? 'Tonight' : 'Tomorrow';
+    return {kind:'soon', label:`RSVPs close in ${h} hour${h === 1 ? '' : 's'}`, short:`Closes in ${h} h`, sub:`${day} at ${fTime(dl.time)}.`}; }
+  return {kind:'open', label:`RSVPs open, close ${fShort(dl.date)}`, short:`Closes ${fMD(dl.date)}`, sub:`In ${daysUntil(dl.date)} days, at ${fTime(dl.time)}.`};
+}
+function answerPill(a){
+  if (a === 'going') return `<span class="pill ok">${ic('checkCircle',15,2)}Going</span>`;
+  if (a === 'cant') return `<span class="pill neutral">${ic('xCircle',15,2)}Can’t go</span>`;
+  return `<span class="pill neutral">${ic('help',15,2)}Not answered</span>`;
+}
+const seatPill = s => s.status === 'open' ? `<span class="pill bad">${ic('alert',15,2)}Needs someone</span>` : pill(s.status === 'pending' ? 'pending' : 'confirmed');
+/* Duties are filled from the Responsibility's team, in team order (a light rotation per Responsibility). */
+function teamPreview(g, roleId, count, taken){
+  const r = role(g, roleId); if (!r) return [];
+  const ptr = S.evPtr[`${g.id}|${roleId}`] || 0, out = [];
+  for (let i = 0; i < r.roster.length && out.length < count; i++) { const p = r.roster[(ptr + i) % r.roster.length]; if (!(taken || []).includes(p)) out.push(p); }
+  return out;
+}
+function nextFromTeam(g, roleId, taken){
+  const r = role(g, roleId), key = `${g.id}|${roleId}`, ptr = S.evPtr[key] || 0;
+  for (let i = 0; i < r.roster.length; i++) { const p = r.roster[(ptr + i) % r.roster.length]; if (!taken.includes(p)) { S.evPtr[key] = (ptr + i + 1) % r.roster.length; return p; } }
+  return null;
+}
+
+/* ---------- Duty vs Invite cards ---------- */
+/* Home: a duty is a FILLED card ("You're on Bring food"); an invite is an OUTLINED card ("Game Night, Fri. Are you coming?"). */
+function evDutyCard(ev){
+  const g = G(ev.gid), {d, s} = mySeat(ev), r = role(g, d.roleId), pending = s.status === 'pending';
+  return `<div class="evduty fade-in"><div class="tap" data-a="open-event" data-id="${ev.id}" role="button" tabindex="0">
+      <div class="row" style="gap:10px"><span class="evic">${ic('clipboardCheck',20,2)}</span><span class="ovl grow">Your duty · ${fShort(ev.date)}</span>${seatPill(s)}</div>
+      <div class="evt">You’re on ${esc(r.name)}</div>
+      <div class="evs">${esc(ev.title)} · ${fTime(ev.time)} · ${esc(g.name)}</div></div>
+    ${pending ? `<div class="btn-row" style="margin-top:14px"><button class="btn duty-yes" data-a="ev-duty-confirm" data-id="${ev.id}">${ic('check',18,2.25)}Confirm</button><button class="btn duty-no" data-a="ev-duty-decline" data-id="${ev.id}">Can’t make it</button></div>`
+      : `<div class="evs" style="margin-top:12px;display:flex;align-items:center;gap:6px">${ic('checkCircle',16,2)}Confirmed. You’re counted as going.</div>`}
+  </div>`;
+}
+function evInviteCard(ev){
+  const g = G(ev.gid), a = ev.rsvp[ME], dl = deadlineState(ev), h = headcount(ev);
+  const title = a ? `${esc(ev.title)}, ${fDow(ev.date)}` : `${esc(ev.title)}, ${fDow(ev.date)}. Are you coming?`;
+  return `<div class="evrsvp fade-in"><div class="tap" data-a="open-event" data-id="${ev.id}" role="button" tabindex="0">
+      <div class="row" style="gap:10px"><span class="evic">${ic('mail',18)}</span><span class="ovl grow">Invite · ${fShort(ev.date)}</span>${a ? answerPill(a) : ''}</div>
+      <div class="evt">${title}</div>
+      <div class="evs">${esc(g.name)} · ${fTime(ev.time)} · ${h.going.length} going</div>
+      ${dl.kind === 'soon' ? `<div class="evdl warn">${ic('clock',14,2)}${esc(dl.label)}</div>` : dl.kind === 'closed' ? `<div class="evdl">${ic('lock',14,2)}RSVPs closed</div>` : ''}</div>
+    ${!a && dl.kind !== 'closed' ? `<div class="btn-row" style="margin-top:12px"><button class="btn sm secondary" data-a="ev-rsvp" data-id="${ev.id}" data-v="going">${ic('check',16,2.25)}Going</button><button class="btn sm secondary" data-a="ev-rsvp" data-id="${ev.id}" data-v="cant">${ic('x',16,2.25)}Can’t</button></div>` : ''}
+  </div>`;
+}
+/* Schedule rows: duty = shadowed card, 4px --duty bar, solid --duty date box, 800 weight, "Your duty" label.
+   Invite = outlined, transparent, hollow date box, 700 weight, "Invite" label. */
+function evSchedCard(ev){
+  const g = G(ev.gid), seat = mySeat(ev);
+  const dot = `<span class="dot ${g.acc}" style="display:inline-block;margin-right:6px;vertical-align:middle"></span>`;
+  if (seat) { const r = role(g, seat.d.roleId);
+    return `<div class="card sitem duty tap" data-a="open-event" data-id="${ev.id}" role="button" tabindex="0">${datebox(ev.date, true)}
+      <div class="grow"><div class="dlabel">${ic('clipboardCheck',14,2.25)}Your duty</div><div class="bb">${esc(r.name)}</div><div class="small muted ellip">${dot}${esc(ev.title)} · ${esc(g.name)}</div>
+      <div style="margin-top:8px">${seatPill(seat.s)}</div></div><span class="chev">${ic('chevR',20)}</span></div>`; }
+  const h = headcount(ev), dl = deadlineState(ev);
+  return `<div class="sitem evrsvp tap" data-a="open-event" data-id="${ev.id}" role="button" tabindex="0">${datebox(ev.date, false, 'rsvp')}
+    <div class="grow"><div class="ilabel">${ic('mail',14,2)}Invite</div><div class="b">${esc(ev.title)}</div><div class="small muted ellip">${dot}${esc(g.name)} · ${fTime(ev.time)}</div>
+    <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">${answerPill(ev.rsvp[ME])}<span class="xs muted b">${h.going.length} going${dl.kind === 'soon' ? ` · ${esc(dl.short)}` : ''}</span></div></div><span class="chev">${ic('chevR',20)}</span></div>`;
+}
+
+/* ---------- EVENT PAGE ---------- */
+const HC = {going:['Going','checkCircle'], cant:['Can’t','xCircle'], none:['Haven’t answered','help']};
+function hcRow(ev, key, list){
+  const open = !!S.evExpand[ev.id + key], [label, icon] = HC[key];
+  const seatOf = p => { for (const d of ev.duties) if (d.seats.some(s => s.p === p)) return role(G(ev.gid), d.roleId).name; return ''; };
+  return `<button class="li tap" style="width:100%" aria-expanded="${open}" data-a="ev-expand" data-id="${ev.id}" data-v="${key}"><span class="hc-ic ${key}">${ic(icon,20)}</span>
+      <div class="grow"><div class="t">${label} · ${list.length}</div></div><span class="av-stack">${list.slice(0,4).map(p => avatar(p,'sm')).join('')}</span>
+      <span class="chev" style="transform:rotate(${open ? 180 : 0}deg);transition:transform .2s">${ic('chevDown',20)}</span></button>
+    ${open ? `<div class="hc-names">${list.length ? list.map(p => { const sn = seatOf(p); return `<div class="hc-name">${avatar(p,'sm')}<div class="grow" style="min-width:0"><div class="small b ellip">${esc(nameMe(p))}</div>${sn ? `<div class="xs muted ellip">${esc(sn)}</div>` : ''}</div></div>`; }).join('') : '<div class="xs muted">Nobody yet</div>'}</div>` : ''}`;
+}
+function dutyBlock(ev, d){
+  const g = G(ev.gid), r = role(g, d.roleId), filled = d.seats.filter(s => s.p).length;
+  const iCanTake = r.roster.includes(ME) && !mySeat(ev);
+  return `<div class="card" style="padding:14px 16px">
+    <div class="row"><span class="li-ic">${ic('clipboardCheck',20)}</span><div class="grow"><div class="b">${esc(r.name)} <span class="muted">×${d.count}</span></div><div class="xs muted">From the ${esc(r.name)} team · ${r.roster.length} people</div></div><span class="xs b ${filled < d.count ? '' : 'muted'}" style="${filled < d.count ? 'color:var(--danger-text)' : ''}">${filled}/${d.count} filled</span></div>
+    <div style="margin-top:8px">${d.seats.map((s, i) => `<div class="seat">${s.p ? avatar(s.p,'sm') : `<span class="av sm" style="background:var(--danger-tint);color:var(--danger-text)">?</span>`}
+      <div class="grow" style="min-width:0"><div class="small b ellip" style="${isMe(s.p) ? 'color:var(--primary)' : ''}">${s.p ? esc(nameMe(s.p)) : 'Open'}</div>${s.was ? `<div class="xs muted">${esc(nameMe(s.was))} can’t make it. The team was asked.</div>` : ''}</div>
+      ${!s.p && iCanTake ? `<button class="btn sm primary" data-a="ev-duty-take" data-id="${ev.id}" data-v="${d.roleId}" data-i="${i}">I’ll take it</button>` : seatPill(s)}</div>`).join('')}</div></div>`;
+}
+function screenEvent(route){
+  const ev = EV(route.id);
+  if (!ev) return navbar('Event') + `<div class="empty">This Event was removed.</div>`;
+  const g = G(ev.gid), dl = deadlineState(ev), h = headcount(ev), seat = mySeat(ev), mgr = canManage(ev), a = ev.rsvp[ME];
+  const closed = dl.kind === 'closed', locked = closed && !mgr;
+  const kv = (icon, k, v) => `<div class="kv" style="align-items:flex-start"><span class="li-ic">${ic(icon,20)}</span><div class="grow"><div class="k">${k}</div><div class="v" style="font-weight:600">${v}</div></div></div>`;
+  let answer;
+  if (seat) {
+    const r = role(g, seat.d.roleId), pending = seat.s.status === 'pending';
+    answer = `<div class="evduty" style="margin-top:16px;box-shadow:none">
+      <div class="row" style="gap:10px"><span class="evic">${ic('clipboardCheck',20,2)}</span><span class="ovl grow">Your duty</span>${seatPill(seat.s)}</div>
+      <div class="evt">You’re on ${esc(r.name)}</div>
+      <div class="evs">${seat.d.count > 1 ? `With ${seat.d.seats.filter(s => s.p && s.p !== ME).map(s => first(s.p)).join(', ') || 'one more person'}. ` : ''}Confirming your duty counts as Going.</div>
+      ${pending ? `<div class="btn-row" style="margin-top:14px"><button class="btn duty-yes" data-a="ev-duty-confirm" data-id="${ev.id}">${ic('check',18,2.25)}Confirm</button><button class="btn duty-no" data-a="ev-duty-decline" data-id="${ev.id}">Can’t make it</button></div>`
+        : `<button class="btn sm duty-no" style="margin-top:12px" data-a="ev-duty-decline" data-id="${ev.id}">I can’t make it after all</button>`}</div>`;
+  } else {
+    answer = `<div class="field-label">Are you coming?</div>
+      <div class="btn-row"><button class="btn lg secondary rsvp-btn going" aria-pressed="${a === 'going'}" data-a="ev-rsvp" data-id="${ev.id}" data-v="going" ${locked ? 'disabled' : ''}>${ic('check',20,2.25)}Going</button>
+        <button class="btn lg secondary rsvp-btn cant" aria-pressed="${a === 'cant'}" data-a="ev-rsvp" data-id="${ev.id}" data-v="cant" ${locked ? 'disabled' : ''}>${ic('x',20,2.25)}Can’t</button></div>
+      <div class="xs muted" style="margin-top:8px">${locked ? `RSVPs are closed. If your plans change, tell ${esc(first(ev.by))}.` : closed ? 'RSVPs are closed for everyone else, but you can still change answers.' : a ? 'You can change your answer until RSVPs close.' : 'Just Going or Can’t. You can change it later.'}</div>`;
+  }
+  const bar = h.total ? `<div class="hc-bar" aria-hidden="true"><i class="g" style="width:${h.going.length / h.total * 100}%"></i><i class="c" style="width:${h.cant.length / h.total * 100}%"></i></div>` : '';
+  const manage = mgr ? `<div class="section"><div class="sec-head"><h2>Manage</h2><span class="pill admin">${ic(ev.by === ME ? 'pencil' : 'shield',13,2)}${ev.by === ME ? 'You created this' : 'Admin'}</span></div><div class="pad">
+      <div class="note">${ic('bell',20)}<div class="grow"><b>Reminder: ${esc(REMIND_PHRASE[ev.reminder])}.</b> It goes to the ${h.going.length} going and nudges the ${h.none.length} who haven’t answered.</div></div>
+      <div class="stack" style="margin-top:12px;gap:8px">
+        <button class="btn primary block" data-a="ev-remind" data-id="${ev.id}">${ic('send',18)}Send reminder now</button>
+        <button class="btn secondary block" data-a="ev-edit" data-id="${ev.id}">${ic('pencil',18)}Edit Event</button>
+        <button class="btn quiet block" style="color:var(--danger-text)" data-a="ev-remove" data-id="${ev.id}">${ic('trash',18)}Remove Event</button></div>
+      <div class="xs muted" style="margin-top:8px">${ev.by === ME ? `Admins of ${esc(g.name)} can also edit or remove it.` : `${esc(pname(ev.by))} created it. You’re an Admin of ${esc(g.name)}, so you can edit or remove any Event in it.`}</div></div></div>`
+    : `<div class="pad" style="margin-top:20px"><div class="note">${ic('bell',20)}<div class="grow">${a === 'going' || seat ? `We’ll remind you ${esc(REMIND_PHRASE[ev.reminder])}.` : `Reminder is set for ${esc(REMIND_PHRASE[ev.reminder])}. If you haven’t answered by then, we’ll nudge you.`} Only ${esc(first(ev.by))} and the group’s Admins can change this Event.</div></div></div>`;
+  return navbar('Event') + `
+    <div class="card dhead"><div class="row">${gtile(g,'sm')}<span class="b small muted grow ellip">${esc(g.name)}</span>${seat ? `<span class="pill info">${ic('clipboardCheck',15,2)}You have a duty</span>` : `<span class="pill neutral">${ic('mail',15,2)}Invite</span>`}</div>
+      <h1>${esc(ev.title)}</h1><div class="b">${fLong(ev.date)}</div><div class="small muted">${fTime(ev.time)} · ${rel(ev.date)}</div>
+      <div class="note ${dl.kind === 'soon' ? 'warn' : ''}" style="margin-top:14px;${closed ? 'background:var(--neutral-tint)' : ''}">${ic(closed ? 'lock' : 'clock',20)}<div class="grow"><b>${esc(dl.label)}.</b> ${esc(dl.sub)}</div></div>
+      ${answer}
+      <div style="margin-top:12px">
+        ${ev.location ? kv('mapPin','Where', esc(ev.location)) : ''}
+        ${ev.notes ? kv('fileText','Notes', esc(ev.notes)) : ''}
+        ${kv('user','Created by', esc(nameMe(ev.by)))}
+      </div>
+    </div>
+    <div class="section"><div class="sec-head"><h2>Who’s coming</h2><span class="xs muted b">Everyone in the group · ${h.total}</span></div><div class="pad"><div class="card" style="padding:16px 16px 6px">
+      <div class="bb" style="font-size:17px;line-height:24px">${hcText(h)}</div>${bar}</div>
+      <div class="list" style="margin-top:8px">${['going','cant','none'].map(k => hcRow(ev, k, h[k])).join('')}</div></div></div>
+    ${ev.duties.length ? `<div class="section"><div class="sec-head"><h2>Responsibilities</h2><span class="xs muted b">Filled from each team</span></div><div class="stack pad">${ev.duties.map(d => dutyBlock(ev, d)).join('')}</div></div>` : ''}
+    ${manage}
+    <div class="spacer"></div>`;
+}
+
+/* ---------- CREATE / EDIT EVENT ---------- */
+function openEventForm(gid, fromGroup){
+  const gnc = myGroups().find(g => g.id === 'gnc');
+  S.draft = {id:null, gid: gid || (gnc ? gnc.id : myGroups()[0].id), fromGroup:!!fromGroup, title:'', date:'2026-11-27', time:'19:00', location:'', notes:'',
+    duties:[], reminder:'1d', deadlineOn:false, deadline:'1d', keepDeadline:null, newResp:''};
+  push({name:'event-form'});
+}
+function draftDeadline(d){
+  if (!d.deadlineOn) return null;
+  if (d.deadline === 'keep') return d.keepDeadline;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date || '')) return null;
+  return {date:addDays(d.date, -DL_DAYS[d.deadline]), time:d.time || '19:00'};
+}
+function draftDeadlineHint(d){ const x = draftDeadline(d); return x ? `RSVPs close ${fShort(x.date)}, ${fTime(x.time)}.` : ''; }
+function screenEventForm(){
+  const d = S.draft; if (!d) return navbar('New Event');
+  const g = G(d.gid), editing = !!d.id, n = membersOf(g).length;
+  const added = new Set(d.duties.filter(x => x.roleId).map(x => x.roleId));
+  const avail = g.roles.filter(r => !added.has(r.id));
+  const dutyRows = d.duties.map((x, i) => {
+    const r = x.roleId ? role(g, x.roleId) : null, name = r ? r.name : x.name;
+    const ev = editing ? EV(d.id) : null, old = ev && x.roleId ? ev.duties.find(o => o.roleId === x.roleId) : null;
+    const who = old ? old.seats.slice(0, x.count).map(s => s.p).filter(Boolean) : [];
+    const more = r ? teamPreview(g, r.id, x.count - who.length, who) : [];
+    const team = r ? `From the ${esc(name)} team · ${r.roster.length} people` : `New: everyone in ${esc(g.name)} is on the ${esc(name)} team for now`;
+    const next = who.concat(more);
+    return `<div class="dutyrow"><div class="grow" style="min-width:0"><div class="b">${esc(name)} <span class="muted">×${x.count}</span></div><div class="xs muted">${team}</div>
+        ${next.length ? `<div class="xs b" style="margin-top:4px">${old ? 'Assigned' : 'Next up'}: ${next.map(p => esc(nameMe(p))).join(', ')}</div>` : ''}</div>
+      <div class="stepper"><button data-a="draft-duty-count" data-i="${i}" data-v="-1" aria-label="Fewer" ${x.count <= 1 ? 'disabled' : ''}>${ic('minus',18)}</button><span class="n">${x.count}</span><button data-a="draft-duty-count" data-i="${i}" data-v="1" aria-label="More">${ic('plus',18)}</button></div>
+      <button class="icon-btn" data-a="draft-duty-remove" data-i="${i}" aria-label="Remove ${esc(name)}">${ic('x',20)}</button></div>`;
+  }).join('');
+  const ok = d.title.trim() && d.date;
+  return navbar(editing ? 'Edit Event' : 'New Event') + `<div class="pad">
+    ${!editing && !d.fromGroup ? `<div class="field-label" style="margin-top:4px">Group</div><div class="chips">${myGroups().map(x => `<button class="chip" aria-pressed="${x.id === d.gid}" data-a="draft-group" data-v="${x.id}"><span class="dot ${x.acc}"></span>${esc(x.name)}</button>`).join('')}</div>`
+      : `<div class="row" style="margin-top:4px">${gtile(g,'sm')}<span class="b small">${esc(g.name)}</span></div>`}
+    <div class="field-label">Title</div><input type="text" data-model="draft.title" value="${esc(d.title)}" placeholder="e.g. Game Night" aria-label="Title">
+    <div class="two"><div><div class="field-label">Date</div><input type="date" data-model="draft.date" value="${esc(d.date)}" min="${TODAY_ISO}" aria-label="Date"></div>
+      <div><div class="field-label">Time</div><input type="time" data-model="draft.time" value="${esc(d.time)}" aria-label="Time"></div></div>
+    <div class="field-label">Location (optional)</div><input type="text" data-model="draft.location" value="${esc(d.location)}" placeholder="e.g. Sam’s place" aria-label="Location">
+    <div class="field-label">Notes (optional)</div><textarea rows="2" data-model="draft.notes" placeholder="What to bring, parking, anything people should know" aria-label="Notes">${esc(d.notes)}</textarea>
+
+    <div class="field-label">Responsibilities (optional)</div>
+    <div class="xs muted" style="margin:-4px 0 10px">Need people to bring or do something? Each one is filled from that Responsibility’s team, and they’re asked to confirm.</div>
+    ${dutyRows ? `<div class="stack" style="gap:8px;margin-bottom:10px">${dutyRows}</div>` : ''}
+    <div class="chips">${avail.map(r => `<button class="chip" data-a="draft-duty-add" data-v="${r.id}">${ic('plus',16)}${esc(r.name)}</button>`).join('')}</div>
+    <div class="row" style="gap:8px;margin-top:10px"><input type="text" data-model="draft.newResp" value="${esc(d.newResp)}" placeholder="New Responsibility, e.g. Bring dessert" aria-label="New Responsibility"><button class="btn secondary" style="flex:none" data-a="draft-duty-new">Add</button></div>
+
+    <div class="field-label">Reminder</div><div class="chips">${REMINDERS.map(([v,l]) => `<button class="chip" aria-pressed="${d.reminder === v}" data-a="draft-reminder" data-v="${v}">${l}</button>`).join('')}</div>
+    <div class="xs muted" style="margin-top:8px">Reminds everyone who’s going, and nudges anyone who hasn’t answered.</div>
+
+    <div class="list" style="margin-top:20px"><div class="set-row"><div class="grow"><div class="b small">RSVP deadline</div><div class="xs muted">Optional. After it, answers can’t change.</div></div><button class="switch" role="switch" aria-checked="${d.deadlineOn}" aria-label="RSVP deadline" data-a="draft-deadline-toggle"></button></div></div>
+    ${d.deadlineOn ? `<div class="chips" style="margin-top:10px">${d.keepDeadline ? `<button class="chip" aria-pressed="${d.deadline === 'keep'}" data-a="draft-deadline" data-v="keep">Keep ${fMD(d.keepDeadline.date)}, ${fTime(d.keepDeadline.time)}</button>` : ''}${DEADLINES.map(([v,l]) => `<button class="chip" aria-pressed="${d.deadline === v}" data-a="draft-deadline" data-v="${v}">${l}</button>`).join('')}</div>
+      <div class="xs b" style="margin-top:8px;color:var(--text-2)" id="dlHint">${esc(draftDeadlineHint(d))}</div>` : ''}
+
+    <div class="note" style="margin-top:20px">${ic('users',20)}<div class="grow">${editing ? `Everyone in ${esc(g.name)} is told what changed.` : `Everyone in ${esc(g.name)} (${n} people) is invited and can answer Going or Can’t.`}</div></div>
+    <button class="btn lg primary block" style="margin-top:16px" id="evSave" data-a="ev-save" ${ok ? '' : 'disabled'}>${editing ? `${ic('check',20,2.25)}Save changes` : `${ic('send',20)}Create and invite`}</button>
+    <button class="btn quiet block" style="margin-top:4px" data-a="back">Cancel</button>
+    <div class="spacer"></div></div>`;
+}
 
 /* ============================================================
    Activity / toast
@@ -854,11 +1174,16 @@ function groupCard(g){
   let lead = '';
   if (next) { const pr = g.roles.find(r => r.primary); const sl = next.slots.find(x => x.roleId === pr.id); lead = `${pr.name}: ${whoLabel(st(sl))}`; }
   const mine = mySlots(true).find(sl => sl.gid === g.id);
-  const right = mine ? (() => { const s = st(mine); return `<span class="xs muted b">You · ${fMD(mine.date)}</span>${pill(s.status, s.status==='covered'?'Covering':null)}`; })() : `<span class="xs muted b">No turns soon</span>`;
+  const evs = groupEvents(g), nextEv = evs[0], dutyEv = evs.find(e => mySeat(e)), askEv = evs.find(e => !mySeat(e) && !e.rsvp[ME] && deadlineState(e).kind !== 'closed');
+  const right = mine ? (() => { const s = st(mine); return `<span class="xs muted b">You · ${fMD(mine.date)}</span>${pill(s.status, s.status==='covered'?'Covering':null)}`; })()
+    : dutyEv ? `<span class="xs muted b">You · ${fMD(dutyEv.date)}</span>${seatPill(mySeat(dutyEv).s)}`
+    : askEv ? `<span class="xs muted b">${esc(askEv.title)}</span>${answerPill(null)}`
+    : `<span class="xs muted b">No turns soon</span>`;
+  const meta = next ? `${fShort(next.date)} · ${esc(lead)}` : nextEv ? `${fShort(nextEv.date)} · ${esc(nextEv.title)}` : 'No upcoming Events';
   return `<div class="card gcard tap" data-a="open-group" data-g="${g.id}" role="button" tabindex="0">
     ${gtile(g)}
     <div class="grow"><div class="nm ellip">${esc(g.name)}</div>
-      <div class="meta ellip">${next ? fShort(next.date) : 'No upcoming Events'} · ${esc(lead)}</div></div>
+      <div class="meta ellip">${meta}</div></div>
     <div class="right">${right}</div></div>`;
 }
 /* Managed card: same identity plus Admin-only health stats. */
@@ -885,11 +1210,21 @@ function groupsList(){
   return `<div class="chips scroll" style="margin-bottom:12px">${chip('all','All', myGroups().length)}${chip('mine','Managed by me', managed.length)}${chip('attn','Needs attention', needN)}</div>
     <div class="stack pad">${list.map(g => isAdmin(g) ? managedCard(g) : groupCard(g)).join('') || `<div class="caught" style="margin:0">${ic('checkCircle',20)}Nothing needs attention in the groups you manage.</div>`}</div>`;
 }
+/* Duties (filled) and invites (outlined) side by side, in date order. */
+function eventsSection(){
+  const evs = myEvents().filter(e => daysUntil(e.date) <= 30);
+  if (!evs.length) return '';
+  const ask = evs.filter(e => !mySeat(e) && !e.rsvp[ME] && deadlineState(e).kind !== 'closed').length;
+  return `<div class="section"><div class="sec-head"><h2>Events coming up</h2><span class="xs muted b">${ask ? `${ask} to answer` : ''}</span></div>
+    <div class="stack pad">${evs.map(e => mySeat(e) ? evDutyCard(e) : evInviteCard(e)).join('')}</div></div>`;
+}
 function screenHome(){
   const att = attentionItems();
   return `<div class="greet"><div class="grow"><div class="overline">${fLong(TODAY_ISO)}</div><h1 class="hello">Good morning, ${esc(first(ME))}</h1></div>
+      <button class="icon-btn ghost" data-a="event-new" aria-label="Create an Event">${ic('plus',26)}</button>
       <button data-a="tab" data-v="profile" aria-label="Profile">${avatar(ME,'')}</button></div>
     ${heroCard()}
+    ${eventsSection()}
     <div class="section"><div class="sec-head"><h2>Needs your attention ${att.length?`<span class="count">${att.length}</span>`:''}</h2></div>
       ${att.length ? `<div class="stack pad">${att.map(a => a.html).join('')}</div>` : `<div class="caught">${ic('checkCircle',20)}You’re all caught up.</div>`}</div>
     <div class="section"><div class="sec-head"><h2>Your groups</h2><button class="link" data-a="tab" data-v="groups">See all</button></div>${groupsList()}</div>
@@ -917,10 +1252,11 @@ function weekLabel(ws){
   return 'Week of ' + fMD(ws);
 }
 function weekKey(date){ return addDays(date, -D(date).getDay()); }
-function datebox(date, me){ return `<div class="datebox ${me?'me':''}"><div class="m">${fmt(date,{month:'short'})}</div><div class="d">${D(date).getDate()}</div></div>`; }
+function datebox(date, me, cls=''){ return `<div class="datebox ${me?'me':''} ${cls}"><div class="m">${fmt(date,{month:'short'})}</div><div class="d">${D(date).getDate()}</div></div>`; }
 function schedItemsMine(){
   const items = [];
   mySlots(true).forEach(sl => items.push({date:sl.date, kind:'slot', sl}));
+  myEvents().forEach(ev => items.push({date:ev.date, kind:'event', ev}));
   myGroups().forEach(g => buildSchedule(g).filter(d => d.skipped && upcoming(d.date)).forEach(d => items.push({date:d.date, kind:'skip', g, d})));
   return items.sort((a,b) => a.date.localeCompare(b.date) || (a.kind==='skip'?1:-1));
 }
@@ -931,8 +1267,9 @@ function skipCard(g, d){
 function mySlotCard(sl){
   const g = G(sl.gid), r = role(g, sl.roleId), s = st(sl);
   const lbl = s.status === 'covered' && s.coveredBy === ME ? 'Covering' : null;
-  return `<div class="card sitem tap" data-a="open-assignment" data-k="${keyOf(sl)}" role="button" tabindex="0">${datebox(sl.date, true)}
-    <div class="grow"><div class="b">${s.makeup?'<span class="tag">Make-up Turn</span>':''}${esc(r.name)}</div><div class="small muted ellip"><span class="dot ${g.acc}" style="display:inline-block;margin-right:6px;vertical-align:middle"></span>${esc(g.name)}</div>
+  const onIt = s.assignee === ME;
+  return `<div class="card sitem tap ${onIt?'duty':''}" data-a="open-assignment" data-k="${keyOf(sl)}" role="button" tabindex="0">${datebox(sl.date, onIt)}
+    <div class="grow">${onIt?`<div class="dlabel">${ic('clipboardCheck',14,2.25)}Your duty</div>`:''}<div class="bb">${s.makeup?'<span class="tag">Make-up Turn</span>':''}${esc(r.name)}</div><div class="small muted ellip"><span class="dot ${g.acc}" style="display:inline-block;margin-right:6px;vertical-align:middle"></span>${esc(g.name)}</div>
     <div style="margin-top:8px">${pill(s.status, lbl)}</div></div><span class="chev">${ic('chevR',20)}</span></div>`;
 }
 function dayGroupCard(g, d){
@@ -950,7 +1287,7 @@ function slotRow(g, sl){
 function screenSchedule(){
   const sc = S.sched;
   const top = `<div class="lt-head"><div><h1>Schedule</h1><div class="sub">${sc.scope==='me'?'Your Assignments':'All your groups'}</div></div>
-      <button class="icon-btn ghost" data-a="open-availability" aria-label="Time Off">${ic('calOff',24)}</button></div>
+      <div class="row" style="gap:0"><button class="icon-btn ghost" data-a="open-availability" aria-label="Time Off">${ic('calOff',24)}</button><button class="icon-btn ghost" data-a="event-new" aria-label="Create an Event">${ic('plus',26)}</button></div></div>
     <div class="seg" role="tablist"><button role="tab" aria-selected="${sc.view==='list'}" data-a="sched-view" data-v="list">${ic('list',18)}List</button><button role="tab" aria-selected="${sc.view==='month'}" data-a="sched-view" data-v="month">${ic('grid',18)}Month</button></div>
     <div class="chips scroll" style="margin-top:12px"><button class="chip" aria-pressed="${sc.scope==='me'}" data-a="sched-scope" data-v="me">Just me</button><button class="chip" aria-pressed="${sc.scope==='all'}" data-a="sched-scope" data-v="all">Everyone in my groups</button></div>`;
   return top + (sc.view === 'list' ? schedList() : schedMonth());
@@ -958,11 +1295,12 @@ function screenSchedule(){
 function schedList(){
   const sc = S.sched; const weeks = new Map();
   const add = (date, html) => { const wk = weekKey(date); if (!weeks.has(wk)) weeks.set(wk, []); weeks.get(wk).push(html); };
-  if (sc.scope === 'me') schedItemsMine().forEach(it => add(it.date, it.kind === 'skip' ? skipCard(it.g, it.d) : mySlotCard(it.sl)));
+  if (sc.scope === 'me') schedItemsMine().forEach(it => add(it.date, it.kind === 'skip' ? skipCard(it.g, it.d) : it.kind === 'event' ? evSchedCard(it.ev) : mySlotCard(it.sl)));
   else {
     const all = [];
-    myGroups().forEach(g => buildSchedule(g).filter(d => upcoming(d.date)).forEach(d => all.push({g, d})));
-    all.sort((a,b) => a.d.date.localeCompare(b.d.date)).forEach(({g,d}) => add(d.date, dayGroupCard(g, d)));
+    myGroups().forEach(g => buildSchedule(g).filter(d => upcoming(d.date)).forEach(d => all.push({date:d.date, html:() => dayGroupCard(g, d)})));
+    myEvents().forEach(ev => all.push({date:ev.date, html:() => evSchedCard(ev)}));
+    all.sort((a,b) => a.date.localeCompare(b.date)).forEach(x => add(x.date, x.html()));
   }
   if (!weeks.size) return `<div class="empty">Nothing scheduled.</div>`;
   return [...weeks.entries()].map(([wk, cards]) => `<div class="week-h"><h3>${weekLabel(wk)}</h3><span>${fMD(wk)} – ${fMD(addDays(wk,6))}</span></div><div class="stack pad">${cards.join('')}</div>`).join('');
@@ -980,14 +1318,17 @@ function dayInfo(date){
   myGroups().forEach(g => { const d = buildSchedule(g).find(x => x.date === date); if (!d) return;
     if (d.skipped) { skips.push({g,d}); return; }
     groups.push({g,d}); d.slots.forEach(sl => { if (st(sl).assignee === ME) mine.push(sl); }); });
-  return {groups, mine, skips};
+  const events = myEvents().filter(e => e.date === date);
+  return {groups, mine, skips, events};
 }
 function schedMonth(){
   const sc = S.sched; const cells = monthCells(sc.month);
   const grid = cells.map(c => {
     const inf = dayInfo(c.date);
-    const cls = ['cday', 'tap', c.out?'out':'', c.date===TODAY_ISO?'today':'', inf.mine.length?'mine':'', (!inf.groups.length && inf.skips.length)?'skip':'', sc.sel===c.date?'sel':''].join(' ');
-    const dots = sc.scope === 'me' ? inf.mine.map(sl => `<i class="dot ${G(sl.gid).acc}"></i>`).join('') : inf.groups.map(x => `<i class="dot ${x.g.acc}"></i>`).join('');
+    const dutyEv = inf.events.some(e => mySeat(e));
+    const cls = ['cday', 'tap', c.out?'out':'', c.date===TODAY_ISO?'today':'', (inf.mine.length || dutyEv)?'mine':'', (!inf.groups.length && !inf.events.length && inf.skips.length)?'skip':'', sc.sel===c.date?'sel':''].join(' ');
+    const evDots = inf.events.map(e => `<i class="dot ${G(e.gid).acc} ${mySeat(e)?'':'ring'}"></i>`).join('');
+    const dots = (sc.scope === 'me' ? inf.mine.map(sl => `<i class="dot ${G(sl.gid).acc}"></i>`).join('') : inf.groups.map(x => `<i class="dot ${x.g.acc}"></i>`).join('')) + evDots;
     return `<button class="${cls}" data-a="cal-pick" data-d="${c.date}" aria-label="${fLong(c.date)}"><span class="num">${D(c.date).getDate()}</span><span class="dots">${dots}</span></button>`;
   }).join('');
   let detail = '';
@@ -996,13 +1337,14 @@ function schedMonth(){
     const inf = dayInfo(sel); const cards = [];
     if (sc.scope === 'me') mySlots(true).filter(sl => sl.date === sel).forEach(sl => cards.push(mySlotCard(sl)));
     else inf.groups.forEach(({g,d}) => cards.push(dayGroupCard(g,d)));
+    inf.events.forEach(ev => cards.push(evSchedCard(ev)));
     inf.skips.forEach(({g,d}) => cards.push(skipCard(g,d)));
     detail = `<div class="week-h"><h3>${fLong(sel)}</h3><span>${rel(sel)}</span></div><div class="stack pad">${cards.join('') || `<div class="empty card">Nothing on this day.</div>`}</div>`;
   } else detail = `<div class="empty small">Tap a day to see who’s serving.</div>`;
-  const short = g => g.name.split(' ')[0] === 'Sunday' ? 'Worship' : g.name.split(' ')[0];
+  const short = g => g.short || (g.name.split(' ')[0] === 'Sunday' ? 'Worship' : g.name.split(' ')[0]);
   return `<div class="card cal" style="margin-top:16px"><div class="cal-head"><button class="icon-btn" data-a="cal-move" data-v="-1" aria-label="Previous month">${ic('chevL',22)}</button><span class="mt">${monthTitle(sc.month)}</span><button class="icon-btn" data-a="cal-move" data-v="1" aria-label="Next month">${ic('chevR',22)}</button></div>
     <div class="cal-grid">${['S','M','T','W','T','F','S'].map(x => `<div class="cal-dow">${x}</div>`).join('')}${grid}</div>
-    <div class="legend"><span><i class="lg-sw" style="background:var(--primary);border-radius:50%"></i>You’re serving</span><span><i class="lg-sw" style="border:1.5px dashed var(--border-strong)"></i>Skip Date</span>${myGroups().map(g => `<span><i class="dot ${g.acc}"></i>${esc(short(g))}</span>`).join('')}</div></div>${detail}`;
+    <div class="legend"><span><i class="lg-sw" style="background:var(--primary);border-radius:50%"></i>You’re on duty</span><span><i class="dot ring" style="color:var(--text-2)"></i>Invite</span><span><i class="lg-sw" style="border:1.5px dashed var(--border-strong)"></i>Skip Date</span>${myGroups().map(g => `<span><i class="dot ${g.acc}"></i>${esc(short(g))}</span>`).join('')}</div></div>${detail}`;
 }
 
 /* ---------- ASSIGNMENT DETAILS ---------- */
@@ -1028,7 +1370,7 @@ function screenAssignment(route){
     coverage = `<div class="section pad"><div class="card" style="padding:16px">
       <div class="row">${pill(s.status)}<span class="xs muted b">${s.reason ? '“'+esc(s.reason)+'”' : ''}</span></div>
       <div class="b" style="margin-top:12px">${replace ? (iHold ? 'Nobody’s free. Please find a replacement.' : `Nobody’s free. ${esc(holderText[0].toUpperCase()+holderText.slice(1))} ${g.settings.duty==='admins'?'are':'is'} finding a replacement.`) : iDeclined ? 'We’re finding someone to cover you' : `${esc(first(sl.person))} can’t make it`}</div>
-      <div class="small muted" style="margin-top:2px">${replace ? `Asked ${notified.length} Qualified ${notified.length===1?'Member':'Members'}; no one volunteered by the alert time. Replacement Duty is on ${esc(holderText)}.${adm && !iHold ? ' You’re informed; no action needed.' : ''}` : `Asked ${notified.length} Qualified ${notified.length===1?'Member':'Members'} for ${esc(r.name)}. The first to accept gets it. We’ll remind them once more at the alert time.`}</div>
+      <div class="small muted" style="margin-top:2px">${replace ? `Asked the ${esc(r.name)} team (${notified.length} ${notified.length===1?'person':'people'}); no one volunteered by the alert time. Replacement Duty is on ${esc(holderText)}.${adm && !iHold ? ' You’re informed; no action needed.' : ''}` : `Asked the ${esc(r.name)} team (${notified.length} ${notified.length===1?'person':'people'}). Only the ${esc(r.name)} team can cover, and the first to accept gets it. We’ll remind them once more at the alert time.`}</div>
       <div class="row" style="margin-top:12px"><span class="av-stack">${notified.slice(0,5).map(p => avatar(p,'sm')).join('')}</span><span class="xs muted b">${notified.map(p => isMe(p)?'You':first(p)).join(', ')}</span></div>
       <div class="stack" style="margin-top:16px;gap:8px">
         ${!iDeclined && r.roster.includes(ME) && !replace ? `<button class="btn primary block" data-a="cover" data-k="${route.k}">${ic('check',18,2.25)}I can cover</button>` : ''}
@@ -1072,13 +1414,17 @@ function groupOverview(g, adm){
   const h = groupHealth(g); const n = h.next;
   const recent = S.activity.filter(a => a.gid === g.id);
   const open = h.coverage + h.replace;
+  const evs = groupEvents(g);
   return `<div class="pad" style="margin-top:8px">
     ${n ? `<div class="card" style="padding:16px"><div class="overline">Next Event · ${rel(n.date)}</div><div class="bb" style="font-size:18px;margin-top:2px">${fLong(n.date)}</div><div class="xs muted">${esc(g.time)}</div>
       <div class="roles" style="margin-top:12px">${n.slots.map(sl => slotRow(g, sl)).join('')}</div></div>` : ''}
     ${adm ? `<div class="stats" style="margin-top:12px">
       <div class="stat ${open?'bad':''}">${ic('alert',16)}<span><b>${open}</b> open coverage</span></div>
       <div class="stat ${h.pending?'warn':''}">${ic('clock',16)}<span><b>${h.pending}</b> pending · 3 wks</span></div></div>` : ''}
-    <button class="btn secondary block" style="margin-top:12px" data-a="skip-open" data-g="${g.id}">${ic('calX',20)}Add a Skip Date</button>
+    ${!g.interval ? `<div class="note" style="margin-top:4px">${ic('mail',20)}<div class="grow">${esc(g.name)} meets when it suits. Anyone in the group can create an Event; everyone is invited.</div></div>` : ''}
+    <button class="btn ${g.interval?'secondary':'primary'} block" style="margin-top:12px" data-a="event-new" data-g="${g.id}">${ic('plus',20)}Create an Event</button>
+    ${evs.length ? `<div class="field-label">Upcoming Events</div><div class="stack">${evs.map(evSchedCard).join('')}</div>` : !g.interval ? `<div class="empty card" style="margin-top:12px">No Events yet.</div>` : ''}
+    ${g.interval ? `<button class="btn secondary block" style="margin-top:12px" data-a="skip-open" data-g="${g.id}">${ic('calX',20)}Add a Skip Date</button>` : ''}
     ${h.skips.length ? `<div class="field-label">Upcoming Skip Dates</div><div class="stack">${h.skips.map(d => skipCard(g,d)).join('')}</div>` : ''}
     <div class="field-label" style="display:flex;justify-content:space-between"><span>Schedule history</span><span style="font-weight:600">Visible to all Members</span></div>
     <div class="list">${recent.length ? recent.map(a => `<div class="act">${actIcon(a)}<div class="grow"><div class="txt small">${a.html}</div><div class="when">${a.day === 'Today' ? a.t : a.day + ' · ' + a.t}</div></div></div>`).join('') : '<div class="empty">No history yet</div>'}</div>
@@ -1086,9 +1432,12 @@ function groupOverview(g, adm){
 }
 function groupSchedule(g){
   const days = buildSchedule(g).filter(d => upcoming(d.date));
+  const evItems = groupEvents(g).map(ev => ({date:ev.date, html:evSchedCard(ev)}));
+  const dayHtml = d => d.skipped ?skipCard(g,d) + `<button class="btn sm quiet" style="align-self:flex-start;margin-top:-6px" data-a="unskip" data-g="${g.id}" data-d="${d.date}">${ic('undo',16)}Remove Skip Date</button>` : `<div class="card" style="padding:14px"><div class="row">${datebox(d.date, d.slots.some(sl => st(sl).assignee===ME))}<div class="grow"><div class="b">${fShort(d.date)}</div><div class="xs muted">${rel(d.date)}</div></div></div><div class="roles">${d.slots.map(sl => slotRow(g, sl)).join('')}</div></div>`;
+  const items = days.map(d => ({date:d.date, html:dayHtml(d)})).concat(evItems).sort((a,b) => a.date.localeCompare(b.date));
   return `<div class="pad stack" style="margin-top:8px">
-    <button class="btn secondary block" data-a="skip-open" data-g="${g.id}">${ic('calX',20)}Add a Skip Date</button>
-    ${days.map(d => d.skipped ? skipCard(g,d) + `<button class="btn sm quiet" style="align-self:flex-start;margin-top:-6px" data-a="unskip" data-g="${g.id}" data-d="${d.date}">${ic('undo',16)}Remove Skip Date</button>` : `<div class="card" style="padding:14px"><div class="row">${datebox(d.date, d.slots.some(sl => st(sl).assignee===ME))}<div class="grow"><div class="b">${fShort(d.date)}</div><div class="xs muted">${rel(d.date)}</div></div></div><div class="roles">${d.slots.map(sl => slotRow(g, sl)).join('')}</div></div>`).join('')}
+    <div class="btn-row"><button class="btn secondary" data-a="event-new" data-g="${g.id}">${ic('plus',20)}Create an Event</button>${g.interval ? `<button class="btn secondary" data-a="skip-open" data-g="${g.id}">${ic('calX',20)}Skip Date</button>` : ''}</div>
+    ${items.map(x => x.html).join('') || '<div class="empty card">Nothing scheduled yet.</div>'}
   </div>`;
 }
 function groupMembers(g, adm){
@@ -1110,7 +1459,7 @@ function groupMembers(g, adm){
     <div class="legend" style="padding:12px 2px 4px"><span><i class="lg-sw" style="background:var(--primary)"></i>Served (3 mo)</span><span><i class="lg-sw" style="background:color-mix(in srgb,var(--primary) 45%,transparent)"></i>Upcoming</span><span><i class="lg-sw" style="background:var(--success)"></i>Covering</span></div>
     <div class="list" style="margin-top:8px">${rows.map(r => `<div class="li" style="align-items:flex-start;padding:14px 16px">${avatar(r.p)}<div class="grow">
       <div class="row" style="gap:8px"><span class="t ellip">${esc(nameMe(r.p))}</span>${admins.includes(r.p) ? `<span class="pill admin">${ic('shield',12,2)}Admin</span>` : ''}</div>
-      <div class="s ellip">${r.roles.length ? 'Qualified: ' + esc(r.roles.join(' · ')) : 'Not in a Rotation'}</div>
+      <div class="s ellip">${r.roles.length ? (r.roles.length === 1 ? esc(r.roles[0]) + ' team' : 'Teams: ' + esc(r.roles.join(' · '))) : 'Not on a team yet'}</div>
       ${r.roles.length ? `<div class="row" style="margin-top:8px;gap:10px"><div class="bar grow"><i class="b1" style="width:${r.sv/max*100}%"></i><i class="b2" style="width:${(r.up-r.covers)/max*100}%"></i><i class="b3" style="width:${r.covers/max*100}%"></i></div><span class="xs b" style="min-width:56px;text-align:right">${r.total} turns</span></div>` : ''}
     </div></div>`).join('')}</div>
     ${adm ? `<button class="btn secondary block" style="margin-top:12px" data-a="invite" data-g="${g.id}">${ic('userPlus',20)}Invite people</button>` : ''}
@@ -1127,7 +1476,7 @@ function groupSettings(g, adm){
   return `<div class="pad" style="margin-top:8px">
     ${!adm ? `<div class="note" style="margin-bottom:4px">${ic('info',20)}<div class="grow">Only Admins can change settings. Ask ${esc(g.admins.map(pname).join(' or '))}.</div></div>` : ''}
     <div class="field-label">Events</div><div class="list">${val('Event Series', g.cadence)}${val('Time', g.time)}${val('Primary Responsibility', g.roles.find(r => r.primary).name)}</div>
-    <div class="field-label">Responsibilities</div><div class="list">${g.roles.map(r => sw(r.confirm, esc(r.name) + (r.primary?' <span class="xs muted">· primary</span>':''), `${r.roster.length} Qualified Members · Needs confirmation`, `data-a="role-confirm" data-g="${g.id}" data-v="${r.id}"`)).join('')}
+    <div class="field-label">Responsibilities</div><div class="list">${g.roles.map(r => sw(r.confirm, esc(r.name) + (r.primary?' <span class="xs muted">· primary</span>':''), `${esc(r.name)} team · ${r.roster.length} people${r.eventOnly ? ' · used at one-off Events' : ''} · Needs confirmation`, `data-a="role-confirm" data-g="${g.id}" data-v="${r.id}"`)).join('')}
       ${adm ? `<button class="set-row" style="width:100%;color:var(--primary)" data-a="toast" data-msg="Adding Responsibilities isn’t in this prototype yet">${ic('plus',20)}<span class="b small">Add Responsibility</span></button>` : ''}</div>
     <div class="field-label">Coverage</div><div class="list">
       ${choice('Coverage Policy', POLICY[s.policy], 'policy')}
@@ -1217,8 +1566,8 @@ function screenActivity(){
   const days = [...new Set(items.map(a => a.day))];
   const chip = (v,l) => `<button class="chip" aria-pressed="${f===v}" data-a="act-filter" data-v="${v}">${l}</button>`;
   return `<div class="lt-head"><div><h1>Activity</h1><div class="sub">Across all your groups</div></div></div>
-    <div class="chips scroll">${chip('all','All')}${chip('coverage','Coverage')}${chip('confirm','Confirmations')}${chip('change','Schedule changes')}</div>
-    ${days.map(d => `<div class="week-h"><h3>${d}</h3></div><div class="list" style="margin:0 16px">${items.filter(a => a.day === d).map(a => { const g = G(a.gid); return `<div class="act tap" data-a="open-group" data-g="${a.gid}" role="button" tabindex="0"><span>${actIcon(a)}</span><div class="grow" style="padding-right:12px"><div class="txt">${a.html}</div><div class="when"><i class="dot ${g.acc}"></i>${esc(g.name)} · ${esc(a.t)}</div></div>${a.unread?'<span class="unread" aria-label="Unread"></span>':''}</div>`; }).join('')}</div>`).join('') || '<div class="empty">Nothing here yet.</div>'}`;
+    <div class="chips scroll">${chip('all','All')}${chip('coverage','Coverage')}${chip('confirm','Confirmations')}${chip('event','Events')}${chip('change','Schedule changes')}</div>
+    ${days.map(d => `<div class="week-h"><h3>${d}</h3></div><div class="list" style="margin:0 16px">${items.filter(a => a.day === d).map(a => { const g = G(a.gid); const tgt = a.ev && EV(a.ev) ? `data-a="open-event" data-id="${a.ev}"` : `data-a="open-group" data-g="${a.gid}"`; return `<div class="act tap" ${tgt} role="button" tabindex="0"><span>${actIcon(a)}</span><div class="grow" style="padding-right:12px"><div class="txt">${a.html}</div><div class="when"><i class="dot ${g.acc}"></i>${esc(g.name)} · ${esc(a.t)}</div></div>${a.unread?'<span class="unread" aria-label="Unread"></span>':''}</div>`; }).join('')}</div>`).join('') || '<div class="empty">Nothing here yet.</div>'}`;
 }
 
 /* ---------- PROFILE ---------- */
@@ -1233,9 +1582,9 @@ function screenProfile(){
     <div class="field-label">Remind me before an Assignment</div><div class="chips">${tchip('1w','1 week before')}${tchip('2d','2 days before')}${tchip('1d','1 day before')}${tchip('0d','Morning of')}</div>
     <div class="field-label">Reminder time</div><div class="chips">${['8:00 AM','12:00 PM','6:00 PM','8:00 PM'].map(t => `<button class="chip" aria-pressed="${p.time===t}" data-a="pref-time" data-v="${t}">${t}</button>`).join('')}</div>
     <div class="field-label">How to reach me</div><div class="list">${sw('push','phone','Push notifications','On by default')}${sw('email','mail','Email','Optional')}${sw('sms','msg','Text message','Optional · standard rates may apply')}</div>
-    <div class="field-label">Tell me about</div><div class="list">${sw('nCover','repeat','Coverage Requests','When someone needs cover for a Responsibility I’m Qualified for')}${sw('nChange','calX','Schedule changes','Skip Dates, Time Off routing and Make-up Turns that affect me')}</div>
+    <div class="field-label">Tell me about</div><div class="list">${sw('nCover','repeat','Coverage Requests','When someone on one of my teams needs cover')}${sw('nChange','calX','Schedule changes','Skip Dates, Time Off routing and Make-up Turns that affect me')}</div>
     ${S.persona==='admin' ? `<div class="field-label">As an Admin</div><div class="list"><button class="set-row tap" style="width:100%" data-a="pref-alert"><span class="li-ic">${ic('shield',20)}</span><div class="grow"><div class="b small">Alert me about Unconfirmed / Needs coverage Assignments</div><div class="xs muted">In the groups you manage. Nothing is ever declined automatically.</div></div><span class="val">${esc(p.alertLead)}</span><span class="chev">${ic('chevR',18)}</span></button></div>` : ''}
-    <div class="empty xs">${esc(APP_NAME)} prototype · v0.2</div></div>`;
+    <div class="empty xs">${esc(APP_NAME)} prototype · v0.3</div></div>`;
 }
 
 /* ============================================================
@@ -1249,11 +1598,11 @@ function sheetHTML(){
     const reasons = ['Traveling','Sick','Work conflict','Family commitment','Other'];
     const s = st(sl);
     return sheetWrap(`<div class="overline">${esc(g.name)} · ${fShort(sl.date)}</div><h2>Can’t make ${esc(r.name)}?</h2>
-      <div class="small muted">No problem. We’ll send a Coverage Request to everyone Qualified. A reason is optional but helps.</div>
+      <div class="small muted">No problem. We’ll send a Coverage Request to the rest of the ${esc(r.name)} team. A reason is optional but helps.</div>
       <div class="field-label">Reason</div><div class="chips">${reasons.map(x => `<button class="chip" aria-pressed="${sh.reason===x}" data-a="decline-reason" data-v="${x}">${x}</button>`).join('')}</div>
       <div class="field-label">Note (optional)</div><textarea rows="2" data-model="sheet.note" placeholder="Anything the group should know?">${esc(sh.note||'')}</textarea>
       <div class="field-label">Who we’ll ask</div>
-      <div class="card" style="padding:12px 14px;box-shadow:none;background:var(--surface-alt)"><div class="row"><span class="av-stack">${ask.map(p => avatar(p,'sm')).join('')}</span><div class="grow small"><b>${ask.map(first).join(', ')}</b>, Qualified for ${esc(r.name)}</div></div>
+      <div class="card" style="padding:12px 14px;box-shadow:none;background:var(--surface-alt)"><div class="row"><span class="av-stack">${ask.map(p => avatar(p,'sm')).join('')}</span><div class="grow small"><b>${ask.map(first).join(', ')}</b> on the ${esc(r.name)} team</div></div>
       <div class="xs muted" style="margin-top:8px">The first to accept gets it. If nobody does by the alert time, ${g.settings.duty==='admins'?'the Admins will find a replacement':'you’ll be asked to find a replacement'}.</div></div>
       ${g.settings.policy==='payItBack' ? `<div class="debt" style="margin-top:12px">${ic('handshake',20)}<div class="grow">${esc(g.name)} uses <b>Pay It Back</b>: whoever covers you is owed a Make-up Turn. You’ll take their next ${esc(r.name)} turn.</div></div>` : ''}
       ${s.makeup ? `<div class="xs muted" style="margin-top:8px">This is a Make-up Turn. Declining it settles your debt to ${esc(first(s.makeup.creditor))}; you’ll owe whoever covers instead.</div>` : ''}`,
@@ -1275,7 +1624,7 @@ function sheetHTML(){
       .sort((a,b) => (a.busy - b.busy) || (r.roster.includes(b.p) - r.roster.includes(a.p)) || pname(a.p).localeCompare(pname(b.p)));
     return sheetWrap(`<div class="overline">${esc(g.name)} · ${fShort(sl.date)}</div><h2>Who’s covering ${esc(r.name)}?</h2>
       <div class="small muted">Pick anyone in the group, or record someone from outside it.</div>
-      <div class="stack" style="margin-top:14px;gap:8px">${opts.map(o => `<button class="opt tap" data-a="mark-pick" data-v="${o.p}" ${o.busy?'disabled style="opacity:.5"':''}>${avatar(o.p,'sm')}<div class="grow"><div class="b small">${esc(nameMe(o.p))}</div><div class="xs muted">${o.busy?'Already at this Event':r.roster.includes(o.p)?`Qualified for ${esc(r.name)}`:'Group Member'}</div></div></button>`).join('')}</div>
+      <div class="stack" style="margin-top:14px;gap:8px">${opts.map(o => `<button class="opt tap" data-a="mark-pick" data-v="${o.p}" ${o.busy?'disabled style="opacity:.5"':''}>${avatar(o.p,'sm')}<div class="grow"><div class="b small">${esc(nameMe(o.p))}</div><div class="xs muted">${o.busy?'Already at this Event':r.roster.includes(o.p)?`${esc(r.name)} team`:'Group Member'}</div></div></button>`).join('')}</div>
       <div class="or">or a Guest Cover</div>
       <div class="row" style="gap:8px"><input type="text" data-model="sheet.guest" value="${esc(sh.guest||'')}" placeholder="Name, e.g. John Smith" aria-label="Guest name"><button class="btn secondary" data-a="mark-guest" style="flex:none">Save</button></div>
       <div class="xs muted" style="margin-top:8px">A Guest Cover is recorded by name only. It counts toward no one’s workload and creates no Make-up Turn.</div>`,
@@ -1297,6 +1646,13 @@ function sheetHTML(){
       `<button class="btn quiet block" data-a="sheet-close">Done</button>`);
   }
   if (sh.type === 'skip') return skipSheet(sh);
+  if (sh.type === 'ev-remove') {
+    const ev = EV(sh.id); if (!ev) return '';
+    const g = G(ev.gid), h = headcount(ev), seats = ev.duties.reduce((n, d) => n + d.seats.filter(s => s.p).length, 0);
+    return sheetWrap(`<div class="overline">${esc(g.name)} · ${fShort(ev.date)}</div><h2>Remove ${esc(ev.title)}?</h2>
+      <div class="small muted">Everyone invited (${h.total} people) is told it’s off${seats ? `, and the ${seats} people with a Responsibility are released` : ''}. This can’t be undone.</div>`,
+      `<button class="btn lg danger block" data-a="ev-remove-confirm">${ic('trash',20)}Remove Event</button><button class="btn quiet block" data-a="sheet-close">Keep it</button>`);
+  }
   return '';
 }
 function sheetWrap(body, foot, tall){
@@ -1308,7 +1664,7 @@ function skipPreview(g, date, reason){
   for (let i = 0; i < before.length && out.length < 5; i++) {
     const b = before[i], a = after[i];
     if (b.date < date || b.skipped) continue;
-    const rows = g.roles.map(r => {
+    const rows = seriesRoles(g).map(r => {
       const bp = (b.slots.find(s => s.roleId === r.id) || {}).person, ap = (a.slots.find(s => s.roleId === r.id) || {}).person;
       if (bp !== ap) { if (bp) affected.add(bp); if (ap) affected.add(ap); }
       return {r, bp, ap};
@@ -1413,7 +1769,8 @@ function render(keepScroll){
   const top = S.stack[S.stack.length-1];
   const y = view.scrollTop;
   let html;
-  if (top) html = top.name === 'assignment' ? screenAssignment(top) : top.name === 'group' ? screenGroup(top) : top.name === 'availability' ? screenAvailability() : '';
+  if (top) html = top.name === 'assignment' ? screenAssignment(top) : top.name === 'group' ? screenGroup(top) : top.name === 'availability' ? screenAvailability()
+    : top.name === 'event' ? screenEvent(top) : top.name === 'event-form' ? screenEventForm() : '';
   else html = {home:screenHome, groups:screenGroups, schedule:screenSchedule, activity:screenActivity, profile:screenProfile}[S.tab]();
   view.innerHTML = html;
   view.scrollTop = keepScroll ? y : 0;
@@ -1592,6 +1949,94 @@ const A = {
   'pref-time'(el){ S.prefs.time = el.dataset.v; render(true); },
   'pref-toggle'(el){ S.prefs[el.dataset.v] = !S.prefs[el.dataset.v]; render(true); },
   'pref-alert'(){ S.prefs.alertLead = cycle(ALERT_OPTS, S.prefs.alertLead); render(true); },
+  /* one-off Events */
+  'open-event'(el){ push({name:'event', id:el.dataset.id}); },
+  'event-new'(el){ openEventForm(el.dataset.g, !!el.dataset.g); },
+  'ev-rsvp'(el){
+    const ev = EV(el.dataset.id), v = el.dataset.v, g = G(ev.gid);
+    if (ev.rsvp[ME] === v) { render(true); return; }
+    ev.rsvp[ME] = v;
+    log(g.id, v === 'going' ? 'checkCircle' : 'xCircle', v === 'going' ? 'ok' : 'neutral', 'event', `<b>You</b> ${v === 'going' ? 'are going to' : 'can’t make'} <b>${esc(ev.title)}</b> on ${fShort(ev.date)}.`);
+    S.activity[0].ev = ev.id;
+    render(true); toast(v === 'going' ? `You’re going to ${ev.title}. We’ll remind you ${REMIND_PHRASE[ev.reminder]}.` : `Got it. ${first(ev.by)} will see you can’t make it.`, v === 'going' ? 'checkCircle' : 'info');
+  },
+  'ev-expand'(el){ const k = el.dataset.id + el.dataset.v; S.evExpand[k] = !S.evExpand[k]; render(true); },
+  'ev-duty-confirm'(el){
+    const ev = EV(el.dataset.id), seat = mySeat(ev), r = role(G(ev.gid), seat.d.roleId);
+    seat.s.status = 'confirmed'; ev.rsvp[ME] = 'going';
+    log(ev.gid, 'clipboardCheck', 'ok', 'event', `<b>You</b> confirmed <b>${esc(r.name)}</b> for ${esc(ev.title)} on ${fShort(ev.date)}.`); S.activity[0].ev = ev.id;
+    render(true); toast(`Confirmed ${r.name} for ${ev.title}. You’re counted as going.`);
+  },
+  'ev-duty-decline'(el){
+    const ev = EV(el.dataset.id), g = G(ev.gid), seat = mySeat(ev), r = role(g, seat.d.roleId);
+    seat.s.p = null; seat.s.was = ME; seat.s.status = 'open'; ev.rsvp[ME] = 'cant';
+    const n = r.roster.filter(p => p !== ME && !ev.duties.some(d => d.seats.some(s => s.p === p))).length;
+    log(g.id, 'repeat', 'bad', 'event', `<b>You</b> can’t make <b>${esc(r.name)}</b> for ${esc(ev.title)}. Asked the ${esc(r.name)} team (${n} people).`); S.activity[0].ev = ev.id;
+    render(true); toast(`Asked the rest of the ${r.name} team (${n} people) to take it.`, 'send');
+  },
+  'ev-duty-take'(el){
+    const ev = EV(el.dataset.id), d = ev.duties.find(x => x.roleId === el.dataset.v), s = d.seats[+el.dataset.i], r = role(G(ev.gid), d.roleId);
+    s.p = ME; s.status = 'confirmed'; ev.rsvp[ME] = 'going';
+    log(ev.gid, 'clipboardCheck', 'info', 'event', `<b>You</b> took <b>${esc(r.name)}</b> for ${esc(ev.title)}.`); S.activity[0].ev = ev.id;
+    render(true); toast(`You’re on ${r.name} for ${ev.title}. Thank you!`);
+  },
+  'ev-remind'(el){
+    const ev = EV(el.dataset.id), h = headcount(ev), closed = deadlineState(ev).kind === 'closed';
+    const going = h.going.filter(p => p !== ME).length, nudge = closed ? 0 : h.none.length;
+    log(ev.gid, 'bell', 'info', 'event', `<b>You</b> sent a reminder for <b>${esc(ev.title)}</b> to ${going} going${nudge ? ` and nudged ${nudge} who haven’t answered` : ''}.`); S.activity[0].ev = ev.id;
+    render(true); toast(`Reminder sent to ${going} going.${nudge ? ` Nudged ${nudge} who haven’t answered.` : ''}`, 'send');
+  },
+  'ev-edit'(el){
+    const ev = EV(el.dataset.id);
+    S.draft = {id:ev.id, gid:ev.gid, fromGroup:true, title:ev.title, date:ev.date, time:ev.time, location:ev.location || '', notes:ev.notes || '',
+      duties:ev.duties.map(d => ({roleId:d.roleId, count:d.count})), reminder:ev.reminder, deadlineOn:!!ev.deadline,
+      deadline:ev.deadline ? 'keep' : '1d', keepDeadline:ev.deadline, newResp:''};
+    push({name:'event-form'});
+  },
+  'ev-remove'(el){ S.sheet = {type:'ev-remove', id:el.dataset.id}; render(true); },
+  'ev-remove-confirm'(){
+    const ev = EV(S.sheet.id), g = G(ev.gid), n = headcount(ev).total;
+    S.events = S.events.filter(e => e.id !== ev.id);
+    log(g.id, 'trash', 'neutral', 'event', `<b>You</b> removed <b>${esc(ev.title)}</b> (${fShort(ev.date)}). Everyone invited was told.`);
+    closeSheet(); S.stack.pop(); render(); toast(`${ev.title} removed. ${n} people were told it’s off.`, 'trash');
+  },
+  'draft-group'(el){ S.draft.gid = el.dataset.v; S.draft.duties = []; render(true); },
+  'draft-duty-add'(el){ S.draft.duties.push({roleId:el.dataset.v, count: role(G(S.draft.gid), el.dataset.v).name === 'Bring food' ? 2 : 1}); render(true); },
+  'draft-duty-new'(){
+    const name = (S.draft.newResp || '').trim(); if (!name) { toast('Type a name first, e.g. Bring dessert', 'info'); return; }
+    S.draft.duties.push({roleId:null, name, count:1}); S.draft.newResp = ''; render(true);
+  },
+  'draft-duty-count'(el){ const x = S.draft.duties[+el.dataset.i]; x.count = Math.max(1, Math.min(12, x.count + (+el.dataset.v))); render(true); },
+  'draft-duty-remove'(el){ S.draft.duties.splice(+el.dataset.i, 1); render(true); },
+  'draft-reminder'(el){ S.draft.reminder = el.dataset.v; render(true); },
+  'draft-deadline-toggle'(){ S.draft.deadlineOn = !S.draft.deadlineOn; render(true); },
+  'draft-deadline'(el){ S.draft.deadline = el.dataset.v; render(true); },
+  'ev-save'(){
+    const d = S.draft, g = G(d.gid), title = d.title.trim();
+    if (!title || !d.date) { toast('Add a title and a date first', 'info'); return; }
+    d.duties.forEach(x => { if (!x.roleId) { const id = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+      g.roles.push({id, name:x.name, confirm:true, eventOnly:true, roster:membersOf(g).slice()}); x.roleId = id; } });
+    const deadline = draftDeadline(d);
+    const seatsFor = (x, old) => { const seats = old ? old.seats.slice(0, x.count) : [];
+      while (seats.length < x.count) { const p = nextFromTeam(g, x.roleId, seats.map(s => s.p)); seats.push({p, status: !p ? 'open' : p === ME ? 'confirmed' : 'pending'}); }
+      return {roleId:x.roleId, count:x.count, seats}; };
+    if (d.id) {
+      const ev = EV(d.id);
+      Object.assign(ev, {title, date:d.date, time:d.time || '19:00', location:d.location.trim(), notes:d.notes.trim(), reminder:d.reminder, deadline});
+      ev.duties = d.duties.map(x => seatsFor(x, ev.duties.find(o => o.roleId === x.roleId)));
+      log(g.id, 'pencil', 'info', 'event', `<b>You</b> updated <b>${esc(title)}</b> (${fShort(ev.date)}). Everyone invited was told what changed.`); S.activity[0].ev = ev.id;
+      S.draft = null; S.stack.pop(); render(); toast('Event updated. Everyone invited was told what changed.');
+    } else {
+      const ev = {id:'e' + Date.now().toString(36), gid:g.id, title, date:d.date, time:d.time || '19:00', location:d.location.trim(), notes:d.notes.trim(),
+        by:ME, reminder:d.reminder, deadline, rsvp:{[ME]:'going'}, duties:[]};
+      ev.duties = d.duties.map(x => seatsFor(x));
+      S.events.push(ev);
+      const n = membersOf(g).length;
+      log(g.id, 'mail', 'info', 'event', `<b>You</b> created <b>${esc(title)}</b> for ${fShort(ev.date)} and invited everyone in ${esc(g.name)}.`); S.activity[0].ev = ev.id;
+      S.draft = null; S.stack.pop(); S.stack.push({name:'event', id:ev.id}); render();
+      toast(`${title} created. ${n - 1} people invited.`, 'send');
+    }
+  },
   /* onboarding */
   'onb-next'(){ S.onb.step++; render(true); },
   'onb-back'(){ S.onb.step--; render(true); },
@@ -1621,6 +2066,11 @@ document.getElementById('screen').addEventListener('input', e => {
   const [obj, key] = m.split('.');
   if (obj === 'sheet' && S.sheet) S.sheet[key] = e.target.value;
   if (obj === 'avail') S.avail[key] = e.target.value;
+  if (obj === 'draft' && S.draft) {
+    S.draft[key] = e.target.value;
+    const b = document.getElementById('evSave'); if (b) b.disabled = !(S.draft.title.trim() && S.draft.date);
+    const hint = document.getElementById('dlHint'); if (hint) hint.textContent = draftDeadlineHint(S.draft);
+  }
   if (obj === 'onb' && S.onb) { S.onb[key] = e.target.value; const b = document.getElementById('onbNameNext'); if (b) b.disabled = !S.onb.firstName.trim(); }
 });
 
@@ -1636,7 +2086,7 @@ function simCover(){
   const sl = mine[0], g = G(sl.gid), r = role(g, sl.roleId);
   const ev = buildSchedule(g).find(d => d.date === sl.date);
   const who = r.roster.find(p => p !== ME && !ev.slots.some(x => x.roleId !== r.id && x.person === p));
-  if (!who) { toast('No one Qualified is free for that Event.', 'info'); return; }
+  if (!who) { toast(`No one on the ${r.name} team is free for that Event.`, 'info'); return; }
   const debt = applyCover(sl, who);
   log(g.id, 'repeat', 'info', 'coverage', `<b>${esc(pname(who))}</b> is covering your <b>${esc(r.name)}</b> on ${fShort(sl.date)}.${debt?` You owe ${esc(first(who))} a Make-up Turn: you’ll take ${esc(first(who))}’s ${fMD(debt.payDate)} turn.`:''}`);
   if (debt) S.notices.push({id:'n'+Date.now(), icon:'handshake', title:`${first(who)} is covering you`, html:`${esc(r.name)}, ${fShort(sl.date)}. ${makeupLine(debt, r)}`});
@@ -1681,6 +2131,8 @@ document.getElementById('sbIcons').innerHTML = '<svg width="18" height="12" view
   if (h.get('group')) S.stack.push({name:'group', g:h.get('group'), tab:h.get('gtab') || 'overview'});
   if (h.get('screen') === 'availability') S.stack.push({name:'availability'});
   if (h.get('screen') === 'assignment') S.stack.push({name:'assignment', k:h.get('k') || K('worship','2026-11-29','lead','jordan')});
+  if (h.get('screen') === 'event') S.stack.push({name:'event', id:h.get('ev') || 'gn1'});
+  if (h.get('screen') === 'event-new') { render(); openEventForm(h.get('group'), !!h.get('group')); }
   if (h.get('sheet') === 'skip') S.sheet = {type:'skip', g:h.get('group') || 'worship', step:+(h.get('step')||1), date:h.get('date') || null, reason:h.get('step')>1?'Holiday':null, note:''};
   if (h.get('sheet') === 'mark') S.sheet = {type:'mark', k:K('hosp','2026-11-22','greeter','jordan'), guest:''};
   if (h.get('sheet') === 'cover') S.sheet = {type:'cover', k:K('hosp','2026-12-06','greeter','priya')};
