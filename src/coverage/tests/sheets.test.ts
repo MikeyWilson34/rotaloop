@@ -37,7 +37,7 @@ describe('qualifiedToAsk / nameList', () => {
   it('lists active Qualified Members with an account, except the given ones', () => {
     const { state } = buildGroup();
     expect(qualifiedToAsk(state, 'sound', ['ben'])).toEqual(['ana', 'cal']);
-    // Pat is a Placeholder: Qualified for Greeter, but can't be asked.
+    // Pat is a Placeholder: on the Greeter team, but can't be asked.
     expect(qualifiedToAsk(state, 'greeter', [])).toEqual(['cal', 'ben']);
   });
 
@@ -56,7 +56,8 @@ describe('declineSheetView', () => {
     expect(v.overline).toBe('Sunday Team · Sun, Nov 22');
     expect(v.title).toBe("Can't make Sound?");
     expect(v.ask.names).toEqual(['Ben', 'Cal']);
-    expect(v.ask.line).toBe('Qualified for Sound');
+    expect(v.ask.line).toBe('On the Sound team');
+    expect(v.message).toMatch(/^No problem\. We'll send a Coverage Request to the Sound team\./);
     expect(v.deadlineNote).toBe(
       "The first to accept gets it. If nobody does by Thu, Nov 19, you'll be asked to find a replacement.",
     );
@@ -85,7 +86,7 @@ describe('declineSheetView', () => {
     run(built, { type: 'unqualifyMember', memberId: 'cal', responsibilityId: 'sound' }, 'ana');
     const v = declineSheetView(ctx(built.state), seat(built.state, '2026-11-22', 'sound').id)!;
     expect(v.ask.names).toEqual([]);
-    expect(v.ask.line).toMatch(/No one else is Qualified for Sound/);
+    expect(v.ask.line).toMatch(/No one else is on the Sound team/);
   });
 
   it('a Make-up Turn: declining it settles the debt and moves it along', () => {
@@ -106,7 +107,7 @@ describe('declineSheetView', () => {
     const v = declineSheetView(ctx(built.state, 'ana'), id)!;
     expect(v.withdrawingCover).toBe(true);
     expect(v.title).toBe("Can't cover Sound after all?");
-    expect(v.message).toBe('The Coverage Request opens again for Ben, and Qualified Members are asked again.');
+    expect(v.message).toBe('The Coverage Request opens again for Ben, and the Sound team is asked again.');
     expect(v.ask.names).toEqual(['Cal']);
     expect(v.payItBack).toBe('The Make-up Turn Ben owes you for this is cancelled.');
     expect(v.deadlineNote).toMatch(/Ben will be asked to find a replacement\.$/);
@@ -149,7 +150,7 @@ describe('markCoveredSheetView', () => {
     const v = markCoveredSheetView(ctx(built.state, 'ana'), id)!;
     expect(v.title).toBe("Who's covering Sound?");
     expect(v.options).toEqual([
-      { memberId: 'ana', name: 'You', detail: 'Qualified for Sound', disabled: false },
+      { memberId: 'ana', name: 'You', detail: 'On the Sound team', disabled: false },
       { memberId: 'pat', name: 'Pat', detail: 'Group Member', disabled: false },
       { memberId: 'cal', name: 'Cal', detail: 'Already at this Event', disabled: true },
     ]);
@@ -160,7 +161,7 @@ describe('markCoveredSheetView', () => {
     const { built, id } = bensRequest();
     run(built, { type: 'changeSettings', settings: { allowDoubling: true } }, 'ana');
     const cal = markCoveredSheetView(ctx(built.state, 'ana'), id)!.options.find((o) => o.memberId === 'cal');
-    expect(cal).toEqual({ memberId: 'cal', name: 'Cal', detail: 'Qualified for Sound', disabled: false });
+    expect(cal).toEqual({ memberId: 'cal', name: 'Cal', detail: 'On the Sound team', disabled: false });
   });
 });
 
@@ -171,7 +172,7 @@ describe('coveragePanelView', () => {
     const startsAt = '2026-11-29T15:00:00.000Z';
     expect(coveragePanelView(built.state, a, startsAt, 'ana', true, NOW)).toEqual({
       headline: 'Ben can’t make it',
-      detail: 'Asked 2 Qualified Members for Sound. The first to accept gets it. We’ll remind them once more before the Event.',
+      detail: 'Asked 2 people on the Sound team. The first to accept gets it. We’ll remind them once more before the Event.',
       asked: ['You', 'Cal'],
       reason: null,
     });

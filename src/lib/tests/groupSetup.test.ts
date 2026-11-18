@@ -26,6 +26,7 @@ import {
   responsibilityChanges,
   responsibilityViews,
   rotationQueue,
+  teamLabel,
   seriesEdit,
   seriesFormFrom,
   seriesViews,
@@ -104,11 +105,17 @@ describe('helpers', () => {
 });
 
 describe('Responsibilities', () => {
+  it("names a Responsibility's team and its size", () => {
+    expect(teamLabel('Sound', 6)).toBe('Sound team · 6 people');
+    expect(teamLabel('Sound', 1)).toBe('Sound team · 1 person');
+    expect(teamLabel('Sound', 0)).toBe('Sound team · 0 people');
+  });
+
   it('lists active ones in fill order with a summary', () => {
     const views = responsibilityViews(sample());
     expect(views.map((v) => v.id)).toEqual(['sound', 'greeter']);
-    expect(views[0]).toMatchObject({ isPrimary: true, qualifiedCount: 2, summary: '2 Qualified Members · 1 per Event · Needs confirmation' });
-    expect(views[1].summary).toBe('0 Qualified Members · 2 per Event · No confirmation');
+    expect(views[0]).toMatchObject({ isPrimary: true, qualifiedCount: 2, summary: 'Sound team · 2 people · 1 per Event · Needs confirmation' });
+    expect(views[1].summary).toBe('Greeter team · 0 people · 2 per Event · No confirmation');
   });
 
   it('shows the Rotation queue in order and qualification options by name', () => {

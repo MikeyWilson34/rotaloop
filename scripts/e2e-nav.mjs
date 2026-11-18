@@ -169,7 +169,7 @@ try {
   const item = (label) => page.getByRole('button', { name: new RegExp(`^${label.replace(/'/g, "'")}`) }).first();
   for (const [label, expected] of [
     ['Add Responsibilities', /Add Responsibility/],
-    ["Choose who's Qualified", /Responsibility/],
+    ['Choose each team', /Responsibility/],
     ['Set when Events happen', /Event Series/],
   ]) {
     await item(label).click();

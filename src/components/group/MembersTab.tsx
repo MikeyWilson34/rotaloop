@@ -174,7 +174,7 @@ function MemberRow({
   onPress?: () => void;
 }) {
   const { colors, fonts } = useTheme();
-  const qualified = member.qualifiedFor.length > 0 ? `Qualified: ${member.qualifiedFor.join(' · ')}` : 'Not in a Rotation yet';
+  const qualified = member.qualifiedFor.length > 0 ? `${member.qualifiedFor.length === 1 ? 'Team' : 'Teams'}: ${member.qualifiedFor.join(' · ')}` : 'Not on a team yet';
   const showBar = !!bar && (member.qualifiedFor.length > 0 || bar.total > 0);
   const workload = showBar
     ? ` ${turnsLabel(bar.total)}: ${bar.served} served in the last 3 months, ${bar.upcoming} upcoming, ${bar.covering} covering.`

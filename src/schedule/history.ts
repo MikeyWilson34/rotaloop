@@ -233,12 +233,12 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
     }
     case 'qualifyMember':
       return {
-        text: `${actor} made ${object(nameOf(ctx, cause.memberId))} a Qualified Member for ${responsibilityName(ctx, cause.responsibilityId)}.`,
+        text: `${actor} added ${object(nameOf(ctx, cause.memberId))} to the ${responsibilityName(ctx, cause.responsibilityId)} team.`,
         tone: 'neutral',
       };
     case 'unqualifyMember':
       return {
-        text: `${actor} took ${object(nameOf(ctx, cause.memberId))} out of the ${responsibilityName(ctx, cause.responsibilityId)} Rotation.`,
+        text: `${actor} took ${object(nameOf(ctx, cause.memberId))} off the ${responsibilityName(ctx, cause.responsibilityId)} team.`,
         tone: 'neutral',
       };
     case 'removeMember':

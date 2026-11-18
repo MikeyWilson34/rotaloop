@@ -65,6 +65,11 @@ const queueOf = (state: GroupState, responsibilityId: string) =>
 // ---------------------------------------------------------------------------
 // Responsibilities
 
+/** A Responsibility's team and its size: "Sound team · 6 people". */
+export function teamLabel(responsibilityName: string, size: number): string {
+  return `${responsibilityName} team · ${plural(size, 'person', 'people')}`;
+}
+
 export type ResponsibilityView = {
   id: string;
   name: string;
@@ -72,7 +77,7 @@ export type ResponsibilityView = {
   requiresConfirmation: boolean;
   isPrimary: boolean;
   qualifiedCount: number;
-  /** "2 Qualified Members · 2 per Event · Needs confirmation". */
+  /** "Sound team · 2 people · 2 per Event · Needs confirmation". */
   summary: string;
 };
 
@@ -81,7 +86,7 @@ export function responsibilityViews(state: GroupState): ResponsibilityView[] {
   return activeResponsibilities(state).map((r) => {
     const qualifiedCount = queueOf(state, r.id).length;
     const parts = [
-      plural(qualifiedCount, 'Qualified Member'),
+      teamLabel(r.name, qualifiedCount),
       `${r.headcount} per Event`,
       r.requiresConfirmation ? 'Needs confirmation' : 'No confirmation',
     ];
@@ -586,8 +591,8 @@ export function setupChecklist(state: GroupState): { show: boolean; items: Check
       },
       {
         key: 'qualified',
-        label: "Choose who's Qualified",
-        description: 'Pick who can take each Responsibility. They rotate in order.',
+        label: 'Choose each team',
+        description: "Pick who's on each Responsibility's team. They rotate in order.",
         done: allQualified,
       },
       {
@@ -606,7 +611,7 @@ export function setupChecklist(state: GroupState): { show: boolean; items: Check
   };
 }
 
-/** The first Responsibility nobody is Qualified for yet (where "Choose who's Qualified" leads). */
+/** The first Responsibility whose team is still empty (where "Choose each team" leads). */
 export function firstUnstaffedResponsibility(state: GroupState): string | null {
   const r = activeResponsibilities(state).find((x) => queueOf(state, x.id).length === 0) ?? activeResponsibilities(state)[0];
   return r?.id ?? null;

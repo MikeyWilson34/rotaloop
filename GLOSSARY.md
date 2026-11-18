@@ -6,14 +6,14 @@ The language for sharing recurring responsibilities fairly across a group of peo
 
 **Group**:
 A set of people who share recurring Responsibilities, with its own Members, Rotations, rules and history.
-_Avoid_: Team, ministry, organization
+_Avoid_: Team (a Team is one Responsibility's people, never a Group), ministry, organization
 
 **Member**:
 A person who belongs to a Group. A person can be a Member of many Groups, with different permissions in each.
 _Avoid_: Volunteer, user (in domain discussion)
 
 **Admin**:
-A Member who can manage a Group's Rotations, Skip Dates, settings and other Members' Assignments. A Group can have several Admins. Being an Admin is separate from serving: an Admin is rotated only for the Responsibilities they're a Qualified Member of.
+A Member who can manage a Group's Rotations, Skip Dates, settings and other Members' Assignments. A Group can have several Admins. Being an Admin is separate from serving: an Admin is rotated only for the Responsibilities whose Team they're on.
 _Avoid_: Owner, leader, manager
 
 **Placeholder Member**:
@@ -30,16 +30,16 @@ _Avoid_: Service, slot, date, occurrence
 A kind of duty a Group needs filled at its Events, such as Sound or Greeter, with a headcount of how many people each Event needs.
 _Avoid_: Role, job, position, task
 
-**Qualified Member**:
-A Member who is eligible to be assigned a particular Responsibility.
-_Avoid_: Eligible member, trained member
+**Team**:
+The Members who can be assigned one Responsibility, named after it: "the Sound team". A Member can be on several Teams. In code a Team is still called "qualified" (`qualifiedMemberIds`, `qualifyMember`, `isQualified`, `notQualified`).
+_Avoid_: Qualified Member, eligible member, trained member
 
 **Assignment**:
 One Member filling one seat of one Responsibility at one Event.
 _Avoid_: Shift, slot, booking, duty
 
 **Rotation**:
-The ordered queue of Qualified Members for one Responsibility, which decides who is assigned next. A Member passed over because they were unavailable keeps their place at the front.
+The ordered queue of one Responsibility's Team, which decides who is assigned next. A Member passed over because they were unavailable keeps their place at the front.
 _Avoid_: Roster, cycle, order
 
 **Rebalance**:
@@ -77,7 +77,7 @@ An Assignment whose Member has Declined it and that is waiting for someone else 
 _Avoid_: Open shift, swap request, sub request
 
 **Cover**:
-To take over another Member's Assignment from a Coverage Request. Only that Responsibility's Qualified Members can Cover, and the first to accept gets it. Covering always counts toward the workload of the Member who covers.
+To take over another Member's Assignment from a Coverage Request. Only that Responsibility's Team can Cover, and the first to accept gets it. Covering always counts toward the workload of the Member who covers.
 _Avoid_: Sub, fill in, swap
 
 **Replacement Duty**:

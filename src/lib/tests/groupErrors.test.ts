@@ -99,7 +99,7 @@ describe('group setup messages', () => {
 describe('Assignment action messages (ticket 09)', () => {
   it('explains coverage refusals in plain words', () => {
     expect(groupCommandMessage('alreadyCovered', 'cover')).toBe('Someone else already covered that.');
-    expect(groupCommandMessage('notQualified', 'cover')).toMatch(/Only Qualified Members/);
+    expect(groupCommandMessage('notQualified', 'cover')).toMatch(/Only this Responsibility's team can cover it/);
     expect(groupCommandMessage('alreadyAssignedAtEvent', 'cover')).toMatch(/already have an Assignment at this Event/);
     expect(groupCommandMessage('notPermitted', 'markCovered')).toMatch(/finding a replacement, or an Admin/);
     expect(groupCommandMessage('invalid', 'markCovered')).toMatch(/guest's name/);

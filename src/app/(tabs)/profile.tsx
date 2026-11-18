@@ -340,7 +340,7 @@ export default function ProfileScreen() {
             <SwitchRow
               icon={Repeat}
               label="Coverage Requests"
-              description="When someone needs cover for a Responsibility I'm Qualified for"
+              description="When someone needs cover on a team I'm on"
               value={profile.notify_coverage_requests}
               onValueChange={(on) => save({ notify_coverage_requests: on })}
             />

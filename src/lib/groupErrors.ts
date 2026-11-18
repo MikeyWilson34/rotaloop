@@ -113,12 +113,12 @@ const ASSIGNMENT: Partial<Record<GroupAction, Partial<Record<string, string>>>> 
   },
   decline: {
     notPermitted: "Only the person assigned can say they can't make it. Pull down to refresh.",
-    alreadyNeedsCoverage: 'This already needs coverage. Qualified Members have been asked.',
+    alreadyNeedsCoverage: 'This already needs coverage. The team has been asked.',
     invalid: 'No one holds this Assignment anymore. Pull down to refresh.',
   },
   cover: {
     notPermitted: 'Only Members of this group can cover.',
-    notQualified: "Only Qualified Members for this Responsibility can cover it. Ask an Admin to add you.",
+    notQualified: "Only this Responsibility's team can cover it. Ask an Admin to add you to the team.",
     noCoverageRequest: "This doesn't need coverage anymore. Pull down to refresh.",
     alreadyAssignedAtEvent: "You already have an Assignment at this Event, so you can't cover this one too.",
     invalid: "You asked for coverage on this one, so you can't cover it yourself.",
@@ -158,7 +158,7 @@ export function groupCommandMessage(reason: GroupCommandFailure | string, action
     case 'alreadyCovered':
       return 'Someone else already covered that.';
     case 'notQualified':
-      return "That person isn't a Qualified Member for this Responsibility.";
+      return "That person isn't on this Responsibility's team.";
     case 'noCoverageRequest':
       return 'There is no Coverage Request for that Assignment anymore.';
     case 'alreadyNeedsCoverage':

@@ -31,6 +31,7 @@ import {
   qualificationOptions,
   responsibilityChanges,
   rotationQueue,
+  teamLabel,
   validateResponsibilityForm,
 } from '@/lib/groupSetup';
 import { useSession } from '@/lib/session';
@@ -45,7 +46,7 @@ function back(groupId: string) {
 
 /**
  * A Responsibility: add or edit it (name, headcount, confirmation, Primary), pick its
- * Qualified Members, reorder its Rotation, Rebalance, or remove it. Members see it read-only.
+ * team, reorder its Rotation, Rebalance, or remove it. Members see it read-only.
  * `responsibilityId` "new" adds one.
  */
 export default function ResponsibilityScreen() {
@@ -207,7 +208,7 @@ function NewResponsibility({ group, run }: { group: GroupDetails; run: RunComman
         headcountHint="How many people fill this at each Event."
       />
       <View style={{ gap: space.sm }}>
-        <FieldLabel>Qualified Members</FieldLabel>
+        <FieldLabel>{name.trim() ? `${name.trim()} team` : 'Team'}</FieldLabel>
         <ChipGroup>
           {options.map((o) => (
             <Chip
@@ -222,7 +223,7 @@ function NewResponsibility({ group, run }: { group: GroupDetails; run: RunComman
           ))}
         </ChipGroup>
         <Text variant="subhead" color="textSecondary">
-          {"Not everyone here yet? Add people by name from the Members tab, and choose them later."}
+          {"Not everyone here yet? Add people by name from the Members tab, and add them to the team later."}
         </Text>
       </View>
       {error ? <Notice>{error}</Notice> : null}
@@ -347,9 +348,9 @@ function EditResponsibility({ group, responsibilityId, run }: { group: GroupDeta
       {error && confirm === null ? <Notice>{error}</Notice> : null}
 
       <View style={{ gap: space.sm }}>
-        <FieldLabel>Qualified Members</FieldLabel>
+        <FieldLabel>{teamLabel(r.name, queue.length)}</FieldLabel>
         <Text variant="subhead" color="textSecondary">
-          Tap to add or remove. New people join the end of the Rotation.
+          Tap a name to add them to the {r.name} team or take them off. New people join the end of the Rotation.
         </Text>
         <ChipGroup>
           {options.map((o) => (
@@ -374,7 +375,7 @@ function EditResponsibility({ group, responsibilityId, run }: { group: GroupDeta
         <FieldLabel>Rotation: who is next</FieldLabel>
         {shownQueue.length === 0 ? (
           <Text variant="subhead" color="textSecondary">
-            Nobody is Qualified yet, so these seats stay open. Choose Qualified Members above.
+            Nobody is on the {r.name} team yet, so these seats stay open. Add people to the team above.
           </Text>
         ) : (
           <>
@@ -473,7 +474,7 @@ function ViewResponsibility({ group, responsibilityId }: { group: GroupDetails; 
         <FieldLabel>Rotation: who is next</FieldLabel>
         {queue.length === 0 ? (
           <Text variant="subhead" color="textSecondary">
-            Nobody is Qualified yet.
+            Nobody is on the {r.name} team yet.
           </Text>
         ) : (
           <ReorderList
