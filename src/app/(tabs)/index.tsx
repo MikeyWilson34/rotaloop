@@ -13,6 +13,7 @@ import { Avatar, Button, Notice, showToast, Text } from '@/components/ui';
 import { APP_NAME } from '@/config/app';
 import { CAN_WITHDRAW_DECLINE } from '@/coverage/actions';
 import { successMessage } from '@/coverage/sheets';
+import { collapsedSummary } from '@/home/attentionCollapse';
 import { useHomeData } from '@/home/data';
 import {
   attentionItems,
@@ -30,6 +31,7 @@ import {
   type GroupFilter,
   type HomeContext,
 } from '@/home/home';
+import { useAttentionCollapsed } from '@/home/useAttentionCollapsed';
 import { runGroupCommand } from '@/lib/groupCommand';
 import { groupCommandMessage } from '@/lib/groupErrors';
 import { deviceTimeZone } from '@/lib/groupViews';
@@ -59,6 +61,7 @@ export default function HomeScreen() {
   const { data, loading, error, refresh, refreshing, reload } = useHomeData();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
+  const [attentionCollapsed, toggleAttention] = useAttentionCollapsed();
 
   const viewerTimeZone = data?.viewerTimeZone ?? deviceTimeZone();
   // Statuses depend on the time: recomputed with every load.
@@ -169,8 +172,16 @@ export default function HomeScreen() {
           <HeroEmpty title="You're all clear" text="No upcoming Assignments. Enjoy the break." />
         )}
 
-        <SectionHead title="Needs your attention" count={attention.length} />
-        {attention.length ? (
+        <SectionHead
+          title="Needs your attention"
+          count={attention.length}
+          collapse={{ collapsed: attentionCollapsed, onToggle: toggleAttention }}
+        />
+        {attentionCollapsed ? (
+          <Text variant="subhead" color="textSecondary">
+            {collapsedSummary(attention.length)}
+          </Text>
+        ) : attention.length ? (
           attention.map((item) => (
             <AttentionCard key={`${item.kind}:${item.key}`} item={item} busy={busyKey === item.key} onAction={(a) => onAttention(item, a)} />
           ))

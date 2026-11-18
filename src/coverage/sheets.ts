@@ -64,7 +64,7 @@ export function firstName(name: string): string {
 }
 
 /**
- * The Members a Coverage Request asks: active Qualified Members of the Responsibility with
+ * The Members a Coverage Request asks: active Members of the Responsibility's team with
  * an account (a Placeholder can't be asked or tap "I can cover"), except the given ones.
  */
 export function qualifiedToAsk(state: GroupState, responsibilityId: string, except: (MemberId | null)[]): MemberId[] {
@@ -119,8 +119,8 @@ export function declineSheetView(ctx: SheetContext, assignmentId: string): Decli
 
   const ask = qualifiedToAsk(state, a.responsibilityId, [me, requester]).map((id) => nameOf(state, id, me));
   const askLine = ask.length
-    ? `Qualified for ${r}`
-    : `No one else is Qualified for ${r} yet, so it will need a replacement.`;
+    ? `On the ${r} team`
+    : `No one else is on the ${r} team yet, so it will need a replacement.`;
 
   const deadline = deadlineOf(state, event.startsAt);
   const admins = state.settings.replacementDuty === 'admins';
@@ -152,8 +152,8 @@ export function declineSheetView(ctx: SheetContext, assignmentId: string): Decli
     overline: `${ctx.groupName} · ${formatDayShort(dateIn(event.startsAt, viewerTimeZone))}`,
     title: withdrawingCover ? `Can't cover ${r} after all?` : `Can't make ${r}?`,
     message: withdrawingCover
-      ? `The Coverage Request opens again for ${requesterName}, and Qualified Members are asked again.`
-      : `No problem. We'll send a Coverage Request to everyone Qualified.${DECLINE_REASON_SAVED ? ' A reason is optional but helps.' : ''}`,
+      ? `The Coverage Request opens again for ${requesterName}, and the ${r} team is asked again.`
+      : `No problem. We'll send a Coverage Request to the ${r} team.${DECLINE_REASON_SAVED ? ' A reason is optional but helps.' : ''}`,
     withdrawingCover,
     ask: { names: ask, line: askLine },
     deadlineNote,
@@ -236,7 +236,7 @@ export function coverSheetView(ctx: SheetContext, assignmentId: string): CoverSh
 export type MarkCoveredOption = {
   memberId: MemberId;
   name: string;
-  /** "Already at this Event", "Qualified for Sound" or "Group Member". */
+  /** "Already at this Event", "On the Sound team" or "Group Member". */
   detail: string;
   disabled: boolean;
 };
@@ -276,7 +276,7 @@ export function markCoveredSheetView(ctx: SheetContext, assignmentId: string): M
       return {
         memberId: m.id,
         name: m.id === me ? 'You' : m.name,
-        detail: busy ? 'Already at this Event' : qualified ? `Qualified for ${r}` : 'Group Member',
+        detail: busy ? 'Already at this Event' : qualified ? `On the ${r} team` : 'Group Member',
         disabled: busy,
         qualified,
       };
@@ -303,7 +303,7 @@ export function markCoveredSheetView(ctx: SheetContext, assignmentId: string): M
 export type CoveragePanelView = {
   headline: string;
   detail: string;
-  /** Names of the Qualified Members asked. */
+  /** Names of the team Members asked. */
   asked: string[];
   /** The Coverage Request's reason, shown quoted beside the pill (prototype). */
   reason: string | null;
@@ -327,7 +327,7 @@ export function coveragePanelView(
   const requester = request.requestedBy;
   const iDeclined = me !== null && requester === me;
   const asked = qualifiedToAsk(state, assignment.responsibilityId, [requester]).map((id) => nameOf(state, id, me));
-  const askedText = `Asked ${asked.length} Qualified ${asked.length === 1 ? 'Member' : 'Members'}`;
+  const askedText = `Asked ${asked.length} ${asked.length === 1 ? 'person' : 'people'} on the ${r} team`;
   const holder = replacementDutyHolder(assignment, eventStartsAt, state.settings, now);
   const reason = request.note ?? null;
 
@@ -353,7 +353,7 @@ export function coveragePanelView(
   else headline = `${firstName(nameOf(state, requester, me))} can’t make it`;
   return {
     headline,
-    detail: `${askedText} for ${r}. The first to accept gets it. We’ll remind them once more before the Event.`,
+    detail: `${askedText}. The first to accept gets it. We’ll remind them once more before the Event.`,
     asked,
     reason,
   };
@@ -376,7 +376,7 @@ export function successMessage(
     case 'confirm':
       return `Confirmed ${responsibilityName} for ${day}. Thank you!`;
     case 'decline':
-      return `Coverage Request sent. We’re asking Qualified Members to cover ${responsibilityName} on ${day}.`;
+      return `Coverage Request sent. We’re asking the ${responsibilityName} team to cover ${day}.`;
     case 'withdrawDecline':
       return `You’re back on ${responsibilityName} for ${day}. The Coverage Request is withdrawn.`;
     case 'withdrawCover':

@@ -139,8 +139,8 @@ describe('describeHistoryEntry', () => {
 
   it('describes membership', () => {
     expect(texts('addMember')).toEqual(['You added Dee as a Placeholder Member.', 'Eve joined the group.']);
-    expect(texts('qualifyMember')).toEqual(['You made Deb a Qualified Member for Sound.']);
-    expect(texts('unqualifyMember')).toEqual(['You took Deb out of the Sound Rotation.']);
+    expect(texts('qualifyMember')).toEqual(['You added Deb to the Sound team.']);
+    expect(texts('unqualifyMember')).toEqual(['You took Deb off the Sound team.']);
     expect(texts('renameMember')).toEqual(['You renamed a Member to Deb.', 'Evie changed their name.']);
     expect(texts('setAdmin')).toEqual(['You made Ben an Admin.', 'Ben stepped down as Admin.']);
     expect(texts('claimPlaceholder')).toEqual(['Deb joined and took their place in the Rotations.']);

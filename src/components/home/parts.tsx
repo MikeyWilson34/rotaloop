@@ -4,6 +4,7 @@ import {
   CalendarClock,
   CalendarOff,
   CalendarX,
+  ChevronDown,
   CircleAlert,
   CircleCheck,
   Clock,
@@ -70,31 +71,57 @@ export function ToneIcon({ icon: Icon, tone }: { icon: LucideIcon; tone: Tone })
   );
 }
 
-/** A section heading with an optional count and a link (prototype `.sec-head`). */
+/**
+ * A section heading with an optional count and a link (prototype `.sec-head`). With
+ * `collapse`, the title and count become a toggle with a chevron that shows or hides the section.
+ */
 export function SectionHead({
   title,
   count,
   link,
+  collapse,
 }: {
   title: string;
   count?: number;
   link?: { label: string; onPress: () => void };
+  collapse?: { collapsed: boolean; onToggle: () => void };
 }) {
   const { colors, fonts, minTapTarget } = useTheme();
+  const badge = count ? (
+    <View
+      accessibilityLabel={`${count} items`}
+      style={{ minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: colors.warningTint, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontFamily: fonts.extrabold, fontSize: 12, lineHeight: 16, color: colors.warningText }}>{String(count)}</Text>
+    </View>
+  ) : null;
+  const titleStyle = { fontFamily: fonts.extrabold, fontSize: 18, lineHeight: 24 };
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 12 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
-        <Text accessibilityRole="header" style={{ fontFamily: fonts.extrabold, fontSize: 18, lineHeight: 24 }}>
-          {title}
-        </Text>
-        {count ? (
-          <View
-            accessibilityLabel={`${count} items`}
-            style={{ minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: colors.warningTint, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ fontFamily: fonts.extrabold, fontSize: 12, lineHeight: 16, color: colors.warningText }}>{String(count)}</Text>
-          </View>
-        ) : null}
-      </View>
+      {collapse ? (
+        <View accessibilityRole="header" style={{ flexShrink: 1 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={count ? `${title}, ${count} ${count === 1 ? 'item' : 'items'}` : title}
+            accessibilityHint={collapse.collapsed ? 'Shows this section' : 'Hides this section'}
+            accessibilityState={{ expanded: !collapse.collapsed }}
+            aria-expanded={!collapse.collapsed}
+            onPress={collapse.onToggle}
+            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: minTapTarget, opacity: pressed ? 0.6 : 1 })}>
+            <Text style={titleStyle}>{title}</Text>
+            {badge}
+            <View style={{ transform: [{ rotate: collapse.collapsed ? '-90deg' : '0deg' }] }}>
+              <ChevronDown size={20} color={colors.textSecondary} strokeWidth={1.75} />
+            </View>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
+          <Text accessibilityRole="header" style={titleStyle}>
+            {title}
+          </Text>
+          {badge}
+        </View>
+      )}
       {link ? (
         <Pressable
           accessibilityRole="link"

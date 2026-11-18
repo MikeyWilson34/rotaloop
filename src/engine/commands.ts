@@ -589,7 +589,7 @@ function cover(state: GroupState, assignmentId: string, ctx: Context): Outcome {
   const coverer = ctx.actorId;
   if (coverer === null || !isActiveMember(state, coverer)) return reject('notPermitted', 'Only a Member can Cover');
   if (!isQualified(state, coverer, assignment.responsibilityId)) {
-    return reject('notQualified', 'Only Qualified Members can Cover');
+    return reject('notQualified', "Only the Responsibility's team can Cover");
   }
   const conflict = seatConflict(state, assignment, coverer);
   if (conflict) return conflict;
@@ -963,7 +963,7 @@ function reorderQueueByHand(state: GroupState, responsibilityId: string, queue: 
   if (!findActiveResponsibility(state, responsibilityId)) return reject('notFound', 'No such Responsibility');
   const rotation = rotationOf(state, responsibilityId);
   if (!isPermutationOf(queue, rotation.queue)) {
-    return reject('invalid', 'The new order must list each Qualified Member exactly once');
+    return reject('invalid', 'The new order must list each Member of the team exactly once');
   }
   return done(withRotation(state, withQueueOrder(rotation, queue)));
 }
