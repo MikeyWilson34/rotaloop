@@ -193,7 +193,8 @@ try {
   if ((await meChip.getAttribute('aria-checked')) !== 'true') await meChip.click();
   if ((await meChip.getAttribute('aria-checked')) !== 'true') throw new Error('Chip has no aria-checked state');
   await click('Add Responsibility');
-  await expectScreen('Responsibility saved', new RegExp(respName));
+  // Its edit screen (the Add form also shows the name, in its team label).
+  await expectScreen('Responsibility saved', /Changes apply from the next Event on/);
   await backToGroup('Responsibility saved');
 
   // Settings → Add Event Series (saved, for that Responsibility).
