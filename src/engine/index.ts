@@ -64,7 +64,7 @@
  * Assignment whose Member or Event changes asks for confirmation again.
  */
 
-export { applyCommand } from './commands';
+export { applyCommand, MAX_REPEAT_COUNT } from './commands';
 export { createGroupState, DEFAULT_GROUP_SETTINGS, type NewGroup } from './state';
 export {
   assignmentStatus,

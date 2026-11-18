@@ -329,6 +329,38 @@ describe('Event Series and one-off Events', () => {
     expect(rejected(state, { type: 'addEventSeries', series: { id: 'sat', name: 'Sat', responsibilityIds: ['nope'] } }, { by: 'ana' })).toBe('notFound');
   });
 
+  it('Accepts and rejects the newer repeat options (every N days, a date, every N months, an end)', () => {
+    const state = setup({ admins: ['ana'] });
+    const command = (repeat: RepeatPattern): Command => ({
+      type: 'addEventSeries',
+      series: { id: 'sat', name: 'Sat', responsibilityIds: ['sound'], repeat },
+    });
+    const daily: RepeatPattern = { ...SUNDAYS_9AM, frequency: 'daily', intervalDays: 10, daysOfWeek: [] };
+    const onDate: RepeatPattern = { ...SUNDAYS_9AM, frequency: 'monthly', dayOfMonth: 31, daysOfWeek: [], intervalMonths: 3 };
+    const byWeekday: RepeatPattern = { ...SUNDAYS_9AM, frequency: 'monthly', weekOfMonth: 1, intervalMonths: 3 };
+    for (const ok of [daily, onDate, byWeekday, { ...SUNDAYS_9AM, endsOn: SUNDAYS_9AM.startsOn }, { ...daily, endsAfter: 6 }]) {
+      expect(act(state, command(ok), { by: 'ana' }).state.eventSeries.find((s) => s.id === 'sat')?.repeat).toEqual(ok);
+    }
+    for (const bad of [
+      { ...daily, intervalDays: 0 },
+      { ...daily, intervalDays: null },
+      { ...daily, daysOfWeek: [1] },
+      { ...SUNDAYS_9AM, intervalDays: 2 }, // only daily has days between
+      { ...onDate, dayOfMonth: 32 },
+      { ...onDate, daysOfWeek: [0] },
+      { ...onDate, weekOfMonth: 1 }, // a date or a weekday, not both
+      { ...byWeekday, intervalMonths: 13 },
+      { ...SUNDAYS_9AM, intervalMonths: 2 }, // only monthly has months between
+      { ...SUNDAYS_9AM, endsOn: '2000-01-01' }, // before startsOn
+      { ...SUNDAYS_9AM, endsOn: 'June' },
+      { ...SUNDAYS_9AM, endsAfter: 0 },
+      { ...SUNDAYS_9AM, endsAfter: 501 },
+      { ...SUNDAYS_9AM, endsOn: '2099-01-01', endsAfter: 3 },
+    ]) {
+      expect(rejected(state, command(bad as RepeatPattern), { by: 'ana' }), JSON.stringify(bad)).toBe('invalid');
+    }
+  });
+
   it('Changing a series’ time replaces its future Events; turns move with their Members and ask to confirm again', () => {
     const state = setup({ admins: ['ana'], responsibilities: [{ id: 'sound', requiresConfirmation: true, qualified: CREW }] });
     const saturdays = [3, 4, 5, 6, 7, 8].map((n) => ({

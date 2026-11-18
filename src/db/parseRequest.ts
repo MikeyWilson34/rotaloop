@@ -14,6 +14,7 @@ import type {
   RepeatPattern,
   ResponsibilityChanges,
 } from '../engine';
+import { MAX_REPEAT_COUNT } from '../engine';
 import type { ClientCommand, GroupCommandRequest } from './protocol';
 
 export class InvalidRequest extends Error {}
@@ -203,28 +204,53 @@ function weekOfMonth(value: unknown, field: string): number {
   return value as number;
 }
 
+function localDay(value: unknown, field: string): string {
+  const date = text(value, field, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) fail(`${field} must be YYYY-MM-DD`);
+  return date;
+}
+
+/**
+ * The newer optional fields (every N days, a date, every N months, an end) are only kept
+ * when they say something, so older patterns come out exactly as they went in.
+ */
 function repeatPattern(value: unknown, field: string): RepeatPattern {
   const o = obj(value, field);
-  const frequency = oneOf(o.frequency, `${field}.frequency`, ['weekly', 'biweekly', 'monthly', 'custom']);
-  const daysOfWeek = list(o.daysOfWeek, `${field}.daysOfWeek`, (v, f) => int(v, f, 0, 6), 7);
-  if (daysOfWeek.length === 0 || new Set(daysOfWeek).size !== daysOfWeek.length) {
+  const frequency = oneOf(o.frequency, `${field}.frequency`, ['weekly', 'biweekly', 'monthly', 'custom', 'daily']);
+  const given = (v: unknown) => v !== undefined && v !== null;
+  const byDate = frequency === 'monthly' && given(o.dayOfMonth);
+  const daysOfWeek = list(o.daysOfWeek ?? [], `${field}.daysOfWeek`, (v, f) => int(v, f, 0, 6), 7);
+  if (frequency === 'daily' || byDate) {
+    if (daysOfWeek.length !== 0) fail(`${field}.daysOfWeek must be empty for this repeat`);
+  } else if (daysOfWeek.length === 0 || new Set(daysOfWeek).size !== daysOfWeek.length) {
     fail(`${field}.daysOfWeek must list distinct days`);
   }
   const startTime = text(o.startTime, `${field}.startTime`, 5);
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime)) fail(`${field}.startTime must be HH:MM`);
-  const startsOn = text(o.startsOn, `${field}.startsOn`, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(startsOn) || Number.isNaN(Date.parse(`${startsOn}T00:00:00Z`))) {
-    fail(`${field}.startsOn must be YYYY-MM-DD`);
-  }
-  return {
+  const startsOn = localDay(o.startsOn, `${field}.startsOn`);
+  const pattern: RepeatPattern = {
     frequency,
     intervalWeeks: frequency === 'custom' ? int(o.intervalWeeks, `${field}.intervalWeeks`, 1, 52) : null,
     daysOfWeek: [...daysOfWeek].sort((a, b) => a - b),
-    weekOfMonth: frequency === 'monthly' ? weekOfMonth(o.weekOfMonth, `${field}.weekOfMonth`) : null,
+    weekOfMonth: frequency === 'monthly' && !byDate ? weekOfMonth(o.weekOfMonth, `${field}.weekOfMonth`) : null,
     startTime,
     timeZone: timeZone(o.timeZone, `${field}.timeZone`),
     startsOn,
   };
+  if (frequency === 'daily') pattern.intervalDays = int(o.intervalDays, `${field}.intervalDays`, 1, 365);
+  if (byDate) pattern.dayOfMonth = int(o.dayOfMonth, `${field}.dayOfMonth`, 1, 31);
+  if (frequency === 'monthly' && given(o.intervalMonths)) {
+    const months = int(o.intervalMonths, `${field}.intervalMonths`, 1, 12);
+    if (months !== 1) pattern.intervalMonths = months;
+  }
+  if (given(o.endsOn) && given(o.endsAfter)) fail(`${field} ends on a date or after a number of Events, not both`);
+  if (given(o.endsOn)) {
+    const endsOn = localDay(o.endsOn, `${field}.endsOn`);
+    if (endsOn < startsOn) fail(`${field}.endsOn must be on or after startsOn`);
+    pattern.endsOn = endsOn;
+  }
+  if (given(o.endsAfter)) pattern.endsAfter = int(o.endsAfter, `${field}.endsAfter`, 1, MAX_REPEAT_COUNT);
+  return pattern;
 }
 
 function eventSeries(value: unknown, field: string): NewEventSeries {

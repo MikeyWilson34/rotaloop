@@ -277,31 +277,52 @@ function removeEvent(state: GroupState, eventId: string, ctx: Context): Outcome 
 
 const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const YYYY_MM_DD = /^\d{4}-\d{2}-\d{2}$/;
+/** The most Events an "ends after N Events" repeat can make. */
+export const MAX_REPEAT_COUNT = 500;
 
 /** Why a repeat pattern is malformed, or null. The engine stores it but never expands it. */
 function repeatError(p: RepeatPattern): string | null {
-  if (!['weekly', 'biweekly', 'monthly', 'custom'].includes(p.frequency)) return 'Unknown repeat frequency';
+  if (!['weekly', 'biweekly', 'monthly', 'custom', 'daily'].includes(p.frequency)) return 'Unknown repeat frequency';
+  const isInt = (v: unknown, min: number, max: number) => Number.isInteger(v) && (v as number) >= min && (v as number) <= max;
+  const given = (v: unknown) => v !== undefined && v !== null;
   if (p.frequency === 'custom') {
-    if (!Number.isInteger(p.intervalWeeks) || (p.intervalWeeks as number) < 1 || (p.intervalWeeks as number) > 52) {
-      return 'A custom repeat needs an interval of 1-52 weeks';
-    }
+    if (!isInt(p.intervalWeeks, 1, 52)) return 'A custom repeat needs an interval of 1-52 weeks';
   } else if (p.intervalWeeks !== null) {
     return 'Only a custom repeat has an interval';
   }
+  if (p.frequency === 'daily') {
+    if (!isInt(p.intervalDays, 1, 365)) return 'A daily repeat needs an interval of 1-365 days';
+  } else if (given(p.intervalDays)) {
+    return 'Only a daily repeat has an interval in days';
+  }
+  const byDate = given(p.dayOfMonth);
   if (p.frequency === 'monthly') {
-    if (![1, 2, 3, 4, -1].includes(p.weekOfMonth as number)) return 'A monthly repeat needs a week of the month (1-4 or -1)';
-  } else if (p.weekOfMonth !== null) {
-    return 'Only a monthly repeat has a week of the month';
+    if (byDate) {
+      if (!isInt(p.dayOfMonth, 1, 31)) return 'A monthly repeat on a date needs a day of the month (1-31)';
+      if (p.weekOfMonth !== null) return 'A monthly repeat is on a date or a weekday, not both';
+    } else if (![1, 2, 3, 4, -1].includes(p.weekOfMonth as number)) {
+      return 'A monthly repeat needs a week of the month (1-4 or -1)';
+    }
+    if (given(p.intervalMonths) && !isInt(p.intervalMonths, 1, 12)) return 'A monthly repeat needs an interval of 1-12 months';
+  } else if (p.weekOfMonth !== null || byDate || given(p.intervalMonths)) {
+    return 'Only a monthly repeat has a week, day or interval of months';
   }
   const days = p.daysOfWeek;
-  if (days.length === 0 || new Set(days).size !== days.length || days.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) {
+  const noDays = p.frequency === 'daily' || byDate;
+  if (noDays) {
+    if (days.length !== 0) return 'This repeat has no days of the week';
+  } else if (days.length === 0 || new Set(days).size !== days.length || days.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) {
     return 'Days of the week must be distinct numbers 0-6';
   }
   if (!HH_MM.test(p.startTime)) return 'Start time must be HH:MM';
   if (p.timeZone.trim() === '') return 'A time zone is needed';
-  if (!YYYY_MM_DD.test(p.startsOn) || Number.isNaN(Date.parse(`${p.startsOn}T00:00:00Z`))) {
-    return 'Start date must be YYYY-MM-DD';
+  const isDate = (d: string) => YYYY_MM_DD.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
+  if (!isDate(p.startsOn)) return 'Start date must be YYYY-MM-DD';
+  if (given(p.endsOn) && given(p.endsAfter)) return 'A repeat ends on a date or after a number of Events, not both';
+  if (given(p.endsOn) && (typeof p.endsOn !== 'string' || !isDate(p.endsOn) || p.endsOn < p.startsOn)) {
+    return 'End date must be YYYY-MM-DD, on or after the start date';
   }
+  if (given(p.endsAfter) && !isInt(p.endsAfter, 1, MAX_REPEAT_COUNT)) return `A repeat can end after 1-${MAX_REPEAT_COUNT} Events`;
   return null;
 }
 

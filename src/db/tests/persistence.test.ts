@@ -219,11 +219,40 @@ describe('apply_group_command_result round trip', () => {
       { frequency: 'custom', intervalWeeks: null, daysOfWeek: [0], weekOfMonth: null, startTime: '09:00', timeZone: 'UTC', startsOn: '2027-01-03' },
       { frequency: 'weekly', intervalWeeks: null, daysOfWeek: [7], weekOfMonth: null, startTime: '09:00', timeZone: 'UTC', startsOn: '2027-01-03' },
       { frequency: 'weekly', intervalWeeks: null, daysOfWeek: [0], weekOfMonth: null, startTime: '9am', timeZone: 'UTC', startsOn: '2027-01-03' },
+      // The newer options (20261122000000_repeat_options.sql)
+      { frequency: 'daily', intervalWeeks: null, daysOfWeek: [], weekOfMonth: null, startTime: '09:00', timeZone: 'UTC', startsOn: '2027-01-03' },
+      { frequency: 'daily', intervalWeeks: null, intervalDays: 2, daysOfWeek: [1], weekOfMonth: null, startTime: '09:00', timeZone: 'UTC', startsOn: '2027-01-03' },
+      { frequency: 'weekly', intervalWeeks: null, intervalDays: 2, daysOfWeek: [0], weekOfMonth: null, startTime: '09:00', timeZone: 'UTC', startsOn: '2027-01-03' },
+      { frequency: 'monthly', intervalWeeks: null, daysOfWeek: [], weekOfMonth: 1, dayOfMonth: 15, startTime: '09:00', timeZone: 'UTC', startsOn: '2027-01-03' },
+      { frequency: 'monthly', intervalWeeks: null, daysOfWeek: [0], weekOfMonth: null, dayOfMonth: 15, startTime: '09:00', timeZone: 'UTC', startsOn: '2027-01-03' },
+      { frequency: 'monthly', intervalWeeks: null, daysOfWeek: [], weekOfMonth: 1, startTime: '09:00', timeZone: 'UTC', startsOn: '2027-01-03' },
+      { frequency: 'weekly', intervalWeeks: null, daysOfWeek: [0], weekOfMonth: null, dayOfMonth: 3, startTime: '09:00', timeZone: 'UTC', startsOn: '2027-01-03' },
+      { frequency: 'weekly', intervalWeeks: null, daysOfWeek: [0], weekOfMonth: null, intervalMonths: 2, startTime: '09:00', timeZone: 'UTC', startsOn: '2027-01-03' },
+      { frequency: 'weekly', intervalWeeks: null, daysOfWeek: [0], weekOfMonth: null, endsOn: 'soon', startTime: '09:00', timeZone: 'UTC', startsOn: '2027-01-03' },
+      { frequency: 'weekly', intervalWeeks: null, daysOfWeek: [0], weekOfMonth: null, endsOn: '2027-06-30', endsAfter: 4, startTime: '09:00', timeZone: 'UTC', startsOn: '2027-01-03' },
     ]) {
       const bad = { ...rows, event_series: rows.event_series.map((s) => ({ ...s, repeat: repeat as unknown as RepeatPattern })) };
       await expect(t.store.persist({ groupId, expectedVersion: 1, rows: bad, history: [] }), JSON.stringify(repeat)).rejects.toThrow(
         /check constraint/,
       );
+    }
+  });
+
+  it('stores and reloads the newer repeat options exactly', async () => {
+    const groupId = uuid(108);
+    let result = run(newGroupState(groupId, { ana: uuid(1) }), { type: 'fillSchedule' }, 'ana');
+    let { version, state } = await persistAndReload(groupId, null, result);
+    const base = { intervalWeeks: null, weekOfMonth: null, startTime: '09:00', timeZone: 'America/Chicago', startsOn: '2027-01-03' };
+    const patterns: RepeatPattern[] = [
+      { ...base, frequency: 'daily', intervalDays: 10, daysOfWeek: [], endsAfter: 6 },
+      { ...base, frequency: 'monthly', dayOfMonth: 31, daysOfWeek: [], intervalMonths: 3, endsOn: '2027-06-30' },
+      { ...base, frequency: 'monthly', weekOfMonth: 1, daysOfWeek: [2], intervalMonths: 3 },
+    ];
+    for (const [i, repeat] of patterns.entries()) {
+      result = run(state, { type: 'addEventSeries', series: { id: `s${i}`, name: `S${i}`, responsibilityIds: ['sound'], repeat } }, 'ana');
+      ({ version, state } = await persistAndReload(groupId, version, result));
+      expect(state).toEqual(result.state);
+      expect(state.eventSeries.find((s) => s.id === `s${i}`)?.repeat).toEqual(repeat);
     }
   });
 

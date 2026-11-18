@@ -11,9 +11,11 @@ import type {
   ReplacementDuty,
   TimeOffHandling,
 } from '../engine';
+import { MAX_REPEAT_COUNT } from '../engine';
 import {
   dayNumber,
   isValidTimeZone,
+  lastOccurrenceDate,
   localDate,
   nextOccurrences,
   samePattern,
@@ -229,28 +231,66 @@ export function todayIn(timeZone: string, now: Date): string {
 // ---------------------------------------------------------------------------
 // Event Series
 
+export type MonthlyBy = 'weekday' | 'date';
+export type SeriesEnd = 'never' | 'onDate' | 'afterCount';
+
 export type SeriesForm = {
   name: string;
   frequency: RepeatFrequency;
   /** Custom only: "every N weeks". */
   intervalWeeks: string;
+  /** Daily only: "every N days". */
+  intervalDays: string;
   daysOfWeek: number[];
-  /** Monthly only: 1-4, or -1 for the last. */
+  /** Monthly only: on the Nth weekday (`weekOfMonth` and the days) or on a date (`dayOfMonth`). */
+  monthlyBy: MonthlyBy;
+  /** Monthly by weekday only: 1-4, or -1 for the last. */
   weekOfMonth: number;
+  /** Monthly on a date only: "1" to "31", as typed. */
+  dayOfMonth: string;
+  /** Monthly only: "every N months", as typed. */
+  intervalMonths: string;
   /** As typed, e.g. "9:00 AM". */
   time: string;
   timeZone: string;
   /** As typed, "YYYY-MM-DD". */
   startsOn: string;
+  ends: SeriesEnd;
+  /** `ends: 'onDate'` only: the last date, as typed "YYYY-MM-DD". */
+  endsOn: string;
+  /** `ends: 'afterCount'` only: how many Events, as typed. */
+  endsAfter: string;
   responsibilityIds: string[];
 };
 
 export const FREQUENCY_OPTIONS: readonly { value: RepeatFrequency; label: string }[] = [
   { value: 'weekly', label: 'Every week' },
   { value: 'biweekly', label: 'Every other week' },
-  { value: 'monthly', label: 'Monthly' },
   { value: 'custom', label: 'Every few weeks' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'daily', label: 'Every few days' },
 ];
+
+export const MONTHLY_BY_OPTIONS: readonly { value: MonthlyBy; label: string }[] = [
+  { value: 'weekday', label: 'A weekday, like the 1st Sunday' },
+  { value: 'date', label: 'A date, like the 15th' },
+];
+
+export const END_OPTIONS: readonly { value: SeriesEnd; label: string }[] = [
+  { value: 'never', label: 'Never' },
+  { value: 'onDate', label: 'On a date' },
+  { value: 'afterCount', label: 'After a number of Events' },
+];
+
+export const INTERVAL_DAYS_MAX = 365;
+export const INTERVAL_MONTHS_MAX = 12;
+
+/** "1st", "2nd", "3rd", "4th", "11th", "22nd", "31st". */
+export function ordinal(n: number): string {
+  const tens = n % 100;
+  const suffix = tens >= 11 && tens <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
+  return `${n}${suffix}`;
+}
 
 export const WEEK_OF_MONTH_OPTIONS: readonly { value: number; label: string }[] = [
   { value: 1, label: '1st' },
@@ -267,11 +307,18 @@ export function newSeriesForm(state: GroupState, groupTimeZone: string, now: Dat
     name: '',
     frequency: 'weekly',
     intervalWeeks: '3',
+    intervalDays: '2',
     daysOfWeek: [weekdayOf(dayNumber(today))],
+    monthlyBy: 'weekday',
     weekOfMonth: 1,
+    dayOfMonth: String(Number(today.slice(8, 10))),
+    intervalMonths: '1',
     time: '9:00 AM',
     timeZone: groupTimeZone,
     startsOn: today,
+    ends: 'never',
+    endsOn: '',
+    endsAfter: '10',
     responsibilityIds: activeResponsibilities(state).map((r) => r.id),
   };
 }
@@ -294,17 +341,42 @@ export function seriesFormFrom(
       ? {
           frequency: p.frequency,
           intervalWeeks: String(p.intervalWeeks ?? 3),
-          daysOfWeek: [...p.daysOfWeek].sort((a, b) => a - b),
+          intervalDays: String(p.intervalDays ?? base.intervalDays),
+          // Daily and monthly-on-a-date have no weekdays: keep the default in case they switch.
+          daysOfWeek: p.daysOfWeek.length > 0 ? [...p.daysOfWeek].sort((a, b) => a - b) : base.daysOfWeek,
+          monthlyBy: p.dayOfMonth != null ? ('date' as const) : ('weekday' as const),
           weekOfMonth: p.weekOfMonth ?? 1,
+          dayOfMonth: p.dayOfMonth != null ? String(p.dayOfMonth) : String(Number(p.startsOn.slice(8, 10))),
+          intervalMonths: String(p.intervalMonths ?? 1),
           time: formatTime(p.startTime),
           timeZone: p.timeZone,
           startsOn: p.startsOn,
+          ends: p.endsOn != null ? ('onDate' as const) : p.endsAfter != null ? ('afterCount' as const) : ('never' as const),
+          endsOn: p.endsOn ?? '',
+          endsAfter: String(p.endsAfter ?? base.endsAfter),
         }
       : {}),
   };
 }
 
-export type SeriesField = 'name' | 'days' | 'time' | 'timeZone' | 'startsOn' | 'interval' | 'responsibilities';
+export type SeriesField =
+  | 'name'
+  | 'days'
+  | 'dayOfMonth'
+  | 'time'
+  | 'timeZone'
+  | 'startsOn'
+  | 'interval'
+  | 'endsOn'
+  | 'endsAfter'
+  | 'responsibilities';
+
+/** A whole number typed into a field, from `min` to `max`, or null. */
+function wholeNumber(text: string, min: number, max: number): number | null {
+  const t = text.trim();
+  const n = Number(t);
+  return /^\d+$/.test(t) && n >= min && n <= max ? n : null;
+}
 
 export type SeriesValue = { name: string; responsibilityIds: string[]; repeat: RepeatPattern };
 
@@ -323,8 +395,13 @@ export function validateSeriesForm(
   if (!name) errors.name = 'Give it a name, like Sunday mornings or Practice.';
   else if (name.length > NAME_MAX) errors.name = `Keep the name under ${NAME_MAX} characters.`;
 
-  const days = [...new Set(form.daysOfWeek)].filter((d) => Number.isInteger(d) && d >= 0 && d <= 6).sort((a, b) => a - b);
-  if (days.length === 0) errors.days = 'Pick at least one day.';
+  const monthly = form.frequency === 'monthly';
+  const byDate = monthly && form.monthlyBy === 'date';
+  const usesDays = form.frequency !== 'daily' && !byDate;
+  const days = usesDays
+    ? [...new Set(form.daysOfWeek)].filter((d) => Number.isInteger(d) && d >= 0 && d <= 6).sort((a, b) => a - b)
+    : [];
+  if (usesDays && days.length === 0) errors.days = 'Pick at least one day.';
 
   const startTime = parseTime(form.time);
   if (!startTime) errors.time = 'Enter a time like 9:00 AM or 18:30.';
@@ -335,53 +412,127 @@ export function validateSeriesForm(
   if (!startsOn) errors.startsOn = 'Enter a date like 2026-11-22.';
 
   let intervalWeeks: number | null = null;
+  let intervalDays: number | null = null;
+  let intervalMonths: number | null = null;
   if (form.frequency === 'custom') {
-    const n = Number(form.intervalWeeks.trim());
-    if (!/^\d+$/.test(form.intervalWeeks.trim()) || n < 1 || n > 52) errors.interval = 'Enter a number of weeks from 1 to 52.';
-    else intervalWeeks = n;
+    intervalWeeks = wholeNumber(form.intervalWeeks, 1, 52);
+    if (intervalWeeks === null) errors.interval = 'Enter a number of weeks from 1 to 52.';
+  } else if (form.frequency === 'daily') {
+    intervalDays = wholeNumber(form.intervalDays, 1, INTERVAL_DAYS_MAX);
+    if (intervalDays === null) errors.interval = `Enter a number of days from 1 to ${INTERVAL_DAYS_MAX}.`;
+  } else if (monthly) {
+    intervalMonths = wholeNumber(form.intervalMonths, 1, INTERVAL_MONTHS_MAX);
+    if (intervalMonths === null) errors.interval = `Enter a number of months from 1 to ${INTERVAL_MONTHS_MAX}.`;
   }
-  const weekOfMonth = form.frequency === 'monthly' ? form.weekOfMonth : null;
+  const weekOfMonth = monthly && !byDate ? form.weekOfMonth : null;
   if (weekOfMonth !== null && ![1, 2, 3, 4, -1].includes(weekOfMonth)) errors.days = 'Pick which week of the month.';
+  let dayOfMonth: number | null = null;
+  if (byDate) {
+    dayOfMonth = wholeNumber(form.dayOfMonth, 1, 31);
+    if (dayOfMonth === null) errors.dayOfMonth = 'Enter a day of the month from 1 to 31.';
+  }
+
+  let endsOn: string | null = null;
+  let endsAfter: number | null = null;
+  if (form.ends === 'onDate') {
+    endsOn = parseDate(form.endsOn);
+    if (!endsOn) errors.endsOn = 'Enter a date like 2027-06-30.';
+    else if (startsOn && endsOn < startsOn) errors.endsOn = 'The end date must be on or after the start date.';
+  } else if (form.ends === 'afterCount') {
+    endsAfter = wholeNumber(form.endsAfter, 1, MAX_REPEAT_COUNT);
+    if (endsAfter === null) errors.endsAfter = `Enter a number of Events from 1 to ${MAX_REPEAT_COUNT}.`;
+  }
 
   const responsibilityIds = form.responsibilityIds.filter((id) => activeResponsibilityIds.includes(id));
   if (responsibilityIds.length === 0) errors.responsibilities = 'Pick at least one Responsibility for these Events.';
 
   if (Object.keys(errors).length > 0 || !startTime || !startsOn) return { ok: false, errors };
-  return {
-    ok: true,
-    value: {
-      name,
-      responsibilityIds,
-      repeat: {
-        frequency: form.frequency,
-        intervalWeeks,
-        daysOfWeek: days,
-        weekOfMonth,
-        startTime,
-        timeZone: form.timeZone,
-        startsOn,
-      },
-    },
+  const repeat: RepeatPattern = {
+    frequency: form.frequency,
+    intervalWeeks,
+    daysOfWeek: days,
+    weekOfMonth,
+    startTime,
+    timeZone: form.timeZone,
+    startsOn,
   };
+  // The newer fields only when they say something, as the server stores them.
+  if (intervalDays !== null) repeat.intervalDays = intervalDays;
+  if (dayOfMonth !== null) repeat.dayOfMonth = dayOfMonth;
+  if (intervalMonths !== null && intervalMonths !== 1) repeat.intervalMonths = intervalMonths;
+  if (endsOn !== null) repeat.endsOn = endsOn;
+  if (endsAfter !== null) repeat.endsAfter = endsAfter;
+  return { ok: true, value: { name, responsibilityIds, repeat } };
 }
 
-/** "Every Sunday at 9:00 AM", "Every other Tue and Thu at 6:30 PM", "Last Sunday of the month at 9:00 AM". */
+/** "Jun 30", or "Jun 30, 2028" when it isn't in the year `sameYearAs` (a "YYYY-MM-DD"). */
+function shortDate(date: string, sameYearAs: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'UTC',
+    month: 'short',
+    day: 'numeric',
+    ...(date.slice(0, 4) === sameYearAs.slice(0, 4) ? {} : { year: 'numeric' }),
+  }).format(new Date(`${date}T12:00:00Z`));
+}
+
+/**
+ * The pattern in words: "Every Sunday at 9:00 AM", "Every other Tue and Thu at 6:30 PM",
+ * "Last Sunday of the month at 9:00 AM", "Every 10 days at 9:00 AM",
+ * "Every 3 months on the 15th at 9:00 AM, until Jun 30", "Every day at 7:00 PM, 5 times".
+ */
 export function describeRepeat(p: RepeatPattern): string {
   const many = p.daysOfWeek.length > 1;
   const days = andList(p.daysOfWeek.map((d) => (many ? WEEKDAY_SHORT[d] : WEEKDAY_LONG[d])));
   const at = `at ${formatTime(p.startTime)}`;
+  const months = p.intervalMonths ?? 1;
+  let text: string;
   switch (p.frequency) {
     case 'weekly':
-      return `Every ${days} ${at}`;
+      text = `Every ${days} ${at}`;
+      break;
     case 'biweekly':
-      return `Every other ${days} ${at}`;
+      text = `Every other ${days} ${at}`;
+      break;
     case 'custom':
-      return p.intervalWeeks === 1 ? `Every ${days} ${at}` : `Every ${p.intervalWeeks} weeks on ${days} ${at}`;
+      text = p.intervalWeeks === 1 ? `Every ${days} ${at}` : `Every ${p.intervalWeeks} weeks on ${days} ${at}`;
+      break;
+    case 'daily':
+      text = (p.intervalDays ?? 1) === 1 ? `Every day ${at}` : `Every ${p.intervalDays} days ${at}`;
+      break;
     case 'monthly': {
-      const which = WEEK_OF_MONTH_OPTIONS.find((o) => o.value === p.weekOfMonth)?.label ?? '';
-      return `${which} ${days} of the month ${at}`;
+      const which =
+        p.dayOfMonth != null
+          ? `the ${ordinal(p.dayOfMonth)}`
+          : `${WEEK_OF_MONTH_OPTIONS.find((o) => o.value === p.weekOfMonth)?.label ?? ''} ${days}`;
+      if (months > 1) text = `Every ${months} months on ${p.dayOfMonth != null ? which : `the ${which.replace(/^Last/, 'last')}`} ${at}`;
+      else if (p.dayOfMonth != null) text = `Monthly on ${which} ${at}`;
+      else text = `${which} of the month ${at}`;
+      break;
     }
   }
+  if (p.endsOn != null) text += `, until ${shortDate(p.endsOn, p.startsOn)}`;
+  else if (p.endsAfter != null) text += p.endsAfter === 1 ? ', once' : `, ${p.endsAfter} times`;
+  return text;
+}
+
+/**
+ * For a pattern that ends: when its last Event is, e.g. "The last of 6 Events is on
+ * Sun, Dec 20, 2026." Null when it never ends.
+ */
+export function describeEnd(p: RepeatPattern): string | null {
+  if (p.endsOn == null && p.endsAfter == null) return null;
+  const last = lastOccurrenceDate(p);
+  if (last === null) return 'No Events fall before the end date.';
+  return p.endsAfter != null && p.endsAfter > 1
+    ? `The last of ${p.endsAfter} Events is on ${formatDate(last)}.`
+    : `The last Event is on ${formatDate(last)}.`;
+}
+
+/** The hint under "Day of the month": what happens in months without that day. */
+export function dayOfMonthHint(text: string): string {
+  const n = wholeNumber(text, 1, 31);
+  if (n !== null && n >= 29) return `Months without a ${ordinal(n)} use their last day, like ${n === 31 ? 'Apr 30 or ' : ''}Feb 28.`;
+  return 'From 1 to 31. Months without that day use their last day.';
 }
 
 /** The next few start times of a pattern, from now (or its start date), as instants. */
