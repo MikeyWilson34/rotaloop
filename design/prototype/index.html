@@ -487,13 +487,22 @@ textarea,input[type=text],input[type=date],input[type=time]{width:100%;border:1.
 .stepper button{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:var(--text)}
 .stepper button[disabled]{opacity:.35}
 .stepper .n{min-width:28px;text-align:center;font-weight:800}
+/* v0.4: collapsible Home sections. The title, count and chevron are one button (48px hit area). */
+.sec-toggle{display:flex;align-items:center;gap:8px;min-height:48px;margin:-12px 0;font-size:18px;line-height:24px;font-weight:800;color:var(--text)}
+.sec-toggle .chev{display:grid;place-items:center;transition:transform .2s}
+.sec-toggle[aria-expanded="false"] .chev{transform:rotate(-90deg)}
+.count.quiet{background:var(--neutral-tint);color:var(--text-2)}
+.sec-hidden{margin:0 16px;font-size:14px;line-height:20px;font-weight:600;color:var(--text-2)}
+.answer-once{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:13px;line-height:18px;font-weight:700;color:var(--on-duty-2)}
+.hc-names.edit{grid-template-columns:1fr}
+.hc-name .btn.sm{min-height:36px;padding:0 12px;font-size:13px;flex:none}
 </style>
 </head>
 <body>
 <div class="stage">
   <aside class="controls" aria-label="Prototype controls">
     <h1><span class="logo" id="logo"></span><span id="brandName">Rotaloop</span></h1>
-    <p>Clickable draft (v0.3: adds one-off Events with RSVPs, and duties that stand out from invites). Use these controls to see how the app adapts. Everything resets on reload.</p>
+    <p>Clickable draft (v0.4: one-off Events with optional RSVPs and deadlines, duties that stand out from invites, and collapsible Home sections). Use these controls to see how the app adapts. Everything resets on reload, except the theme and which Home sections you collapsed.</p>
     <div class="ctl-group">
       <div class="ctl-label">Viewing as</div>
       <div class="ctl-seg" role="group" aria-label="Persona">
@@ -689,26 +698,34 @@ function seedGroups(){
       ], skips:{}, settings:{policy:'countRealWork', duty:'member', timeOff:'route', allowDouble:true} },
   ];
 }
-/* One-off Events: everyone in the Group is invited and answers Going / Can't. Optional Responsibilities (duties)
-   are filled from that Responsibility's team. Times are 24h "HH:MM". */
+/* One-off Events: everyone in the Group can see them. RSVP is opt-in per Event (ask:true = "Ask who's coming"):
+   then everyone answers Going / Can't. An RSVP deadline is opt-in too (deadline:null = none). Optional
+   Responsibilities (duties) are filled from that Responsibility's team. Times are 24h "HH:MM". */
 function seedEvents(){
   return [
     {id:'gn1', gid:'gnc', title:'Game Night', date:'2026-11-20', time:'19:00', location:'Sam’s place, 18 Birch Lane',
-      notes:'Catan and Codenames on the table. Pizza at 7, first game at 7:30.', by:'sam', reminder:'1d', deadline:{date:'2026-11-19', time:'21:00'},
+      notes:'Catan and Codenames on the table. Pizza at 7, first game at 7:30.', by:'sam', reminder:'1d', ask:true, deadline:{date:'2026-11-19', time:'21:00'},
       rsvp:{sam:'going', leah:'going', chris:'going', priya:'going', ben:'going', ana:'going', ethan:'going', olivia:'cant', maria:'cant'}, duties:[]},
     {id:'gn2', gid:'gnc', title:'Escape room', date:'2026-11-28', time:'14:00', location:'Lockbox Escape Rooms, 210 Main St',
-      notes:'The room fits 8 and it’s booked, so RSVPs are closed. $25 each at the door.', by:'jordan', reminder:'2h', deadline:{date:'2026-11-18', time:'18:00'},
+      notes:'The room fits 8 and it’s booked, so RSVPs are closed. $25 each at the door.', by:'jordan', reminder:'2h', ask:true, deadline:{date:'2026-11-18', time:'18:00'},
       rsvp:{jordan:'going', sam:'going', leah:'going', ben:'going', ana:'going', priya:'going', ethan:'going', chris:'cant', tom:'cant', olivia:'cant'}, duties:[]},
     {id:'gn3', gid:'gnc', title:'Friendsgiving potluck', date:'2026-12-05', time:'18:00', location:'Leah’s apartment, 44 Elm St, Apt 3B',
-      notes:'Leah’s cooking the turkey. Bring a side or a dessert that serves 6.', by:'leah', reminder:'2d', deadline:{date:'2026-11-30', time:'18:00'},
+      notes:'Leah’s cooking the turkey. Bring a side or a dessert that serves 6.', by:'leah', reminder:'2d', ask:true, deadline:null,
       rsvp:{leah:'going', ana:'going', sam:'going', ben:'going', priya:'going', daniel:'cant'},
       duties:[
         {roleId:'host', count:1, seats:[{p:'leah', status:'confirmed'}]},
         {roleId:'food', count:2, seats:[{p:'jordan', status:'pending'},{p:'ana', status:'confirmed'}]},
         {roleId:'drinks', count:1, seats:[{p:'chris', status:'pending'}]},
       ]},
+    /* RSVP off: no Going / Can't, no headcount, no nudges. Just the details and the duties. */
+    {id:'w2', gid:'worship', title:'Carols in the park', date:'2026-12-13', time:'16:00', location:'Riverside Park bandstand',
+      notes:'Open to everyone, so bring friends and a warm coat. Hot chocolate from 3:30.', by:'grace', reminder:'1d', ask:false, deadline:null,
+      rsvp:{}, duties:[
+        {roleId:'vocals', count:2, seats:[{p:'maria', status:'confirmed'},{p:'hannah', status:'pending'}]},
+        {roleId:'acoustic', count:1, seats:[{p:'sam', status:'confirmed'}]},
+      ]},
     {id:'w1', gid:'worship', title:'Christmas volunteer dinner', date:'2026-12-18', time:'18:30', location:'Fellowship Hall',
-      notes:'A thank-you dinner for everyone who served this year. Dinner is provided.', by:'grace', reminder:'1d', deadline:null,
+      notes:'A thank-you dinner for everyone who served this year. Dinner is provided, so numbers went to the caterer on Nov 17.', by:'grace', reminder:'1d', ask:true, deadline:{date:'2026-11-17', time:'17:00'},
       rsvp:{jordan:'going', grace:'going', maria:'going', hannah:'going', ben:'cant'}, duties:[]},
   ];
 }
@@ -733,6 +750,7 @@ function seedSlots(){
 function seedActivity(){
   return [
     {day:'Today', t:'7:45 AM', gid:'gnc', ev:'gn1', icon:'mail', tone:'info', kind:'event', unread:true, html:'<b>Sam Carter</b> invited everyone to <b>Game Night</b> on Fri, Nov 20. RSVPs close tonight at 9:00 PM.'},
+    {day:'Yesterday', t:'11:20 AM', gid:'worship', ev:'w2', icon:'calendar', tone:'info', kind:'event', unread:false, html:'<b>Grace Okafor</b> added <b>Carols in the park</b> on Sun, Dec 13. No RSVP needed.'},
     {day:'Yesterday', t:'9:10 PM', gid:'gnc', ev:'gn3', icon:'clipboardCheck', tone:'info', kind:'event', unread:true, html:'<b>Leah Nguyen</b> created <b>Friendsgiving potluck</b> on Sat, Dec 5. <b>You’re on Bring food</b> with Ana Silva.'},
     {day:'Today', t:'1h ago', gid:'hosp', icon:'repeat', tone:'bad', kind:'coverage', unread:true, html:'<b>Priya Shah</b> can’t make <b>Greeter</b> on Sun, Dec 6. Coverage Request sent.'},
     {day:'Today', t:'8:00 AM', gid:'hosp', icon:'alert', tone:'bad', kind:'coverage', unread:true, html:'Nobody volunteered for your <b>Greeter</b> turn on Sun, Nov 22. Please find a replacement.'},
@@ -748,12 +766,18 @@ function seedActivity(){
 const SERVED = {};
 function served(gid, pid){ const k = gid+pid; if (!(k in SERVED)) { let h=0; for (const c of k) h=(h*17+c.charCodeAt(0))%97; SERVED[k] = 2 + (h % 4); } return SERVED[k]; }
 
+/* Home sections remember whether they're collapsed, per device (same rule as the app's "Needs your attention").
+   Anything but "collapsed" means expanded; storage errors fall back to expanded. */
+const COLLAPSE_KEY = k => `rotaloop.home.${k}Collapsed`;
+function loadCollapsed(k){ try { return localStorage.getItem(COLLAPSE_KEY(k)) === 'collapsed'; } catch (_) { return false; } }
+function saveCollapsed(k, v){ try { localStorage.setItem(COLLAPSE_KEY(k), v ? 'collapsed' : 'expanded'); } catch (_) {} }
 function initialState(){
   return {
     persona:'admin', tab:'home', stack:[], sheet:null, onb:null,
     groups: seedGroups(), slots: seedSlots(), activity: seedActivity(), overrides:{}, debts:[],
     notices:[],
     events: seedEvents(), evPtr:{'gnc|host':1, 'gnc|food':2, 'gnc|drinks':1, 'gnc|games':0}, evExpand:{}, draft:null,
+    collapsed:{attention:loadCollapsed('attention'), events:loadCollapsed('events')},
     homeFilter:'all', sched:{view:'list', scope:'me', month:'2026-11', sel:null},
     actFilter:'all',
     timeOff:[{id:'t1', label:'Thu, Dec 31 – Sat, Jan 2', dates:['2026-12-31','2027-01-01','2027-01-02'], repeat:'none', scope:['all'], note:'New Year trip'}],
@@ -893,8 +917,13 @@ function headcount(ev){
 }
 const hcText = h => `${h.going.length} going · ${h.cant.length} can’t · ${h.none.length} haven’t answered`;
 const canManage = ev => ev.by === ME || isAdmin(G(ev.gid));
+/* "Ask who's coming" is opt-in per Event. Off = no Going / Can't, no headcount, no nudges. */
+const asks = ev => ev.ask !== false;
+/* Still waiting on my answer? (RSVP on, no duty, not answered, not past the deadline) */
+const awaitsMe = ev => asks(ev) && !mySeat(ev) && !ev.rsvp[ME] && deadlineState(ev).kind !== 'closed';
+/* A deadline only exists when it was turned on. No deadline = no deadline state anywhere (kind 'none'). */
 function deadlineState(ev){
-  if (!ev.deadline) return {kind:'open', label:'RSVPs open', short:'Open', sub:'No deadline. Answer any time before the Event.'};
+  if (!asks(ev) || !ev.deadline) return {kind:'none', label:'', short:'', sub:''};
   const dl = ev.deadline, mins = minsUntil(dl.date, dl.time), when = `${fShort(dl.date)}, ${fTime(dl.time)}`;
   if (mins <= 0) return {kind:'closed', label:'RSVPs closed', short:'RSVPs closed', sub:`Closed ${when}.`};
   if (mins < 48 * 60) { const h = Math.max(1, Math.round(mins / 60)); const day = daysUntil(dl.date) === 0 ? 'Tonight' : 'Tomorrow';
@@ -928,11 +957,22 @@ function evDutyCard(ev){
       <div class="row" style="gap:10px"><span class="evic">${ic('clipboardCheck',20,2)}</span><span class="ovl grow">Your duty · ${fShort(ev.date)}</span>${seatPill(s)}</div>
       <div class="evt">You’re on ${esc(r.name)}</div>
       <div class="evs">${esc(ev.title)} · ${fTime(ev.time)} · ${esc(g.name)}</div></div>
-    ${pending ? `<div class="btn-row" style="margin-top:14px"><button class="btn duty-yes" data-a="ev-duty-confirm" data-id="${ev.id}">${ic('check',18,2.25)}Confirm</button><button class="btn duty-no" data-a="ev-duty-decline" data-id="${ev.id}">Can’t make it</button></div>`
-      : `<div class="evs" style="margin-top:12px;display:flex;align-items:center;gap:6px">${ic('checkCircle',16,2)}Confirmed. You’re counted as going.</div>`}
+    ${pending ? `<div class="btn-row" style="margin-top:14px"><button class="btn duty-yes" data-a="ev-duty-confirm" data-id="${ev.id}">${ic('check',18,2.25)}Confirm</button><button class="btn duty-no" data-a="ev-duty-decline" data-id="${ev.id}">Can’t make it</button></div>
+        ${asks(ev) ? `<div class="answer-once">${ic('info',15,2)}Confirming also marks you as going.</div>` : ''}`
+      : `<div class="evs" style="margin-top:12px;display:flex;align-items:center;gap:6px">${ic('checkCircle',16,2)}${asks(ev) ? 'Confirmed. You’re counted as going.' : 'Confirmed. Thank you!'}</div>`}
+  </div>`;
+}
+/* RSVP off and no duty: a quiet outlined card with just the details. No answer, no headcount. */
+function evInfoCard(ev){
+  const g = G(ev.gid);
+  return `<div class="evrsvp fade-in tap" data-a="open-event" data-id="${ev.id}" role="button" tabindex="0">
+      <div class="row" style="gap:10px"><span class="evic">${ic('calendar',18)}</span><span class="ovl grow">Event · ${fShort(ev.date)}</span></div>
+      <div class="evt">${esc(ev.title)}, ${fDow(ev.date)}</div>
+      <div class="evs ellip">${esc(g.name)} · ${fTime(ev.time)}${ev.location ? ` · ${esc(ev.location)}` : ''}</div>
   </div>`;
 }
 function evInviteCard(ev){
+  if (!asks(ev)) return evInfoCard(ev);
   const g = G(ev.gid), a = ev.rsvp[ME], dl = deadlineState(ev), h = headcount(ev);
   const title = a ? `${esc(ev.title)}, ${fDow(ev.date)}` : `${esc(ev.title)}, ${fDow(ev.date)}. Are you coming?`;
   return `<div class="evrsvp fade-in"><div class="tap" data-a="open-event" data-id="${ev.id}" role="button" tabindex="0">
@@ -952,6 +992,8 @@ function evSchedCard(ev){
     return `<div class="card sitem duty tap" data-a="open-event" data-id="${ev.id}" role="button" tabindex="0">${datebox(ev.date, true)}
       <div class="grow"><div class="dlabel">${ic('clipboardCheck',14,2.25)}Your duty</div><div class="bb">${esc(r.name)}</div><div class="small muted ellip">${dot}${esc(ev.title)} · ${esc(g.name)}</div>
       <div style="margin-top:8px">${seatPill(seat.s)}</div></div><span class="chev">${ic('chevR',20)}</span></div>`; }
+  if (!asks(ev)) return `<div class="sitem evrsvp tap" data-a="open-event" data-id="${ev.id}" role="button" tabindex="0">${datebox(ev.date, false, 'rsvp')}
+    <div class="grow"><div class="ilabel">${ic('calendar',14,2)}Event</div><div class="b">${esc(ev.title)}</div><div class="small muted ellip">${dot}${esc(g.name)} · ${fTime(ev.time)}</div></div><span class="chev">${ic('chevR',20)}</span></div>`;
   const h = headcount(ev), dl = deadlineState(ev);
   return `<div class="sitem evrsvp tap" data-a="open-event" data-id="${ev.id}" role="button" tabindex="0">${datebox(ev.date, false, 'rsvp')}
     <div class="grow"><div class="ilabel">${ic('mail',14,2)}Invite</div><div class="b">${esc(ev.title)}</div><div class="small muted ellip">${dot}${esc(g.name)} · ${fTime(ev.time)}</div>
@@ -963,10 +1005,15 @@ const HC = {going:['Going','checkCircle'], cant:['Can’t','xCircle'], none:['Ha
 function hcRow(ev, key, list){
   const open = !!S.evExpand[ev.id + key], [label, icon] = HC[key];
   const seatOf = p => { for (const d of ev.duties) if (d.seats.some(s => s.p === p)) return role(G(ev.gid), d.roleId).name; return ''; };
+  /* After the deadline only the creator and the group's Admins can change answers, including other people's. */
+  const edit = deadlineState(ev).kind === 'closed' && canManage(ev);
+  const change = p => { if (!edit || p === ME || seatOf(p)) return '';
+    const v = key === 'going' ? 'cant' : 'going';
+    return `<button class="btn sm secondary" data-a="ev-set-answer" data-id="${ev.id}" data-p="${p}" data-v="${v}" aria-label="Mark ${esc(pname(p))} as ${v === 'going' ? 'going' : 'can’t'}">${v === 'going' ? 'Mark going' : 'Mark can’t'}</button>`; };
   return `<button class="li tap" style="width:100%" aria-expanded="${open}" data-a="ev-expand" data-id="${ev.id}" data-v="${key}"><span class="hc-ic ${key}">${ic(icon,20)}</span>
       <div class="grow"><div class="t">${label} · ${list.length}</div></div><span class="av-stack">${list.slice(0,4).map(p => avatar(p,'sm')).join('')}</span>
       <span class="chev" style="transform:rotate(${open ? 180 : 0}deg);transition:transform .2s">${ic('chevDown',20)}</span></button>
-    ${open ? `<div class="hc-names">${list.length ? list.map(p => { const sn = seatOf(p); return `<div class="hc-name">${avatar(p,'sm')}<div class="grow" style="min-width:0"><div class="small b ellip">${esc(nameMe(p))}</div>${sn ? `<div class="xs muted ellip">${esc(sn)}</div>` : ''}</div></div>`; }).join('') : '<div class="xs muted">Nobody yet</div>'}</div>` : ''}`;
+    ${open ? `<div class="hc-names ${edit ? 'edit' : ''}">${list.length ? list.map(p => { const sn = seatOf(p); return `<div class="hc-name">${avatar(p,'sm')}<div class="grow" style="min-width:0"><div class="small b ellip">${esc(nameMe(p))}</div>${sn ? `<div class="xs muted ellip">${esc(sn)}</div>` : ''}</div>${change(p)}</div>`; }).join('') : '<div class="xs muted">Nobody yet</div>'}</div>` : ''}`;
 }
 function dutyBlock(ev, d){
   const g = G(ev.gid), r = role(g, d.roleId), filled = d.seats.filter(s => s.p).length;
@@ -980,37 +1027,47 @@ function dutyBlock(ev, d){
 function screenEvent(route){
   const ev = EV(route.id);
   if (!ev) return navbar('Event') + `<div class="empty">This Event was removed.</div>`;
-  const g = G(ev.gid), dl = deadlineState(ev), h = headcount(ev), seat = mySeat(ev), mgr = canManage(ev), a = ev.rsvp[ME];
+  const g = G(ev.gid), ask = asks(ev), dl = deadlineState(ev), h = headcount(ev), seat = mySeat(ev), mgr = canManage(ev), a = ev.rsvp[ME];
   const closed = dl.kind === 'closed', locked = closed && !mgr;
   const kv = (icon, k, v) => `<div class="kv" style="align-items:flex-start"><span class="li-ic">${ic(icon,20)}</span><div class="grow"><div class="k">${k}</div><div class="v" style="font-weight:600">${v}</div></div></div>`;
   let answer;
   if (seat) {
+    /* Answer once: with RSVP on, the duty answer is also the RSVP (Confirm = Going, Can't make it = Can't). */
     const r = role(g, seat.d.roleId), pending = seat.s.status === 'pending';
+    const with_ = seat.d.count > 1 ? `With ${seat.d.seats.filter(s => s.p && s.p !== ME).map(s => first(s.p)).join(', ') || 'one more person'}.` : '';
     answer = `<div class="evduty" style="margin-top:16px;box-shadow:none">
       <div class="row" style="gap:10px"><span class="evic">${ic('clipboardCheck',20,2)}</span><span class="ovl grow">Your duty</span>${seatPill(seat.s)}</div>
       <div class="evt">You’re on ${esc(r.name)}</div>
-      <div class="evs">${seat.d.count > 1 ? `With ${seat.d.seats.filter(s => s.p && s.p !== ME).map(s => first(s.p)).join(', ') || 'one more person'}. ` : ''}Confirming your duty counts as Going.</div>
+      ${with_ ? `<div class="evs">${with_}</div>` : ''}
       ${pending ? `<div class="btn-row" style="margin-top:14px"><button class="btn duty-yes" data-a="ev-duty-confirm" data-id="${ev.id}">${ic('check',18,2.25)}Confirm</button><button class="btn duty-no" data-a="ev-duty-decline" data-id="${ev.id}">Can’t make it</button></div>`
-        : `<button class="btn sm duty-no" style="margin-top:12px" data-a="ev-duty-decline" data-id="${ev.id}">I can’t make it after all</button>`}</div>`;
-  } else {
+        : `<button class="btn sm duty-no" style="margin-top:12px" data-a="ev-duty-decline" data-id="${ev.id}">I can’t make it after all</button>`}
+      ${ask ? `<div class="answer-once">${ic('info',15,2)}${pending ? 'Confirming also marks you as going. Can’t make it marks you as can’t.' : 'You’re counted as going. No separate RSVP needed.'}</div>` : ''}</div>`;
+  } else if (ask) {
     answer = `<div class="field-label">Are you coming?</div>
       <div class="btn-row"><button class="btn lg secondary rsvp-btn going" aria-pressed="${a === 'going'}" data-a="ev-rsvp" data-id="${ev.id}" data-v="going" ${locked ? 'disabled' : ''}>${ic('check',20,2.25)}Going</button>
         <button class="btn lg secondary rsvp-btn cant" aria-pressed="${a === 'cant'}" data-a="ev-rsvp" data-id="${ev.id}" data-v="cant" ${locked ? 'disabled' : ''}>${ic('x',20,2.25)}Can’t</button></div>
-      <div class="xs muted" style="margin-top:8px">${locked ? `RSVPs are closed. If your plans change, tell ${esc(first(ev.by))}.` : closed ? 'RSVPs are closed for everyone else, but you can still change answers.' : a ? 'You can change your answer until RSVPs close.' : 'Just Going or Can’t. You can change it later.'}</div>`;
+      <div class="xs muted" style="margin-top:8px">${locked ? `RSVPs are closed. Only ${esc(first(ev.by))} and the group’s Admins can change answers now, so if your plans change, tell ${esc(first(ev.by))}.`
+        : closed ? 'RSVPs are closed. Only the creator and the group’s Admins can change answers now, so you can still change yours and anyone else’s (in Who’s coming).'
+        : dl.kind !== 'none' ? (a ? 'You can change your answer until RSVPs close.' : 'Just Going or Can’t. You can change it until RSVPs close.')
+        : a ? 'You can change your answer any time.' : 'Just Going or Can’t. You can change it later.'}</div>`;
+  } else {
+    answer = `<div class="note" style="margin-top:16px;background:var(--neutral-tint)">${ic('info',20)}<div class="grow">No RSVPs for this Event. Everyone in ${esc(g.name)} can see it${ev.duties.length ? ', and the Responsibilities below are filled from each team' : ''}.</div></div>`;
   }
   const bar = h.total ? `<div class="hc-bar" aria-hidden="true"><i class="g" style="width:${h.going.length / h.total * 100}%"></i><i class="c" style="width:${h.cant.length / h.total * 100}%"></i></div>` : '';
+  const seatCount = ev.duties.reduce((n, d) => n + d.seats.filter(s => s.p).length, 0);
+  const remindTo = ask ? `It goes to the ${h.going.length} going${closed ? '' : ` and nudges the ${h.none.length} who haven’t answered`}.` : `It goes to everyone in ${esc(g.name)}${seatCount ? `, and the ${seatCount} with a Responsibility are reminded of it` : ''}. No RSVP nudges.`;
   const manage = mgr ? `<div class="section"><div class="sec-head"><h2>Manage</h2><span class="pill admin">${ic(ev.by === ME ? 'pencil' : 'shield',13,2)}${ev.by === ME ? 'You created this' : 'Admin'}</span></div><div class="pad">
-      <div class="note">${ic('bell',20)}<div class="grow"><b>Reminder: ${esc(REMIND_PHRASE[ev.reminder])}.</b> It goes to the ${h.going.length} going and nudges the ${h.none.length} who haven’t answered.</div></div>
+      <div class="note">${ic('bell',20)}<div class="grow"><b>Reminder: ${esc(REMIND_PHRASE[ev.reminder])}.</b> ${remindTo}</div></div>
       <div class="stack" style="margin-top:12px;gap:8px">
         <button class="btn primary block" data-a="ev-remind" data-id="${ev.id}">${ic('send',18)}Send reminder now</button>
         <button class="btn secondary block" data-a="ev-edit" data-id="${ev.id}">${ic('pencil',18)}Edit Event</button>
         <button class="btn quiet block" style="color:var(--danger-text)" data-a="ev-remove" data-id="${ev.id}">${ic('trash',18)}Remove Event</button></div>
       <div class="xs muted" style="margin-top:8px">${ev.by === ME ? `Admins of ${esc(g.name)} can also edit or remove it.` : `${esc(pname(ev.by))} created it. You’re an Admin of ${esc(g.name)}, so you can edit or remove any Event in it.`}</div></div></div>`
-    : `<div class="pad" style="margin-top:20px"><div class="note">${ic('bell',20)}<div class="grow">${a === 'going' || seat ? `We’ll remind you ${esc(REMIND_PHRASE[ev.reminder])}.` : `Reminder is set for ${esc(REMIND_PHRASE[ev.reminder])}. If you haven’t answered by then, we’ll nudge you.`} Only ${esc(first(ev.by))} and the group’s Admins can change this Event.</div></div></div>`;
+    : `<div class="pad" style="margin-top:20px"><div class="note">${ic('bell',20)}<div class="grow">${!ask || a === 'going' || seat ? `We’ll remind you ${esc(REMIND_PHRASE[ev.reminder])}.` : `Reminder is set for ${esc(REMIND_PHRASE[ev.reminder])}. If you haven’t answered by then, we’ll nudge you.`} Only ${esc(first(ev.by))} and the group’s Admins can change this Event.</div></div></div>`;
   return navbar('Event') + `
-    <div class="card dhead"><div class="row">${gtile(g,'sm')}<span class="b small muted grow ellip">${esc(g.name)}</span>${seat ? `<span class="pill info">${ic('clipboardCheck',15,2)}You have a duty</span>` : `<span class="pill neutral">${ic('mail',15,2)}Invite</span>`}</div>
+    <div class="card dhead"><div class="row">${gtile(g,'sm')}<span class="b small muted grow ellip">${esc(g.name)}</span>${seat ? `<span class="pill info">${ic('clipboardCheck',15,2)}You have a duty</span>` : ask ? `<span class="pill neutral">${ic('mail',15,2)}Invite</span>` : `<span class="pill neutral">${ic('calendar',15,2)}Event</span>`}</div>
       <h1>${esc(ev.title)}</h1><div class="b">${fLong(ev.date)}</div><div class="small muted">${fTime(ev.time)} · ${rel(ev.date)}</div>
-      <div class="note ${dl.kind === 'soon' ? 'warn' : ''}" style="margin-top:14px;${closed ? 'background:var(--neutral-tint)' : ''}">${ic(closed ? 'lock' : 'clock',20)}<div class="grow"><b>${esc(dl.label)}.</b> ${esc(dl.sub)}</div></div>
+      ${dl.kind !== 'none' ? `<div class="note ${dl.kind === 'soon' ? 'warn' : ''}" style="margin-top:14px;${closed ? 'background:var(--neutral-tint)' : ''}">${ic(closed ? 'lock' : 'clock',20)}<div class="grow"><b>${esc(dl.label)}.</b> ${esc(dl.sub)}</div></div>` : ''}
       ${answer}
       <div style="margin-top:12px">
         ${ev.location ? kv('mapPin','Where', esc(ev.location)) : ''}
@@ -1018,9 +1075,10 @@ function screenEvent(route){
         ${kv('user','Created by', esc(nameMe(ev.by)))}
       </div>
     </div>
-    <div class="section"><div class="sec-head"><h2>Who’s coming</h2><span class="xs muted b">Everyone in the group · ${h.total}</span></div><div class="pad"><div class="card" style="padding:16px 16px 6px">
+    ${ask ? `<div class="section"><div class="sec-head"><h2>Who’s coming</h2><span class="xs muted b">Everyone in the group · ${h.total}</span></div><div class="pad"><div class="card" style="padding:16px 16px 6px">
       <div class="bb" style="font-size:17px;line-height:24px">${hcText(h)}</div>${bar}</div>
-      <div class="list" style="margin-top:8px">${['going','cant','none'].map(k => hcRow(ev, k, h[k])).join('')}</div></div></div>
+      <div class="list" style="margin-top:8px">${['going','cant','none'].map(k => hcRow(ev, k, h[k])).join('')}</div>
+      ${closed && mgr ? `<div class="xs muted" style="margin-top:8px;display:flex;gap:6px;align-items:flex-start">${ic('lock',14,2)}<span>RSVPs are closed, so only ${ev.by === ME ? 'you' : esc(first(ev.by))} and the group’s Admins can change answers. Open a row to change someone’s.</span></div>` : ''}</div></div>` : ''}
     ${ev.duties.length ? `<div class="section"><div class="sec-head"><h2>Responsibilities</h2><span class="xs muted b">Filled from each team</span></div><div class="stack pad">${ev.duties.map(d => dutyBlock(ev, d)).join('')}</div></div>` : ''}
     ${manage}
     <div class="spacer"></div>`;
@@ -1030,11 +1088,11 @@ function screenEvent(route){
 function openEventForm(gid, fromGroup){
   const gnc = myGroups().find(g => g.id === 'gnc');
   S.draft = {id:null, gid: gid || (gnc ? gnc.id : myGroups()[0].id), fromGroup:!!fromGroup, title:'', date:'2026-11-27', time:'19:00', location:'', notes:'',
-    duties:[], reminder:'1d', deadlineOn:false, deadline:'1d', keepDeadline:null, newResp:''};
+    duties:[], reminder:'1d', ask:true, deadlineOn:false, deadline:'1d', keepDeadline:null, newResp:''};
   push({name:'event-form'});
 }
 function draftDeadline(d){
-  if (!d.deadlineOn) return null;
+  if (!d.ask || !d.deadlineOn) return null;
   if (d.deadline === 'keep') return d.keepDeadline;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date || '')) return null;
   return {date:addDays(d.date, -DL_DAYS[d.deadline]), time:d.time || '19:00'};
@@ -1074,14 +1132,17 @@ function screenEventForm(){
     <div class="row" style="gap:8px;margin-top:10px"><input type="text" data-model="draft.newResp" value="${esc(d.newResp)}" placeholder="New Responsibility, e.g. Bring dessert" aria-label="New Responsibility"><button class="btn secondary" style="flex:none" data-a="draft-duty-new">Add</button></div>
 
     <div class="field-label">Reminder</div><div class="chips">${REMINDERS.map(([v,l]) => `<button class="chip" aria-pressed="${d.reminder === v}" data-a="draft-reminder" data-v="${v}">${l}</button>`).join('')}</div>
-    <div class="xs muted" style="margin-top:8px">Reminds everyone who’s going, and nudges anyone who hasn’t answered.</div>
+    <div class="xs muted" style="margin-top:8px">${d.ask ? 'Reminds everyone who’s going, and nudges anyone who hasn’t answered.' : `Reminds everyone in ${esc(g.name)}${d.duties.length ? ' and the people with a Responsibility' : ''}.`}</div>
 
-    <div class="list" style="margin-top:20px"><div class="set-row"><div class="grow"><div class="b small">RSVP deadline</div><div class="xs muted">Optional. After it, answers can’t change.</div></div><button class="switch" role="switch" aria-checked="${d.deadlineOn}" aria-label="RSVP deadline" data-a="draft-deadline-toggle"></button></div></div>
-    ${d.deadlineOn ? `<div class="chips" style="margin-top:10px">${d.keepDeadline ? `<button class="chip" aria-pressed="${d.deadline === 'keep'}" data-a="draft-deadline" data-v="keep">Keep ${fMD(d.keepDeadline.date)}, ${fTime(d.keepDeadline.time)}</button>` : ''}${DEADLINES.map(([v,l]) => `<button class="chip" aria-pressed="${d.deadline === v}" data-a="draft-deadline" data-v="${v}">${l}</button>`).join('')}</div>
+    <div class="list" style="margin-top:20px">
+      <div class="set-row"><div class="grow"><div class="b small">Ask who’s coming</div><div class="xs muted">${d.ask ? 'Everyone answers Going or Can’t, and you see a headcount.' : 'Off: no Going or Can’t and no headcount. The Event just shows its details and any Responsibilities.'}</div></div><button class="switch" role="switch" aria-checked="${d.ask}" aria-label="Ask who’s coming" data-a="draft-ask-toggle"></button></div>
+      ${d.ask ? `<div class="set-row"><div class="grow"><div class="b small">Set an RSVP deadline</div><div class="xs muted">Optional. After it, only you and the group’s Admins can change answers.</div></div><button class="switch" role="switch" aria-checked="${d.deadlineOn}" aria-label="Set an RSVP deadline" data-a="draft-deadline-toggle"></button></div>` : ''}
+    </div>
+    ${d.ask && d.deadlineOn ? `<div class="chips" style="margin-top:10px">${d.keepDeadline ? `<button class="chip" aria-pressed="${d.deadline === 'keep'}" data-a="draft-deadline" data-v="keep">Keep ${fMD(d.keepDeadline.date)}, ${fTime(d.keepDeadline.time)}</button>` : ''}${DEADLINES.map(([v,l]) => `<button class="chip" aria-pressed="${d.deadline === v}" data-a="draft-deadline" data-v="${v}">${l}</button>`).join('')}</div>
       <div class="xs b" style="margin-top:8px;color:var(--text-2)" id="dlHint">${esc(draftDeadlineHint(d))}</div>` : ''}
 
-    <div class="note" style="margin-top:20px">${ic('users',20)}<div class="grow">${editing ? `Everyone in ${esc(g.name)} is told what changed.` : `Everyone in ${esc(g.name)} (${n} people) is invited and can answer Going or Can’t.`}</div></div>
-    <button class="btn lg primary block" style="margin-top:16px" id="evSave" data-a="ev-save" ${ok ? '' : 'disabled'}>${editing ? `${ic('check',20,2.25)}Save changes` : `${ic('send',20)}Create and invite`}</button>
+    <div class="note" style="margin-top:20px">${ic('users',20)}<div class="grow">${editing ? `Everyone in ${esc(g.name)} is told what changed.` : d.ask ? `Everyone in ${esc(g.name)} (${n} people) is invited and can answer Going or Can’t.` : `Everyone in ${esc(g.name)} (${n} people) is told about it. Nobody is asked to answer.`}</div></div>
+    <button class="btn lg primary block" style="margin-top:16px" id="evSave" data-a="ev-save" ${ok ? '' : 'disabled'}>${editing ? `${ic('check',20,2.25)}Save changes` : d.ask ? `${ic('send',20)}Create and invite` : `${ic('check',20,2.25)}Create Event`}</button>
     <button class="btn quiet block" style="margin-top:4px" data-a="back">Cancel</button>
     <div class="spacer"></div></div>`;
 }
@@ -1174,7 +1235,7 @@ function groupCard(g){
   let lead = '';
   if (next) { const pr = g.roles.find(r => r.primary); const sl = next.slots.find(x => x.roleId === pr.id); lead = `${pr.name}: ${whoLabel(st(sl))}`; }
   const mine = mySlots(true).find(sl => sl.gid === g.id);
-  const evs = groupEvents(g), nextEv = evs[0], dutyEv = evs.find(e => mySeat(e)), askEv = evs.find(e => !mySeat(e) && !e.rsvp[ME] && deadlineState(e).kind !== 'closed');
+  const evs = groupEvents(g), nextEv = evs[0], dutyEv = evs.find(e => mySeat(e)), askEv = evs.find(awaitsMe);
   const right = mine ? (() => { const s = st(mine); return `<span class="xs muted b">You · ${fMD(mine.date)}</span>${pill(s.status, s.status==='covered'?'Covering':null)}`; })()
     : dutyEv ? `<span class="xs muted b">You · ${fMD(dutyEv.date)}</span>${seatPill(mySeat(dutyEv).s)}`
     : askEv ? `<span class="xs muted b">${esc(askEv.title)}</span>${answerPill(null)}`
@@ -1211,22 +1272,36 @@ function groupsList(){
     <div class="stack pad">${list.map(g => isAdmin(g) ? managedCard(g) : groupCard(g)).join('') || `<div class="caught" style="margin:0">${ic('checkCircle',20)}Nothing needs attention in the groups you manage.</div>`}</div>`;
 }
 /* Duties (filled) and invites (outlined) side by side, in date order. */
+/* Collapsible Home section header: title + count + chevron are one button. The count stays visible when collapsed. */
+function collapseHead(key, title, count, countCls, right=''){
+  const open = !S.collapsed[key], noun = key === 'events' ? ['event','events'] : ['item','items'];
+  const label = `${title}, ${count} ${count === 1 ? noun[0] : noun[1]}`;
+  return `<div class="sec-head"><h2><button class="sec-toggle" data-a="home-collapse" data-v="${key}" aria-expanded="${open}" aria-label="${esc(label)}" title="${open ? 'Hide' : 'Show'} ${esc(title.toLowerCase())}">
+      ${esc(title)}${count ? `<span class="count ${countCls}">${count}</span>` : ''}<span class="chev">${ic('chevDown',20)}</span></button></h2>${right}</div>`;
+}
+function hiddenLine(count, noun){
+  return `<div class="sec-hidden">${count === 1 ? `1 ${noun} hidden. Tap the heading to show it.` : `${count} ${noun}s hidden. Tap the heading to show them.`}</div>`;
+}
 function eventsSection(){
   const evs = myEvents().filter(e => daysUntil(e.date) <= 30);
   if (!evs.length) return '';
-  const ask = evs.filter(e => !mySeat(e) && !e.rsvp[ME] && deadlineState(e).kind !== 'closed').length;
-  return `<div class="section"><div class="sec-head"><h2>Events coming up</h2><span class="xs muted b">${ask ? `${ask} to answer` : ''}</span></div>
-    <div class="stack pad">${evs.map(e => mySeat(e) ? evDutyCard(e) : evInviteCard(e)).join('')}</div></div>`;
+  const ask = evs.filter(awaitsMe).length;
+  return `<div class="section">${collapseHead('events', 'Events coming up', evs.length, 'quiet', `<span class="xs muted b">${ask ? `${ask} to answer` : ''}</span>`)}
+    ${S.collapsed.events ? hiddenLine(evs.length, 'event') : `<div class="stack pad">${evs.map(e => mySeat(e) ? evDutyCard(e) : evInviteCard(e)).join('')}</div>`}</div>`;
+}
+function attentionSection(){
+  const att = attentionItems();
+  const body = S.collapsed.attention ? (att.length ? hiddenLine(att.length, 'item') : `<div class="sec-hidden">You’re all caught up.</div>`)
+    : att.length ? `<div class="stack pad">${att.map(a => a.html).join('')}</div>` : `<div class="caught">${ic('checkCircle',20)}You’re all caught up.</div>`;
+  return `<div class="section">${collapseHead('attention', 'Needs your attention', att.length, '')}${body}</div>`;
 }
 function screenHome(){
-  const att = attentionItems();
   return `<div class="greet"><div class="grow"><div class="overline">${fLong(TODAY_ISO)}</div><h1 class="hello">Good morning, ${esc(first(ME))}</h1></div>
       <button class="icon-btn ghost" data-a="event-new" aria-label="Create an Event">${ic('plus',26)}</button>
       <button data-a="tab" data-v="profile" aria-label="Profile">${avatar(ME,'')}</button></div>
     ${heroCard()}
     ${eventsSection()}
-    <div class="section"><div class="sec-head"><h2>Needs your attention ${att.length?`<span class="count">${att.length}</span>`:''}</h2></div>
-      ${att.length ? `<div class="stack pad">${att.map(a => a.html).join('')}</div>` : `<div class="caught">${ic('checkCircle',20)}You’re all caught up.</div>`}</div>
+    ${attentionSection()}
     <div class="section"><div class="sec-head"><h2>Your groups</h2><button class="link" data-a="tab" data-v="groups">See all</button></div>${groupsList()}</div>
     <div class="section"><div class="quick">
       <button class="card tap" data-a="open-availability"><span class="li-ic">${ic('calOff',20)}</span><span class="b small">Add Time Off</span></button>
@@ -1650,7 +1725,7 @@ function sheetHTML(){
     const ev = EV(sh.id); if (!ev) return '';
     const g = G(ev.gid), h = headcount(ev), seats = ev.duties.reduce((n, d) => n + d.seats.filter(s => s.p).length, 0);
     return sheetWrap(`<div class="overline">${esc(g.name)} · ${fShort(ev.date)}</div><h2>Remove ${esc(ev.title)}?</h2>
-      <div class="small muted">Everyone invited (${h.total} people) is told it’s off${seats ? `, and the ${seats} people with a Responsibility are released` : ''}. This can’t be undone.</div>`,
+      <div class="small muted">${asks(ev) ? 'Everyone invited' : `Everyone in ${esc(g.name)}`} (${h.total} people) is told it’s off${seats ? `, and the ${seats} people with a Responsibility are released` : ''}. This can’t be undone.</div>`,
       `<button class="btn lg danger block" data-a="ev-remove-confirm">${ic('trash',20)}Remove Event</button><button class="btn quiet block" data-a="sheet-close">Keep it</button>`);
   }
   return '';
@@ -1954,6 +2029,8 @@ const A = {
   'event-new'(el){ openEventForm(el.dataset.g, !!el.dataset.g); },
   'ev-rsvp'(el){
     const ev = EV(el.dataset.id), v = el.dataset.v, g = G(ev.gid);
+    if (!asks(ev)) return;
+    if (deadlineState(ev).kind === 'closed' && !canManage(ev)) { toast(`RSVPs are closed. Tell ${first(ev.by)} if your plans change.`, 'lock'); return; }
     if (ev.rsvp[ME] === v) { render(true); return; }
     ev.rsvp[ME] = v;
     log(g.id, v === 'going' ? 'checkCircle' : 'xCircle', v === 'going' ? 'ok' : 'neutral', 'event', `<b>You</b> ${v === 'going' ? 'are going to' : 'can’t make'} <b>${esc(ev.title)}</b> on ${fShort(ev.date)}.`);
@@ -1965,14 +2042,14 @@ const A = {
     const ev = EV(el.dataset.id), seat = mySeat(ev), r = role(G(ev.gid), seat.d.roleId);
     seat.s.status = 'confirmed'; ev.rsvp[ME] = 'going';
     log(ev.gid, 'clipboardCheck', 'ok', 'event', `<b>You</b> confirmed <b>${esc(r.name)}</b> for ${esc(ev.title)} on ${fShort(ev.date)}.`); S.activity[0].ev = ev.id;
-    render(true); toast(`Confirmed ${r.name} for ${ev.title}. You’re counted as going.`);
+    render(true); toast(asks(ev) ? `Confirmed ${r.name} for ${ev.title}. You’re also marked as going.` : `Confirmed ${r.name} for ${ev.title}. Thank you!`);
   },
   'ev-duty-decline'(el){
     const ev = EV(el.dataset.id), g = G(ev.gid), seat = mySeat(ev), r = role(g, seat.d.roleId);
     seat.s.p = null; seat.s.was = ME; seat.s.status = 'open'; ev.rsvp[ME] = 'cant';
     const n = r.roster.filter(p => p !== ME && !ev.duties.some(d => d.seats.some(s => s.p === p))).length;
     log(g.id, 'repeat', 'bad', 'event', `<b>You</b> can’t make <b>${esc(r.name)}</b> for ${esc(ev.title)}. Asked the ${esc(r.name)} team (${n} people).`); S.activity[0].ev = ev.id;
-    render(true); toast(`Asked the rest of the ${r.name} team (${n} people) to take it.`, 'send');
+    render(true); toast(`Asked the rest of the ${r.name} team (${n} people) to take it.${asks(ev) ? ' You’re marked as can’t.' : ''}`, 'send');
   },
   'ev-duty-take'(el){
     const ev = EV(el.dataset.id), d = ev.duties.find(x => x.roleId === el.dataset.v), s = d.seats[+el.dataset.i], r = role(G(ev.gid), d.roleId);
@@ -1982,6 +2059,9 @@ const A = {
   },
   'ev-remind'(el){
     const ev = EV(el.dataset.id), h = headcount(ev), closed = deadlineState(ev).kind === 'closed';
+    if (!asks(ev)) { const g = G(ev.gid);
+      log(ev.gid, 'bell', 'info', 'event', `<b>You</b> sent a reminder for <b>${esc(ev.title)}</b> to everyone in ${esc(g.name)}.`); S.activity[0].ev = ev.id;
+      render(true); toast(`Reminder sent to everyone in ${g.name} (${h.total - 1} people).`, 'send'); return; }
     const going = h.going.filter(p => p !== ME).length, nudge = closed ? 0 : h.none.length;
     log(ev.gid, 'bell', 'info', 'event', `<b>You</b> sent a reminder for <b>${esc(ev.title)}</b> to ${going} going${nudge ? ` and nudged ${nudge} who haven’t answered` : ''}.`); S.activity[0].ev = ev.id;
     render(true); toast(`Reminder sent to ${going} going.${nudge ? ` Nudged ${nudge} who haven’t answered.` : ''}`, 'send');
@@ -1989,7 +2069,7 @@ const A = {
   'ev-edit'(el){
     const ev = EV(el.dataset.id);
     S.draft = {id:ev.id, gid:ev.gid, fromGroup:true, title:ev.title, date:ev.date, time:ev.time, location:ev.location || '', notes:ev.notes || '',
-      duties:ev.duties.map(d => ({roleId:d.roleId, count:d.count})), reminder:ev.reminder, deadlineOn:!!ev.deadline,
+      duties:ev.duties.map(d => ({roleId:d.roleId, count:d.count})), reminder:ev.reminder, ask:asks(ev), deadlineOn:!!ev.deadline,
       deadline:ev.deadline ? 'keep' : '1d', keepDeadline:ev.deadline, newResp:''};
     push({name:'event-form'});
   },
@@ -2009,7 +2089,17 @@ const A = {
   'draft-duty-count'(el){ const x = S.draft.duties[+el.dataset.i]; x.count = Math.max(1, Math.min(12, x.count + (+el.dataset.v))); render(true); },
   'draft-duty-remove'(el){ S.draft.duties.splice(+el.dataset.i, 1); render(true); },
   'draft-reminder'(el){ S.draft.reminder = el.dataset.v; render(true); },
+  'draft-ask-toggle'(){ S.draft.ask = !S.draft.ask; render(true); },
   'draft-deadline-toggle'(){ S.draft.deadlineOn = !S.draft.deadlineOn; render(true); },
+  'home-collapse'(el){ const k = el.dataset.v; S.collapsed[k] = !S.collapsed[k]; saveCollapsed(k, S.collapsed[k]); render(true); },
+  /* After the deadline, the creator and the group's Admins can still change anyone's answer. */
+  'ev-set-answer'(el){
+    const ev = EV(el.dataset.id), p = el.dataset.p, v = el.dataset.v;
+    if (!canManage(ev)) return;
+    ev.rsvp[p] = v;
+    log(ev.gid, v === 'going' ? 'checkCircle' : 'xCircle', v === 'going' ? 'ok' : 'neutral', 'event', `<b>You</b> marked <b>${esc(pname(p))}</b> as ${v === 'going' ? 'going to' : 'can’t make'} <b>${esc(ev.title)}</b>.`); S.activity[0].ev = ev.id;
+    render(true); toast(`${first(p)} is now marked as ${v === 'going' ? 'going' : 'can’t'}. ${first(p)} was told.`);
+  },
   'draft-deadline'(el){ S.draft.deadline = el.dataset.v; render(true); },
   'ev-save'(){
     const d = S.draft, g = G(d.gid), title = d.title.trim();
@@ -2022,19 +2112,20 @@ const A = {
       return {roleId:x.roleId, count:x.count, seats}; };
     if (d.id) {
       const ev = EV(d.id);
-      Object.assign(ev, {title, date:d.date, time:d.time || '19:00', location:d.location.trim(), notes:d.notes.trim(), reminder:d.reminder, deadline});
+      Object.assign(ev, {title, date:d.date, time:d.time || '19:00', location:d.location.trim(), notes:d.notes.trim(), reminder:d.reminder, ask:d.ask, deadline});
+      if (d.ask && !ev.rsvp[ev.by]) ev.rsvp[ev.by] = 'going';
       ev.duties = d.duties.map(x => seatsFor(x, ev.duties.find(o => o.roleId === x.roleId)));
-      log(g.id, 'pencil', 'info', 'event', `<b>You</b> updated <b>${esc(title)}</b> (${fShort(ev.date)}). Everyone invited was told what changed.`); S.activity[0].ev = ev.id;
-      S.draft = null; S.stack.pop(); render(); toast('Event updated. Everyone invited was told what changed.');
+      log(g.id, 'pencil', 'info', 'event', `<b>You</b> updated <b>${esc(title)}</b> (${fShort(ev.date)}). Everyone in ${esc(g.name)} was told what changed.`); S.activity[0].ev = ev.id;
+      S.draft = null; S.stack.pop(); render(); toast(`Event updated. Everyone in ${g.name} was told what changed.`);
     } else {
       const ev = {id:'e' + Date.now().toString(36), gid:g.id, title, date:d.date, time:d.time || '19:00', location:d.location.trim(), notes:d.notes.trim(),
-        by:ME, reminder:d.reminder, deadline, rsvp:{[ME]:'going'}, duties:[]};
+        by:ME, reminder:d.reminder, ask:d.ask, deadline, rsvp:d.ask ? {[ME]:'going'} : {}, duties:[]};
       ev.duties = d.duties.map(x => seatsFor(x));
       S.events.push(ev);
       const n = membersOf(g).length;
-      log(g.id, 'mail', 'info', 'event', `<b>You</b> created <b>${esc(title)}</b> for ${fShort(ev.date)} and invited everyone in ${esc(g.name)}.`); S.activity[0].ev = ev.id;
+      log(g.id, d.ask ? 'mail' : 'calendar', 'info', 'event', `<b>You</b> created <b>${esc(title)}</b> for ${fShort(ev.date)} and ${d.ask ? 'invited' : 'told'} everyone in ${esc(g.name)}.`); S.activity[0].ev = ev.id;
       S.draft = null; S.stack.pop(); S.stack.push({name:'event', id:ev.id}); render();
-      toast(`${title} created. ${n - 1} people invited.`, 'send');
+      toast(d.ask ? `${title} created. ${n - 1} people invited.` : `${title} created. Everyone in ${g.name} can see it.`, d.ask ? 'send' : 'checkCircle');
     }
   },
   /* onboarding */
