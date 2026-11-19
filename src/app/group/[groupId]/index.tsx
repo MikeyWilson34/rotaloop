@@ -100,7 +100,7 @@ export default function GroupScreen() {
         </View>
         {count < 2 ? (
           <InfoNote icon={Info}>
-            <Text variant="subhead">All turns are yours until people join. Share the invite link from settings.</Text>
+            <Text variant="subhead">All turns are yours until people join. Tap Invite people under Members to share the link.</Text>
           </InfoNote>
         ) : null}
 
