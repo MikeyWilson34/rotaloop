@@ -1,40 +1,31 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { Bell, CalendarOff, UserPlus, type LucideIcon } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { Bell } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useActivityUnreadCount } from '@/activity/data';
-import { InviteSheet } from '@/components/group/InviteSheet';
 import { AttentionCard } from '@/components/home/AttentionCard';
-import { ManagedGroupCard, MemberGroupCard } from '@/components/home/GroupCards';
-import { Hero, HeroEmpty } from '@/components/home/Hero';
-import { CaughtUp, FilterChips, HomeSkeleton, SectionHead } from '@/components/home/parts';
+import { Hero } from '@/components/home/Hero';
+import { HomeSkeleton, SectionHead } from '@/components/home/parts';
+import { HomeGroupCard, NothingThisWeek, ThisWeekList } from '@/components/home/Week';
 import { Button, Notice, showToast, Text } from '@/components/ui';
 import { APP_NAME } from '@/config/app';
 import { CAN_WITHDRAW_DECLINE } from '@/coverage/actions';
 import { successMessage } from '@/coverage/sheets';
 import { useHomeData } from '@/home/data';
 import {
-  attentionItems,
-  filterGroupCards,
   greeting,
   groupCards,
-  groupFilterCounts,
-  parseGroupFilter,
-  selectHero,
-  showGroupFilters,
+  homeWeek,
   todayLabel,
   type AttentionAction,
   type AttentionItem,
-  type GroupFilter,
   type HomeContext,
 } from '@/home/home';
 import { runGroupCommand } from '@/lib/groupCommand';
 import { groupCommandMessage } from '@/lib/groupErrors';
 import { deviceTimeZone } from '@/lib/groupViews';
-import { fetchGroupInviteToken } from '@/lib/inviteLinks';
-import { reminderSummary } from '@/lib/notificationPrefs';
 import { useSession } from '@/lib/session';
 import { useTheme } from '@/theme';
 
@@ -48,36 +39,25 @@ function openAssignment(groupId: string, assignmentId: string, action?: Assignme
 }
 
 /**
- * Home (ticket 12; prototype `screenHome`): personal first, Admin-aware. The greeting, the
- * next Assignment, what needs the person's attention, their Groups (managed ones with health
- * stats and filters) and quick actions. Everything shown is derived in src/home/home.ts.
+ * Home (simplify ticket 05; prototype `PAGES.home`): only the next 7 days. The big card with
+ * one button, "Needs you" when there is anything, "This week", or a calm "Nothing this week"
+ * naming the next turn. Then "Your groups". Activity is the bell. Derived in src/home/home.ts.
  */
 export default function HomeScreen() {
-  const { colors, fonts, space } = useTheme();
-  const params = useLocalSearchParams<{ filter?: string }>();
+  const { colors, fonts, radii, space } = useTheme();
   const { profile } = useSession();
   const unread = useActivityUnreadCount();
   const { data, loading, error, refresh, refreshing, reload } = useHomeData();
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [inviting, setInviting] = useState(false);
 
   const viewerTimeZone = data?.viewerTimeZone ?? deviceTimeZone();
-  // Statuses depend on the time: recomputed with every load.
+  // What's "this week" depends on the time: recomputed with every load.
   const now = useMemo(() => new Date().toISOString(), [data]); // eslint-disable-line react-hooks/exhaustive-deps
-  const reminderText = profile ? reminderSummary(profile) : undefined;
-  const ctx: HomeContext = useMemo(() => ({ now, viewerTimeZone, reminderText }), [now, viewerTimeZone, reminderText]);
+  const ctx: HomeContext = useMemo(() => ({ now, viewerTimeZone }), [now, viewerTimeZone]);
   const groups = useMemo(() => data?.groups ?? [], [data]);
-  const hero = useMemo(() => selectHero(groups, ctx), [groups, ctx]);
-  const attention = useMemo(
-    () => attentionItems(groups, ctx, { heroKey: hero?.key ?? null, canWithdraw: CAN_WITHDRAW_DECLINE }),
-    [groups, ctx, hero],
-  );
+  const week = useMemo(() => homeWeek(groups, ctx, { canWithdraw: CAN_WITHDRAW_DECLINE }), [groups, ctx]);
   const cards = useMemo(() => groupCards(groups, ctx), [groups, ctx]);
-  const filter = parseGroupFilter(params.filter, cards);
-  const shown = filterGroupCards(cards, filter);
-  const counts = groupFilterCounts(cards);
   const name = profile?.display_name ?? null;
-  const inviteGroup = cards[0] ?? null;
 
   async function send(key: string, groupId: string, command: Parameters<typeof runGroupCommand>[1], done: string) {
     setBusyKey(key);
@@ -154,11 +134,18 @@ export default function HomeScreen() {
     );
   } else if (groups.length === 0) {
     body = (
-      <HeroEmpty title={`Welcome to ${APP_NAME}`} text="Start a group and invite people, or join with a link someone sent you.">
-        <Button label="Go to Groups" variant="secondary" onPress={() => router.push('/groups')} />
-      </HeroEmpty>
+      <View style={{ padding: 24, gap: 4, borderRadius: radii.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}>
+        <Text style={{ fontFamily: fonts.extrabold, fontSize: 17, lineHeight: 24, textAlign: 'center' }}>{`Welcome to ${APP_NAME}`}</Text>
+        <Text variant="subhead" color="textSecondary" style={{ textAlign: 'center' }}>
+          Start a group and invite people, or join with a link someone sent you.
+        </Text>
+        <View style={{ marginTop: 12, alignSelf: 'stretch' }}>
+          <Button label="Go to Groups" variant="secondary" onPress={() => router.push('/groups')} />
+        </View>
+      </View>
     );
   } else {
+    const { hero, needsYou, thisWeek, nextTurn } = week;
     body = (
       <>
         {hero ? (
@@ -166,62 +153,35 @@ export default function HomeScreen() {
             hero={hero}
             busy={busyKey === hero.key}
             onOpen={() => openAssignment(hero.groupId, hero.assignmentId)}
+            onCantMakeIt={() => openAssignment(hero.groupId, hero.assignmentId, 'decline')}
             onConfirm={() =>
               void send(hero.key, hero.groupId, { type: 'confirm', assignmentId: hero.assignmentId }, successMessage('confirm', hero.responsibilityName, hero.date))
             }
-            onDecline={() => openAssignment(hero.groupId, hero.assignmentId, 'decline')}
           />
         ) : (
-          <HeroEmpty title="You're all clear" text="No upcoming Assignments. Enjoy the break." />
+          <NothingThisWeek nextTurn={nextTurn} />
         )}
 
-        <SectionHead title="Needs your attention" count={attention.length} />
-        {attention.length ? (
-          attention.map((item) => (
-            <AttentionCard key={`${item.kind}:${item.key}`} item={item} busy={busyKey === item.key} onAction={(a) => onAttention(item, a)} />
-          ))
-        ) : (
-          <CaughtUp text="You're all caught up." />
-        )}
-
-        <SectionHead title="Your groups" link={{ label: 'See all', onPress: () => router.push('/groups') }} />
-        {showGroupFilters(cards) ? (
-          <FilterChips<GroupFilter>
-            label="Filter groups"
-            value={filter}
-            onChange={(v) => router.setParams({ filter: v === 'all' ? undefined : v })}
-            options={[
-              { value: 'all', label: 'All', count: counts.all },
-              { value: 'managed', label: 'Managed by me', count: counts.managed },
-              { value: 'attention', label: 'Needs attention', count: counts.attention },
-            ]}
-          />
+        {needsYou.length ? (
+          <>
+            <SectionHead title="Needs you" />
+            {needsYou.map((item) => (
+              <AttentionCard key={`${item.kind}:${item.key}`} item={item} busy={busyKey === item.key} onAction={(a) => onAttention(item, a)} />
+            ))}
+          </>
         ) : null}
-        {shown.length ? (
-          shown.map((card) => (card.health ? <ManagedGroupCard key={card.groupId} card={card} /> : <MemberGroupCard key={card.groupId} card={card} />))
-        ) : (
-          <CaughtUp text="Nothing needs attention in the groups you manage." />
-        )}
 
-        <View style={{ flexDirection: 'row', gap: space.md, marginTop: space.md }}>
-          <QuickAction icon={CalendarOff} label="Add dates off" onPress={() => router.push('/time-off')} />
-          <QuickAction
-            icon={UserPlus}
-            label="Invite someone"
-            onPress={() => (inviteGroup ? setInviting(true) : router.push('/groups'))}
-          />
-        </View>
-        {inviteGroup ? (
-          <InviteSheet
-            visible={inviting}
-            onClose={() => setInviting(false)}
-            groupName={inviteGroup.name}
-            title={`Invite people to ${inviteGroup.name}`}
-            message="Anyone with this link or QR code joins the group directly."
-            loadToken={() => fetchGroupInviteToken(inviteGroup.groupId)}
-            shareMessage={`Join ${inviteGroup.name} on ${APP_NAME}:`}
-          />
+        {thisWeek.length ? (
+          <>
+            <SectionHead title="This week" />
+            <ThisWeekList turns={thisWeek} onOpen={(t) => openAssignment(t.groupId, t.assignmentId)} />
+          </>
         ) : null}
+
+        <SectionHead title="Your groups" />
+        {cards.map((card) => (
+          <HomeGroupCard key={card.groupId} card={card} />
+        ))}
       </>
     );
   }
@@ -235,32 +195,5 @@ export default function HomeScreen() {
         {body}
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function QuickAction({ icon: Icon, label, onPress }: { icon: LucideIcon; label: string; onPress: () => void }) {
-  const { colors, fonts, radii, shadows } = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={({ pressed }) => ({
-        flex: 1,
-        minHeight: 96,
-        padding: 14,
-        gap: 10,
-        borderRadius: radii.lg,
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-        boxShadow: shadows.shadow1,
-        transform: [{ scale: pressed ? 0.98 : 1 }],
-      })}>
-      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' }}>
-        <Icon size={20} color={colors.primary} strokeWidth={1.75} />
-      </View>
-      <Text style={{ fontFamily: fonts.bold, fontSize: 14, lineHeight: 20 }}>{label}</Text>
-    </Pressable>
   );
 }

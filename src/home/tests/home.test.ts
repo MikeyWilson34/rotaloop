@@ -1,29 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
 import type { GroupState } from '../../engine';
-import { buildGroup, eventId, NOW, run, seat, ZONE, type Built } from '../../schedule/tests/fixture';
+import { buildGroup, NOW, run, seat, ZONE, type Built } from '../../schedule/tests/fixture';
 import {
   attentionItems,
-  filterGroupCards,
   greeting,
   groupCards,
-  groupFilterCounts,
-  groupHealth,
-  initialsOf,
-  isRoutineHistory,
-  parseGroupFilter,
-  selectHero,
-  showGroupFilters,
-  skipDatesLabel,
+  homeWeek,
+  HOME_DAYS,
+  inHomeWindow,
   todayLabel,
-  withLabel,
   type HomeContext,
   type HomeGroup,
 } from '../home';
 
+// The fixture: weekly Sundays from Nov 22, 2026. Sound (Ana, Ben, Cal in turn) and Greeter
+// (Pat, Cal, Ben). NOW is Wednesday Nov 18, so the 7-day window is Nov 18–25.
 const ctx: HomeContext = { now: NOW, viewerTimeZone: ZONE };
-/** Friday Nov 20, 2026, 6:00 AM Chicago: inside the 3-day "find a replacement by" window for Nov 22. */
-const LATE = '2026-11-20T12:00:00.000Z';
+/** Monday Nov 23, 6:00 AM Chicago: the window is Nov 23–30. */
+const MON: HomeContext = { ...ctx, now: '2026-11-23T12:00:00.000Z' };
 
 function home(built: Built, me: string | null = 'ana', overrides: Partial<HomeGroup> = {}): HomeGroup {
   return {
@@ -37,397 +32,175 @@ function home(built: Built, me: string | null = 'ana', overrides: Partial<HomeGr
   };
 }
 
-/** Another Group (same shape, other id and name). */
+/** Another Group (same schedule, other id and name). */
 function other(built: Built, me = 'ana', name = 'Hospitality'): HomeGroup {
   const state: GroupState = { ...built.state, groupId: 'g2' };
   return home({ state, history: built.history }, me, { id: 'g2', name, state });
 }
 
-const holderOf = (built: Built, date: string, r: string) => seat(built.state, date, r).memberId!;
-
-describe('greeting', () => {
-  it('says good morning / afternoon / evening by the viewer’s clock, with the first name', () => {
+describe('header', () => {
+  it('greets by the viewer’s clock and shows today', () => {
     expect(greeting('Alex Rivera', ctx)).toBe('Good morning, Alex');
     expect(greeting('Alex', { ...ctx, now: '2026-11-18T19:00:00.000Z' })).toBe('Good afternoon, Alex');
-    expect(greeting('Alex', { ...ctx, now: '2026-11-19T01:00:00.000Z' })).toBe('Good evening, Alex');
-    expect(greeting('', ctx)).toBe('Good morning');
-    expect(greeting(null, ctx)).toBe('Good morning');
-  });
-
-  it('today’s date and initials', () => {
+    expect(greeting(null, { ...ctx, now: '2026-11-19T01:00:00.000Z' })).toBe('Good evening');
     expect(todayLabel(ctx)).toBe('Wednesday, November 18');
-    expect(initialsOf('Alex Rivera')).toBe('AR');
-    expect(initialsOf('ben')).toBe('B');
-    expect(initialsOf('Mary Ann Lee')).toBe('ML');
-    expect(initialsOf('  ')).toBe('?');
-  });
-
-  it('"With …" lists two names then a count', () => {
-    expect(withLabel([])).toBeNull();
-    expect(withLabel(['Ben'])).toBe('With Ben');
-    expect(withLabel(['Ben', 'Cal'])).toBe('With Ben, Cal');
-    expect(withLabel(['Ben', 'Cal', 'Dee', 'Eve'])).toBe('With Ben, Cal & 2 more');
   });
 });
 
-describe('selectHero', () => {
-  it('is null with no Groups, or nothing upcoming for me', () => {
-    expect(selectHero([], ctx)).toBeNull();
-    const b = buildGroup();
-    expect(selectHero([home(b, null)], ctx)).toBeNull();
-    // After the last Event has started.
-    expect(selectHero([home(b)], { ...ctx, now: '2027-01-11T00:00:00.000Z' })).toBeNull();
+describe('the 7-day window', () => {
+  it('runs from today through 7 days ahead', () => {
+    expect(HOME_DAYS).toBe(7);
+    expect(inHomeWindow('2026-11-18', '2026-11-18')).toBe(true);
+    expect(inHomeWindow('2026-11-25', '2026-11-18')).toBe(true);
+    expect(inHomeWindow('2026-11-26', '2026-11-18')).toBe(false);
+    expect(inHomeWindow('2026-11-17', '2026-11-18')).toBe(false);
+    // Across the year boundary.
+    expect(inHomeWindow('2027-01-03', '2026-12-28')).toBe(true);
   });
 
-  it('picks my soonest Assignment across Groups, with date, time, relative day and who’s with me', () => {
-    const b = buildGroup();
-    const anaFirst = b.state.assignments
-      .filter((a) => a.memberId === 'ana')
-      .map((a) => b.state.events.find((e) => e.id === a.eventId)!.startsAt)
-      .sort()[0];
-    const hero = selectHero([other(b, 'ben', 'Zeta'), home(b)], ctx)!;
-    expect(hero).not.toBeNull();
-    expect(Date.parse(anaFirst)).toBeLessThanOrEqual(Date.parse(`${hero.date}T23:00:00Z`));
-    expect(hero.timeLabel).toBe('9:00 AM');
-    expect(hero.dateLabel).toMatch(/^Sunday, /);
-    expect(hero.relative).toMatch(/^In \d+ days?$|^In 1 week$/);
-    const event = b.state.events.find((e) => e.startsAt.startsWith(hero.date))!;
-    const others = b.state.assignments.filter((a) => a.eventId === event.id && a.memberId !== 'ana');
-    expect(hero.with.length).toBe(others.length);
+  it('the big card is my first turn this week, with day, time and how soon', () => {
+    const week = homeWeek([home(buildGroup())], ctx);
+    expect(week.hero).toMatchObject({
+      responsibilityName: 'Sound',
+      groupName: 'Sunday Team',
+      date: '2026-11-22',
+      dayLabel: 'Sun, Nov 22',
+      timeLabel: '9:00 AM',
+      relative: 'In 4 days',
+      mode: 'cantMakeIt',
+      note: null,
+      needsCover: false,
+    });
+    expect(week.thisWeek).toEqual([]);
+    expect(week.needsYou).toEqual([]);
   });
 
-  it('skips Events that already started and my own open Coverage Requests', () => {
+  it('a turn exactly 7 days away is in; 8 days away is out', () => {
     const b = buildGroup();
-    const first = selectHero([home(b)], ctx)!;
-    run(b, { type: 'decline', assignmentId: first.assignmentId }, 'ana');
-    const next = selectHero([home(b)], ctx)!;
-    expect(next.assignmentId).not.toBe(first.assignmentId);
-    expect(next.date > first.date).toBe(true);
-    // Once the first Event has started, it's no longer "next".
-    const b2 = buildGroup();
-    const h = selectHero([home(b2)], ctx)!;
-    const later = selectHero([home(b2)], { ...ctx, now: `${h.date}T15:30:00.000Z` })!;
-    expect(later.date > h.date).toBe(true);
+    // Sunday Nov 15: Nov 22 is 7 days ahead.
+    expect(homeWeek([home(b)], { ...ctx, now: '2026-11-15T18:00:00.000Z' }).hero?.date).toBe('2026-11-22');
+    // Saturday Nov 14: 8 days ahead, so nothing this week.
+    const early = homeWeek([home(b)], { ...ctx, now: '2026-11-14T18:00:00.000Z' });
+    expect(early.hero).toBeNull();
+    expect(early.nextTurn).toBe('Sound · Sunday Team · Sun, Nov 22');
   });
 
-  it('Pending: Confirm mode; Confirmed: all set; Scheduled and needs confirmation: nothing to do yet', () => {
+  it('the rest of my week is listed under the big card, soonest first; later turns are left out', () => {
     const b = buildGroup();
-    const h = selectHero([home(b)], ctx)!;
-    expect(h.responsibilityName).toBe('Sound');
-    expect(h.mode).toBe('later');
-    expect(h.doneText).toMatch(/^Nothing to do yet/);
-    run(b, { type: 'requestConfirmation', assignmentIds: [h.assignmentId] }, 'ana');
-    const pending = selectHero([home(b)], ctx)!;
-    expect(pending.mode).toBe('confirm');
-    expect(pending.status).toBe('pending');
-    run(b, { type: 'confirm', assignmentId: h.assignmentId }, 'ana');
-    const confirmed = selectHero([home(b)], ctx)!;
-    expect(confirmed.mode).toBe('allSet');
-    expect(confirmed.status).toBe('confirmed');
-    expect(confirmed.doneText).toBe("You're all set. We'll remind you before the Event.");
-    // Ticket 11: the person's real reminder settings.
-    const withPrefs = selectHero([home(b)], { ...ctx, reminderText: "We'll remind you the day before at 6:00 PM." })!;
-    expect(withPrefs.doneText).toBe("You're all set. We'll remind you the day before at 6:00 PM.");
+    const week = homeWeek([home(b), other(b)], ctx);
+    // Same date in two Groups: by Group name.
+    expect(week.hero?.groupName).toBe('Hospitality');
+    expect(week.thisWeek.map((t) => [t.groupName, t.responsibilityName, t.dayLabel])).toEqual([['Sunday Team', 'Sound', 'Sun, Nov 22']]);
+    // Ana's next Sound turns (Dec 13 on) are beyond the window.
+    expect(week.thisWeek.every((t) => inHomeWindow(t.date, '2026-11-18'))).toBe(true);
   });
 
-  it('A Responsibility without confirmation is all set', () => {
-    // Cal's next turn is Greeter on Nov 29, with Ben on Sound.
-    const hero = selectHero([home(buildGroup(), 'cal')], ctx)!;
-    expect(hero.responsibilityName).toBe('Greeter');
-    expect(hero.date).toBe('2026-11-29');
-    expect(hero.mode).toBe('allSet');
-    expect(hero.withLabel).toBe('With Ben');
-    expect(hero.with).toEqual([{ name: 'Ben', initials: 'B' }]);
+  it('a turn that already started is gone', () => {
+    const b = buildGroup();
+    expect(homeWeek([home(b)], { ...ctx, now: '2026-11-22T15:30:00.000Z' }).hero).toBeNull();
+  });
+});
+
+describe('nothing this week', () => {
+  it('names my next turn (job · group · date)', () => {
+    // Cal's first turn is Greeter on Nov 29: outside Nov 18–25.
+    const week = homeWeek([home(buildGroup(), 'cal')], ctx);
+    expect(week.hero).toBeNull();
+    expect(week.thisWeek).toEqual([]);
+    expect(week.needsYou).toEqual([]);
+    expect(week.nextTurn).toBe('Greeter · Sunday Team · Sun, Nov 29');
   });
 
-  it('Covering: "You’re covering" pill', () => {
+  it('no turns coming up at all', () => {
     const b = buildGroup();
-    // Ben declines his next Sound turn and Cal covers it.
-    // Ben declines Sound on Nov 29 and Ana covers it; Ana can't make her own Nov 22.
+    expect(homeWeek([], ctx)).toEqual({ hero: null, needsYou: [], thisWeek: [], nextTurn: null });
+    expect(homeWeek([home(b, null)], ctx).nextTurn).toBeNull();
+    expect(homeWeek([home(b)], { ...ctx, now: '2027-01-11T00:00:00.000Z' }).nextTurn).toBeNull();
+  });
+});
+
+describe('the big card', () => {
+  it('my own open request: "Needs cover", and it is not repeated in Needs you', () => {
+    const b = buildGroup();
+    run(b, { type: 'decline', assignmentId: seat(b.state, '2026-11-22', 'sound').id }, 'ana');
+    const week = homeWeek([home(b)], ctx);
+    expect(week.hero?.mode).toBe('needsCover');
+    expect(week.hero?.needsCover).toBe(true);
+    expect(week.hero?.note).toEqual({ tone: 'warn', strong: 'Needs cover.', text: "We'll tell you when someone takes it." });
+    expect(week.needsYou).toEqual([]);
+    // "Nothing this week" would name a turn I'm actually serving, not the one I asked cover for.
+    expect(week.nextTurn).toBe('Sound · Sunday Team · Sun, Dec 13');
+  });
+
+  it('covering someone: a thank-you line', () => {
+    const b = buildGroup();
     const bens = seat(b.state, '2026-11-29', 'sound');
     run(b, { type: 'decline', assignmentId: bens.id }, 'ben');
     run(b, { type: 'cover', assignmentId: bens.id }, 'ana');
-    run(b, { type: 'decline', assignmentId: seat(b.state, '2026-11-22', 'sound').id }, 'ana');
-    const hero = selectHero([home(b)], ctx)!;
+    const hero = homeWeek([home(b)], MON).hero!;
     expect(hero.assignmentId).toBe(bens.id);
-    expect(hero.pillLabel).toBe("You're covering");
-    expect(hero.status).toBe('covered');
-    expect(hero.mode).toBe('allSet');
+    expect(hero.covering).toBe(true);
+    expect(hero.mode).toBe('cantMakeIt');
+    expect(hero.note).toEqual({ tone: 'ok', text: "You're covering for Ben. Thank you!" });
   });
 
-  it('Make-up Turn note: who covered me and when', () => {
+  it('a swapped turn says who covered me and when', () => {
     const b = buildGroup();
-    const anas = selectHero([home(b)], ctx)!;
-    run(b, { type: 'decline', assignmentId: anas.assignmentId }, 'ana');
-    run(b, { type: 'cover', assignmentId: anas.assignmentId }, 'ben');
-    const turn = b.state.makeUpTurns.find((t) => t.debtorId === 'ana')!;
-    expect(turn).toBeDefined();
-    const paying = b.state.assignments.find((a) => a.makeUpTurnId === turn.id)!;
-    expect(paying.memberId).toBe('ana');
-    const hero = selectHero([home(b)], ctx)!;
-    expect(hero.assignmentId).toBe(paying.id);
-    expect(hero.makeUpTurn).toBe(true);
-    expect(hero.notes.join(' ')).toMatch(/^Make-up Turn: Ben covered you on Nov 22, so you're taking Ben's turn\.$/);
-  });
-
-  it('Moved note after a Skip Date', () => {
-    const b = buildGroup();
-    const anas = selectHero([home(b)], ctx)!;
-    run(b, { type: 'addSkipDate', eventId: eventId(anas.date) }, 'ben');
-    const hero = selectHero([home(b)], ctx)!;
-    expect(hero.assignmentId).toBe(anas.assignmentId);
+    const anas = seat(b.state, '2026-11-22', 'sound');
+    run(b, { type: 'decline', assignmentId: anas.id }, 'ana');
+    run(b, { type: 'cover', assignmentId: anas.id }, 'ben');
+    const hero = homeWeek([home(b)], MON).hero!;
     expect(hero.date).toBe('2026-11-29');
-    expect(hero.notes[0]).toBe(
-      'Moved from Sun, Nov 22 to Sun, Nov 29. Ben marked Sun, Nov 22 as a Skip Date. Turns move forward one Event.',
-    );
+    expect(hero.note?.text).toBe("Ben covered you on Nov 22, so you're taking Ben's turn.");
+  });
+
+  it('a Job that still asks for confirmation: Confirm mode', () => {
+    const b = buildGroup();
+    run(b, { type: 'requestConfirmation', assignmentIds: [seat(b.state, '2026-11-22', 'sound').id] }, 'ana');
+    expect(homeWeek([home(b)], ctx).hero?.mode).toBe('confirm');
   });
 });
 
-describe('attentionItems', () => {
-  it('is empty when nothing waits on me', () => {
+describe('Needs you', () => {
+  it('someone’s request I can take, this week only', () => {
     const b = buildGroup();
-    expect(attentionItems([home(b)], ctx)).toEqual([]);
-    expect(attentionItems([], ctx)).toEqual([]);
-  });
-
-  it('a Coverage Request I’m Qualified for: "I can cover"', () => {
-    const b = buildGroup();
-    const bens = selectHero([home(b, 'ben')], ctx)!;
-    run(b, { type: 'decline', assignmentId: bens.assignmentId }, 'ben');
-    const items = attentionItems([home(b)], ctx);
-    const cover = items.find((i) => i.kind === 'cover')!;
-    expect(cover.title).toBe('Ben needs someone for Sound');
-    expect(cover.sub).toMatch(/^Sunday Team · Sun, /);
-    expect(cover.tone).toBe('bad');
-    expect(cover.actions.map((a) => a.kind)).toEqual(['cover', 'details']);
-    // Pat (a Placeholder, not Qualified for Sound) gets nothing.
-    expect(attentionItems([home(b, 'pat')], ctx)).toEqual([]);
-  });
-
-  it('no "I can cover" at an Event where I already serve, unless the Group allows doubling', () => {
-    const b = buildGroup();
-    run(b, { type: 'qualifyMember', memberId: 'ana', responsibilityId: 'greeter' }, 'ana');
-    const anas = selectHero([home(b)], ctx)!;
-    const greeter = seat(b.state, anas.date, 'greeter');
-    run(b, { type: 'decline', assignmentId: greeter.id }, greeter.memberId === 'pat' ? 'ana' : greeter.memberId);
-    expect(attentionItems([home(b)], ctx).filter((i) => i.assignmentId === greeter.id)).toEqual([]);
-    run(b, { type: 'changeSettings', settings: { allowDoubling: true } }, 'ana');
-    expect(attentionItems([home(b)], ctx).find((i) => i.assignmentId === greeter.id)?.kind).toBe('cover');
-  });
-
-  it('my own open request: "Finding cover", how many were asked, withdraw only when available', () => {
-    const b = buildGroup();
-    const anas = selectHero([home(b)], ctx)!;
-    run(b, { type: 'decline', assignmentId: anas.assignmentId }, 'ana');
-    const [item] = attentionItems([home(b)], ctx);
-    expect(item.kind).toBe('myRequest');
-    expect(item.title).toBe('Finding cover for your Sound');
-    expect(item.sub).toMatch(/· 2 people asked · nobody yet$/);
-    expect(item.actions.map((a) => a.kind)).toEqual(['viewRequest']);
-    expect(attentionItems([home(b)], ctx, { canWithdraw: true })[0].actions.map((a) => a.kind)).toEqual([
-      'viewRequest',
-      'withdraw',
+    // Pat (not on the app) can't make Greeter on Nov 22; Ana declines for them.
+    run(b, { type: 'decline', assignmentId: seat(b.state, '2026-11-22', 'greeter').id }, 'ana');
+    const week = homeWeek([home(b, 'ben')], ctx);
+    expect(week.needsYou.map((i) => [i.kind, i.title, i.sub, i.actions.map((a) => a.label)])).toEqual([
+      ['cover', "Pat can't make it", 'Greeter · Sun, Nov 22 · Sunday Team', ["I'll cover", 'Details']],
     ]);
-  });
+    // Ben's own next turn (Sound, Nov 29) is outside the window.
+    expect(week.hero).toBeNull();
 
-  it('Replacement Duty: mine after the deadline (Assigned Member), or an Admin’s (Admins)', () => {
-    const b = buildGroup();
-    const anas = selectHero([home(b)], ctx)!;
-    run(b, { type: 'decline', assignmentId: anas.assignmentId }, 'ana');
-    const late = { ...ctx, now: LATE };
-    const [mine] = attentionItems([home(b)], late);
-    expect(mine.kind).toBe('replacementDuty');
-    expect(mine.title).toBe("Nobody's free for your Sound turn");
-    expect(mine.actions.map((a) => a.kind)).toEqual(['markCovered', 'details']);
-    // Ben (Qualified, not on duty) can still volunteer.
-    expect(attentionItems([home(b, 'ben')], late).find((i) => i.assignmentId === anas.assignmentId)?.kind).toBe('cover');
-
+    // A request beyond the window is left out until it comes within 7 days.
     const c = buildGroup();
-    run(c, { type: 'changeSettings', settings: { replacementDuty: 'admins' } }, 'ana');
-    const bens = selectHero([home(c, 'ben')], ctx)!;
-    run(c, { type: 'decline', assignmentId: bens.assignmentId }, 'ben');
-    const admin = attentionItems([home(c)], { ...ctx, now: `${bens.date}T00:00:00.000Z` }).find(
-      (i) => i.assignmentId === bens.assignmentId,
-    )!;
-    expect(admin.kind).toBe('replacementDuty');
-    expect(admin.title).toBe("Nobody's free for Sound (Ben)");
-    // Ben no longer holds it: he sees his own request.
-    expect(attentionItems([home(c, 'ben')], { ...ctx, now: `${bens.date}T00:00:00.000Z` })[0].kind).toBe('myRequest');
+    run(c, { type: 'decline', assignmentId: seat(c.state, '2026-11-29', 'sound').id }, 'ben');
+    expect(homeWeek([home(c, 'ana')], ctx).needsYou).toEqual([]);
+    expect(homeWeek([home(c, 'ana')], MON).needsYou.map((i) => i.title)).toEqual(["Ben can't make it"]);
+    // All dates are still available to other callers.
+    expect(attentionItems([home(c, 'ana')], ctx).map((i) => i.kind)).toEqual(['cover']);
   });
 
-  it('pending confirmations other than the hero, with inline Confirm', () => {
+  it('a turn waiting on me shows once: in Needs you, not again in This week', () => {
     const b = buildGroup();
-    const anaTurns = b.state.assignments.filter((a) => a.memberId === 'ana' && a.responsibilityId === 'sound').map((a) => a.id);
-    run(b, { type: 'requestConfirmation', assignmentIds: anaTurns.slice(0, 2) }, 'ana');
-    const hero = selectHero([home(b)], ctx)!;
-    const items = attentionItems([home(b)], ctx, { heroKey: hero.key });
-    expect(items).toHaveLength(1);
-    expect(items[0].kind).toBe('confirm');
-    expect(items[0].title).toBe('Confirm Sound for Sunday Team');
-    expect(items[0].actions.map((a) => a.kind)).toEqual(['confirm', 'decline']);
-    // Without a hero key both show.
-    expect(attentionItems([home(b)], ctx)).toHaveLength(2);
-  });
-
-  it('a Make-up Turn to confirm', () => {
-    const b = buildGroup();
-    const anas = selectHero([home(b)], ctx)!;
-    run(b, { type: 'decline', assignmentId: anas.assignmentId }, 'ana');
-    run(b, { type: 'cover', assignmentId: anas.assignmentId }, 'ben');
-    const paying = b.state.assignments.find((a) => a.makeUpTurnId && a.memberId === 'ana')!;
-    run(b, { type: 'requestConfirmation', assignmentIds: [paying.id] }, 'ana');
-    const item = attentionItems([home(b)], ctx).find((i) => i.assignmentId === paying.id)!;
-    expect(item.kind).toBe('makeUp');
-    expect(item.title).toBe('Confirm your Make-up Turn');
-    expect(item.sub).toMatch(/Ben covered you on Nov 22, so you'll take Ben's Sound turn on Sun, /);
-  });
-
-  it('a moved Assignment awaiting confirmation', () => {
-    const b = buildGroup();
-    const anas = selectHero([home(b)], ctx)!;
-    run(b, { type: 'requestConfirmation', assignmentIds: [anas.assignmentId] }, 'ana');
-    run(b, { type: 'addSkipDate', eventId: eventId(anas.date) }, 'ben');
-    // Every turn the Skip Date moved asks for confirmation again. The first is the hero (its
-    // Confirm is there), so it shows here only without the hero key.
-    const heroKey = selectHero([home(b)], ctx)!.key;
-    const withHero = attentionItems([home(b)], ctx, { heroKey });
-    expect(withHero.length).toBeGreaterThan(0);
-    expect(withHero.every((i) => i.kind === 'moved' && i.key !== heroKey)).toBe(true);
-    const [item] = attentionItems([home(b)], ctx);
-    expect(item.kind).toBe('moved');
-    expect(item.title).toBe('Your Sound turn moved');
-    expect(item.sub).toBe(
-      'Sunday Team · Moved from Sun, Nov 22 to Sun, Nov 29. Ben marked Sun, Nov 22 as a Skip Date. Turns move forward one Event. Please confirm again.',
-    );
-  });
-
-  it('sorted by Event date, then the most urgent kind first', () => {
-    const b = buildGroup();
-    const anaTurns = b.state.assignments.filter((a) => a.memberId === 'ana').map((a) => a.id);
-    run(b, { type: 'requestConfirmation', assignmentIds: anaTurns }, 'ana');
-    const bens = selectHero([home(b, 'ben')], ctx)!;
-    run(b, { type: 'decline', assignmentId: bens.assignmentId }, 'ben');
-    const items = attentionItems([home(b), other(b)], ctx);
-    for (let i = 1; i < items.length; i++) expect(Date.parse(items[i - 1].startsAt)).toBeLessThanOrEqual(Date.parse(items[i].startsAt));
-    expect(new Set(items.map((i) => `${i.groupId}/${i.assignmentId}`)).size).toBe(items.length);
-    const sameDay = items.filter((i) => i.date === items.find((x) => x.kind === 'cover')!.date);
-    expect(sameDay.findIndex((i) => i.kind === 'cover')).toBe(0);
+    const sound22 = seat(b.state, '2026-11-22', 'sound').id;
+    run(b, { type: 'requestConfirmation', assignmentIds: [sound22] }, 'ana');
+    const week = homeWeek([home(b), other(b)], ctx);
+    expect(week.hero?.groupName).toBe('Hospitality');
+    expect(week.needsYou.map((i) => [i.kind, i.groupName])).toEqual([['confirm', 'Sunday Team']]);
+    expect(week.thisWeek).toEqual([]);
   });
 });
 
-describe('groupHealth', () => {
-  it('counts open coverage (and those finding a replacement), pending in 3 weeks, recent changes and Skip Dates', () => {
+describe('Your groups', () => {
+  it('one card per group, by name, with my next turn there', () => {
     const b = buildGroup();
-    // Pending: one within 3 weeks (Nov 22) and one beyond (Dec 20: more than 21 days after Nov 18).
-    const soon = seat(b.state, '2026-11-22', 'sound');
-    const far = seat(b.state, '2026-12-20', 'sound');
-    run(b, { type: 'requestConfirmation', assignmentIds: [soon.id, far.id] }, 'ana');
-    // Open coverage: one near (past the deadline at LATE), one later.
-    const near = seat(b.state, '2026-11-22', 'greeter');
-    const later = seat(b.state, '2026-12-06', 'sound');
-    run(b, { type: 'decline', assignmentId: near.id }, near.memberId === 'pat' ? 'ana' : near.memberId);
-    run(b, { type: 'decline', assignmentId: later.id }, later.memberId);
-    run(b, { type: 'addSkipDate', eventId: eventId('2026-12-27') }, 'ben');
-
-    const h = groupHealth(home(b), { ...ctx, now: LATE });
-    expect(h.openCoverage).toBe(2);
-    expect(h.findingReplacement).toBe(1);
-    expect(h.pendingSoon).toBe(1);
-    expect(h.skipDates).toEqual(['2026-12-27']);
-    expect(h.needsAttention).toBe(true);
-    expect(h.recentChanges).toBe(b.history.filter((e) => !isRoutineHistory(e)).length);
-  });
-
-  it('the 3-week window moves with now', () => {
-    const b = buildGroup();
-    const far = seat(b.state, '2026-12-06', 'sound');
-    run(b, { type: 'requestConfirmation', assignmentIds: [far.id] }, 'ana');
-    // Dec 6 15:00Z is 18 days after Nov 18: inside; from Nov 10 it is 26 days: outside.
-    expect(groupHealth(home(b), ctx).pendingSoon).toBe(1);
-    expect(groupHealth(home(b), { ...ctx, now: '2026-11-10T12:00:00.000Z' }).pendingSoon).toBe(0);
-  });
-
-  it('recent changes: the last 7 days only, routine entries left out', () => {
-    const b = buildGroup();
-    const day = 24 * 60 * 60 * 1000;
-    const at = (n: number) => new Date(Date.parse(NOW) - n * day).toISOString();
-    const g = home(b, 'ana', {
-      history: [
-        { id: '1', at: at(1), actorId: 'ben', cause: { type: 'addSkipDate', eventId: eventId('2026-12-27') }, changes: [], makeUpTurns: [] },
-        { id: '2', at: at(6.9), actorId: 'ana', cause: { type: 'rebalance', responsibilityId: 'sound' }, changes: [], makeUpTurns: [] },
-        { id: '3', at: at(7.1), actorId: 'ana', cause: { type: 'rebalance', responsibilityId: 'sound' }, changes: [], makeUpTurns: [] },
-        { id: '4', at: at(0.5), actorId: null, cause: { type: 'addEvents', events: [] }, changes: [], makeUpTurns: [] },
-        { id: '5', at: at(0.5), actorId: null, cause: { type: 'fillSchedule' }, changes: [], makeUpTurns: [] },
-        { id: '6', at: at(0.5), actorId: 'ana', cause: { type: 'addEvents', events: [] }, changes: [], makeUpTurns: [] },
-      ],
-    });
-    expect(groupHealth(g, ctx).recentChanges).toBe(3);
-  });
-
-  it('a calm Group needs no attention', () => {
-    const h = groupHealth(home(buildGroup(), 'ana', { history: [] }), ctx);
-    expect(h).toMatchObject({ openCoverage: 0, findingReplacement: 0, pendingSoon: 0, recentChanges: 0, skipDates: [], needsAttention: false });
-  });
-
-  it('Skip Date label', () => {
-    expect(skipDatesLabel([])).toBe('No Skip Dates');
-    expect(skipDatesLabel(['2026-11-26'])).toBe('Skip Nov 26');
-    expect(skipDatesLabel(['2026-11-26', '2026-12-27', '2027-01-03'])).toBe('Skip Nov 26, Dec 27 +1');
-  });
-});
-
-describe('groupCards and filters', () => {
-  it('Member cards: next Event, the Primary Responsibility holder, my next turn; no health', () => {
-    const b = buildGroup();
-    run(b, { type: 'setPrimaryResponsibility', responsibilityId: 'sound' }, 'ana');
-    const [card] = groupCards([home(b, 'ben')], ctx);
-    const holder = b.state.members.find((m) => m.id === holderOf(b, '2026-11-22', 'sound'))!.name;
-    expect(card.nextLine).toBe(`Sun, Nov 22 · Sound: ${holder}`);
-    expect(card.isAdmin).toBe(false);
-    expect(card.health).toBeNull();
-    expect(card.myNext?.label).toMatch(/^You · (Nov|Dec) \d+$/);
-  });
-
-  it('no Primary Responsibility: just the date; no Events: says so; no turns: null', () => {
-    const b = buildGroup();
-    expect(groupCards([home(b)], ctx)[0].nextLine).toBe('Sun, Nov 22');
-    expect(groupCards([home(b, 'pat')], { ...ctx, now: '2027-02-01T00:00:00.000Z' })[0]).toMatchObject({
-      nextLine: 'No upcoming Events',
-      myNext: null,
-    });
-  });
-
-  it('Admin cards carry health; sorted by name', () => {
-    const b = buildGroup();
-    const cards = groupCards([other(b, 'ana', 'Zeta'), home(b)], ctx);
-    expect(cards.map((c) => c.name)).toEqual(['Sunday Team', 'Zeta']);
-    expect(cards[0].isAdmin).toBe(true);
-    expect(cards[0].health).not.toBeNull();
-  });
-
-  it('filters: shown only to Admins; Managed by me; Needs attention (managed and with issues)', () => {
-    const b = buildGroup();
-    const asMember = groupCards([home(b, 'ben'), other(b, 'ben')], ctx);
-    expect(showGroupFilters(asMember)).toBe(false);
-    expect(parseGroupFilter('managed', asMember)).toBe('all');
-
-    const calm = buildGroup();
-    const busy = buildGroup();
-    run(busy, { type: 'requestConfirmation', assignmentIds: [seat(busy.state, '2026-11-22', 'sound').id] }, 'ana');
-    const cards = groupCards(
-      [
-        home(calm, 'ana', { id: 'calm', name: 'Calm' }),
-        home(busy, 'ana', { id: 'busy', name: 'Busy' }),
-        home(busy, 'ben', { id: 'member', name: 'Member only' }),
-      ],
-      ctx,
-    );
-    expect(showGroupFilters(cards)).toBe(true);
-    expect(filterGroupCards(cards, 'all').map((c) => c.name)).toEqual(['Busy', 'Calm', 'Member only']);
-    expect(filterGroupCards(cards, 'managed').map((c) => c.name)).toEqual(['Busy', 'Calm']);
-    expect(filterGroupCards(cards, 'attention').map((c) => c.name)).toEqual(['Busy']);
-    expect(groupFilterCounts(cards)).toEqual({ all: 3, managed: 2, attention: 1 });
-    expect(parseGroupFilter('attention', cards)).toBe('attention');
-    expect(parseGroupFilter('nonsense', cards)).toBe('all');
+    expect(groupCards([home(b), other(b, 'cal')], ctx)).toEqual([
+      { groupId: 'g2', name: 'Hospitality', line: 'Your next turn: Greeter · Sun, Nov 29' },
+      { groupId: 'g1', name: 'Sunday Team', line: 'Your next turn: Sound · Sun, Nov 22' },
+    ]);
+    expect(groupCards([home(b, null)], ctx)[0].line).toBe('No turns coming up');
+    expect(groupCards([home(b)], { ...ctx, now: '2027-01-11T00:00:00.000Z' })[0].line).toBe('No turns coming up');
   });
 });
