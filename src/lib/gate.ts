@@ -30,8 +30,8 @@ export function gateFor(input: GateInput): Gate {
 }
 
 /**
- * Steps shown in the progress dots from sign-up to the app: name (in `(auth)`, which makes the
- * guest account), then notifications and join-or-create (in `(onboarding)`).
+ * Steps shown in the progress dots from sign-up to the app: welcome and name (in `(auth)`; the
+ * name step makes the guest account), then join-or-start (in `(onboarding)`). Welcome shows no dots.
  */
 export const ONBOARDING_STEPS = 3;
 

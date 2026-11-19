@@ -6,7 +6,8 @@
 //   npm run e2e:nav -- path/to/export              # any other web export folder
 //
 // It signs up a fresh guest (real data in the Supabase project the build points at), creates a
-// Group, taps every Overview checklist item in-app, opens Settings → Add Responsibility / Add
+// Group through the 3-screen setup (name, jobs with the how-often and time sheets, who's in
+// with the invite link, QR code and a typed name), opens Settings → Add Responsibility / Add
 // Event Series, saves one of each, opens an Assignment from the Group's Schedule tab and
 // cycles the bottom tabs. It also reports how many requests the cold load made.
 //
@@ -154,33 +155,45 @@ try {
   await fill('First name', first);
   await fill('Last name', last);
   await click('Continue');
-  await expectScreen('onboarding: notifications', /Stay in the loop/i);
-  await click('Continue');
-  await page.getByRole('radio', { name: 'Create a group' }).click();
-  await expectScreen('onboarding: join or create', /Create a group/);
-  await click('Create group');
-  await expectScreen('create group', /Group name/);
-  await fill('Group name', `E2E Group ${stamp}`);
-  await click('Create group');
-  await expectScreen('the new Group', /Set up your group/i);
+  // Onboarding is one step now: join or start (no notifications step).
+  await expectScreen('onboarding: join or start', /Join or start a group/);
+  await click('Start a group');
 
-  // The Overview checklist, in-app (the QA blocker: these blanked the app).
-  current = 'checklist';
-  const item = (label) => page.getByRole('button', { name: new RegExp(`^${label.replace(/'/g, "'")}`) }).first();
-  for (const [label, expected] of [
-    ['Add Responsibilities', /Add Responsibility/],
-    ["Choose who's Qualified", /Responsibility/],
-    ['Set when Events happen', /Event Series/],
-  ]) {
-    await item(label).click();
-    await expectScreen(`checklist: ${label}`, expected);
-    await backToGroup(`checklist: ${label}`);
-  }
-  await item('Invite people').click();
-  await expectScreen('checklist: Invite people', /Copy link/);
+  // Group setup in 3 screens (simplify ticket 03).
+  current = 'create group';
+  await expectScreen('setup 1: name your group', /Name your group/);
+  await fill('Group name', `E2E Group ${stamp}`);
+  await click('Next');
+  await expectScreen('setup 2: jobs', /What needs doing, and when\?/);
+  await fill('Job 1 name', `E2E Job ${stamp}`);
+  await page.getByRole('button', { name: /how often, every Sunday$/ }).click();
+  await expectScreen('setup 2: how often sheet', /How often\?/);
+  await page.getByRole('radio', { name: 'Every 2 weeks' }).click();
+  await click('Done · every other Sunday');
+  await page.getByRole('button', { name: /time, 10:00am$/ }).click();
+  await expectScreen('setup 2: time sheet', /What time\?/);
+  await page.getByRole('checkbox', { name: '9', exact: true }).click();
+  await click('Done');
+  await expectScreen('setup 2: row updated', /every other Sunday[\s\S]*9:00am/);
+  await click('Add another job');
+  await fill('Job 2 name', `E2E Coffee ${stamp}`);
+  await page.getByRole('radio', { name: 'Headcount' }).last().click();
+  await click('Next');
+  await expectScreen("setup 3: who's in", /Who's in\?/);
+  await expectScreen('setup 3: invite link', /\/join\/[0-9a-f]{64}/);
+  await click('Show QR code');
+  await expectScreen('setup 3: QR code sheet', /Scan to join/);
   await click('Done');
   await sleep(600);
-  await expectScreen('invite sheet closed', /Set up your group/i);
+  await fill('Name', `E2E Standin ${stamp}`);
+  await click('Add');
+  await expectScreen('setup 3: name added', new RegExp(`E2E Standin ${stamp}`));
+  await click('Done');
+  await expectScreen('the new Group', /Overview/);
+  await groupTab('Schedule').click();
+  await expectScreen('the new Group: schedule filled', new RegExp(`E2E Job ${stamp}`));
+  await groupTab('Members').click();
+  await expectScreen('the new Group: typed name is a member', new RegExp(`E2E Standin ${stamp}`));
 
   // Settings → Add Responsibility (saved, with this person Qualified).
   current = 'settings';
