@@ -158,24 +158,50 @@ describe('command', () => {
     });
   });
 
-  it('returns the engine’s permission rules as notPermitted: Admin-only commands and own Time Off', async () => {
+  it('lets a plain Member run every command that used to be Admin-only (no Admins for now)', async () => {
+    const { groupId, ben } = await crewGroup();
+    const asBen = async (command: unknown) => expectOk(await send(BEN, { action: 'command', groupId, command }));
+    expect((await loadState(groupId)).members.find((m) => m.id === ben)?.isAdmin).toBe(false);
+
+    await asBen({ type: 'fillSchedule' });
+    await asBen({ type: 'addEvents', events: [{ id: 'w9', seriesId: 'sun', startsAt: week(9) }] });
+    await asBen({ type: 'requestConfirmation', assignmentIds: [] });
+    await asBen({ type: 'addMember', member: { name: 'Eve' } });
+    await asBen({ type: 'addResponsibility', responsibility: { id: 'video', name: 'Video', headcount: 1, requiresConfirmation: false } });
+    await asBen({ type: 'qualifyMember', memberId: ben, responsibilityId: 'video' });
+    await asBen({ type: 'unqualifyMember', memberId: ben, responsibilityId: 'video' });
+    await asBen({ type: 'editResponsibility', responsibilityId: 'sound', changes: { name: 'Audio' } });
+    await asBen({ type: 'reorderResponsibilities', responsibilityIds: ['video', 'sound'] });
+    await asBen({ type: 'setPrimaryResponsibility', responsibilityId: 'video' });
+    const queue = (await loadState(groupId)).rotations.find((r) => r.responsibilityId === 'sound')!.queue;
+    await asBen({ type: 'reorderQueue', responsibilityId: 'sound', queue: [...queue].reverse() });
+    await asBen({ type: 'addEventSeries', series: { id: 'sat', name: 'Saturdays', responsibilityIds: ['sound'] } });
+    await asBen({ type: 'editEventSeries', seriesId: 'sat', changes: { name: 'Sat' } });
+    await asBen({ type: 'removeEventSeries', seriesId: 'sat' });
+    await asBen({ type: 'addEvents', events: [{ id: 'once', seriesId: null, startsAt: week(10), responsibilityIds: ['sound'] }] });
+    await asBen({ type: 'removeEvent', eventId: 'once' });
+    await asBen({ type: 'changeSettings', settings: { allowDoubling: true } });
+    await asBen({ type: 'rebalance', responsibilityId: 'sound' });
+    await asBen({ type: 'removeResponsibility', responsibilityId: 'video' });
+    await asBen({ type: 'addSkipDate', eventId: 'w4' });
+    // The hidden Admin flag can still be set, but grants nothing.
+    await asBen({ type: 'setAdmin', memberId: ben, isAdmin: true });
+    await asBen({ type: 'setAdmin', memberId: ben, isAdmin: false });
+
+    const state = await loadState(groupId);
+    expect(state.responsibilities.map((r) => [r.name, r.removedAt === null])).toEqual([['Video', false], ['Audio', true]]);
+    expect(state.settings.allowDoubling).toBe(true);
+    // The Stand-in Ben added is in every current Job's Rotation, like anyone.
+    const eve = state.members.find((m) => m.name === 'Eve')!;
+    expect(eve.accountId).toBeNull();
+    expect(state.rotations.find((r) => r.responsibilityId === 'sound')?.queue).toContain(eve.id);
+  });
+
+  it('keeps one person’s own things theirs: Time Off, name and membership, except for a Stand-in', async () => {
     const { groupId, ana, ben } = await crewGroup();
     const asBen = (command: unknown) => send(BEN, { action: 'command', groupId, command });
-    for (const command of [
-      { type: 'addEvents', events: [{ id: 'x', seriesId: 'sun', startsAt: week(9) }] },
-      { type: 'addMember', member: { name: 'Eve' } },
-      { type: 'qualifyMember', memberId: ben, responsibilityId: 'sound' },
-      { type: 'requestConfirmation', assignmentIds: [] },
-      { type: 'changeSettings', settings: { allowDoubling: true } },
-      { type: 'addResponsibility', responsibility: { id: 'video', name: 'Video', headcount: 1, requiresConfirmation: false } },
-      { type: 'editResponsibility', responsibilityId: 'sound', changes: { headcount: 2 } },
-      { type: 'reorderQueue', responsibilityId: 'sound', queue: [ben, ana] },
-      { type: 'setAdmin', memberId: ben, isAdmin: true },
-      { type: 'renameMember', memberId: ana, name: 'Annie' },
-      { type: 'removeEvent', eventId: 'w1' },
-    ]) {
-      expect(await asBen(command), command.type).toMatchObject({ ok: false, reason: 'notPermitted' });
-    }
+    expectOk(await asBen({ type: 'addMember', member: { name: 'Dee' } }));
+    const dee = (await loadState(groupId)).members.find((m) => m.name === 'Dee')!.id;
 
     const timeOff = (memberId: string) => ({
       type: 'addTimeOff',
@@ -183,20 +209,21 @@ describe('command', () => {
     });
     expect(await asBen(timeOff(ana))).toMatchObject({ ok: false, reason: 'notPermitted' });
     expectOk(await asBen(timeOff(ben)));
+    expectOk(await asBen(timeOff(dee)));
     expectOk(await send(ANA, { action: 'command', groupId, command: timeOff(ana) }));
     expect(await asBen({ type: 'removeTimeOff', timeOffId: `t-${ana}` })).toMatchObject({ reason: 'notPermitted' });
     expectOk(await asBen({ type: 'removeTimeOff', timeOffId: `t-${ben}` }));
+    expectOk(await asBen({ type: 'removeTimeOff', timeOffId: `t-${dee}` }));
 
-    // Any Member may add a Skip Date.
-    expectOk(await asBen({ type: 'addSkipDate', eventId: 'w4' }));
+    expect(await asBen({ type: 'renameMember', memberId: ana, name: 'Annie' })).toMatchObject({ reason: 'notPermitted' });
+    expectOk(await asBen({ type: 'renameMember', memberId: dee, name: 'Deb' }));
+    expect(await asBen({ type: 'removeMember', memberId: ana })).toMatchObject({ reason: 'notPermitted' });
+    expectOk(await asBen({ type: 'removeMember', memberId: dee }));
   });
 
-  it('blocks the last Admin from stepping down or leaving, until another Admin is appointed', async () => {
-    const { groupId, ana, ben } = await crewGroup();
+  it('lets anyone leave, including the Group’s creator (no last-Admin guard)', async () => {
+    const { groupId, ana } = await crewGroup();
     const asAna = (command: unknown) => send(ANA, { action: 'command', groupId, command });
-    expect(await asAna({ type: 'setAdmin', memberId: ana, isAdmin: false })).toMatchObject({ ok: false, reason: 'lastAdmin' });
-    expect(await asAna({ type: 'removeMember', memberId: ana })).toMatchObject({ ok: false, reason: 'lastAdmin' });
-    expectOk(await asAna({ type: 'setAdmin', memberId: ben, isAdmin: true }));
     expectOk(await asAna({ type: 'removeMember', memberId: ana }));
     expect(await asAna({ type: 'fillSchedule' })).toMatchObject({ ok: false, reason: 'notMember' });
   });
@@ -301,5 +328,103 @@ describe('command', () => {
     );
     expect(response).toMatchObject({ ok: false, reason: 'conflict' });
     expect(persists).toBe(3);
+  });
+});
+
+describe('Stand-ins and outside covers (simplify ticket 04)', () => {
+  const seatOf = async (groupId: string, memberId: string) =>
+    (await loadState(groupId)).assignments.find((a) => a.memberId === memberId && a.coverageRequest === null)!;
+
+  it('joining puts the new Member in every Job’s Rotation', async () => {
+    const { groupId, ben, cal } = await crewGroup();
+    const queue = (await loadState(groupId)).rotations.find((r) => r.responsibilityId === 'sound')!.queue;
+    expect(queue).toEqual(expect.arrayContaining([ben, cal]));
+  });
+
+  it('any Member adds a Stand-in, says they can’t make it for them, and gets the link they claim their spot with', async () => {
+    const { groupId, cal } = await crewGroup();
+    const asBen = (command: unknown) => send(BEN, { action: 'command', groupId, command });
+    expectOk(await asBen({ type: 'addMember', member: { name: 'Dee' } }));
+    const dee = (await loadState(groupId)).members.find((m) => m.name === 'Dee')!;
+    expect(dee.accountId).toBeNull();
+    const deeSeat = await seatOf(groupId, dee.id);
+    expect(deeSeat).toBeDefined();
+
+    // Ben says Dee can't make it: the request is Dee's.
+    expectOk(await asBen({ type: 'decline', assignmentId: deeSeat.id, reason: 'Away' }));
+    const request = (await loadState(groupId)).assignments.find((a) => a.id === deeSeat.id)!.coverageRequest;
+    expect(request).toMatchObject({ reason: 'declined', requestedBy: dee.id, note: 'Away', cover: null });
+    // But not for another app user.
+    const calSeat = await seatOf(groupId, cal);
+    expect(await asBen({ type: 'decline', assignmentId: calSeat.id })).toMatchObject({ ok: false, reason: 'notPermitted' });
+
+    // Dee claims their spot through the personal link any Member can get.
+    const claimToken = await t.asUser(BEN, () =>
+      t.db.query<{ t: string }>('select public.claim_link_for($1, $2) t', [groupId, dee.id]).then((r) => r.rows[0].t),
+    );
+    expect(expectOk(await send(DEE, { action: 'join', token: claimToken, memberName: 'ignored' })).memberId).toBe(dee.id);
+    const claimed = await loadState(groupId);
+    expect(claimed.members.find((m) => m.id === dee.id)?.accountId).toBe(DEE);
+    expect(claimed.rotations.find((r) => r.responsibilityId === 'sound')?.queue).toContain(dee.id);
+  });
+
+  it('“I’ll find someone to cover”: a Member cover is set in one step and is a swap', async () => {
+    const { groupId, ben, cal } = await crewGroup();
+    const calSeat = await seatOf(groupId, cal);
+    const response = expectOk(
+      await send(CAL, { action: 'command', groupId, command: { type: 'decline', assignmentId: calSeat.id, coveredBy: { memberId: ben } } }),
+    );
+    expect(response.history.at(-1)?.cause).toMatchObject({ type: 'decline', coveredBy: { memberId: ben } });
+    const state = await loadState(groupId);
+    const seat = state.assignments.find((a) => a.id === calSeat.id)!;
+    expect(seat.memberId).toBe(ben);
+    expect(seat.coverageRequest).toMatchObject({ requestedBy: cal, cover: { kind: 'member', memberId: ben, arrangedBy: cal } });
+    expect(state.makeUpTurns).toEqual([expect.objectContaining({ debtorId: cal, creditorId: ben, status: 'outstanding' })]);
+  });
+
+  it('“Pick someone to do it”: any Member may hand anyone’s turn to someone else', async () => {
+    const { groupId, ana, cal } = await crewGroup();
+    const calSeat = await seatOf(groupId, cal);
+    expectOk(
+      await send(BEN, { action: 'command', groupId, command: { type: 'decline', assignmentId: calSeat.id, coveredBy: { memberId: ana } } }),
+    );
+    const seat = (await loadState(groupId)).assignments.find((a) => a.id === calSeat.id)!;
+    expect(seat.coverageRequest).toMatchObject({ requestedBy: cal, cover: { kind: 'member', memberId: ana } });
+  });
+
+  it('an outside cover is a typed name: not a Member, no swap, and kept in history', async () => {
+    const { groupId, ana } = await crewGroup();
+    const anaSeat = await seatOf(groupId, ana);
+    const membersBefore = (await loadState(groupId)).members.length;
+    expectOk(
+      await send(ANA, {
+        action: 'command',
+        groupId,
+        command: { type: 'decline', assignmentId: anaSeat.id, coveredBy: { guestName: ' Pat Smith ' } },
+      }),
+    );
+    const state = await loadState(groupId);
+    const seat = state.assignments.find((a) => a.id === anaSeat.id)!;
+    expect(seat.memberId).toBeNull();
+    expect(seat.coverageRequest).toMatchObject({ requestedBy: ana, cover: { kind: 'guest', guestName: 'Pat Smith' } });
+    expect(state.members).toHaveLength(membersBefore);
+    expect(state.makeUpTurns).toEqual([]);
+    const history = await t.db.query<{ cause: { coveredBy?: { guestName: string } } }>(
+      `select cause from public.schedule_history where group_id = $1 and cause_type = 'decline'`,
+      [groupId],
+    );
+    expect(history.rows.map((r) => r.cause.coveredBy)).toEqual([{ guestName: 'Pat Smith' }]);
+
+    // Any Member may also cover an open request with an outside name ("mark covered").
+    const { groupId: g2, cal } = await crewGroup();
+    const calSeat = await seatOf(g2, cal);
+    expectOk(await send(CAL, { action: 'command', groupId: g2, command: { type: 'decline', assignmentId: calSeat.id } }));
+    expectOk(
+      await send(BEN, { action: 'command', groupId: g2, command: { type: 'markCovered', assignmentId: calSeat.id, by: { guestName: 'Lee' } } }),
+    );
+    expect((await loadState(g2)).assignments.find((a) => a.id === calSeat.id)?.coverageRequest?.cover).toMatchObject({
+      kind: 'guest',
+      guestName: 'Lee',
+    });
   });
 });

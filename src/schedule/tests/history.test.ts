@@ -25,7 +25,7 @@ function story(): Built {
   run(b, { type: 'decline', assignmentId: greeter.id }, 'ana');
   run(b, { type: 'markCovered', assignmentId: greeter.id, by: { guestName: 'Jo' } }, 'ana');
   const g2 = seat(b.state, '2026-12-20', 'greeter');
-  run(b, { type: 'decline', assignmentId: g2.id }, 'ana');
+  run(b, { type: 'decline', assignmentId: g2.id }, g2.memberId);
   const seated = new Set(b.state.assignments.filter((a) => a.eventId === g2.eventId).map((a) => a.memberId));
   const other = ['pat', 'ben', 'cal', 'ana'].find((m) => !seated.has(m))!;
   run(b, { type: 'markCovered', assignmentId: g2.id, by: { memberId: other } }, 'ana');
@@ -41,7 +41,7 @@ function story(): Built {
     type: 'addTimeOff',
     timeOff: { id: 'off1', memberId: 'cal', startsAt: '2026-12-26T06:00:00.000Z', endsAt: '2026-12-28T06:00:00.000Z' },
   }, 'cal');
-  run(b, { type: 'removeTimeOff', timeOffId: 'off1' }, 'ana');
+  run(b, { type: 'removeTimeOff', timeOffId: 'off1' }, 'cal');
   // Members.
   run(b, { type: 'addMember', member: { id: 'dee', name: 'Dee', accountId: null } }, 'ana');
   run(b, { type: 'addMember', member: { id: 'eve', name: 'Eve', accountId: 'acct-eve' } }, 'eve');
@@ -52,7 +52,7 @@ function story(): Built {
   run(b, { type: 'setAdmin', memberId: 'ben', isAdmin: true }, 'ana');
   run(b, { type: 'setAdmin', memberId: 'ben', isAdmin: false }, 'ben');
   run(b, { type: 'claimPlaceholder', memberId: 'dee', accountId: 'acct-dee' }, null);
-  run(b, { type: 'removeMember', memberId: 'dee' }, 'ana');
+  run(b, { type: 'removeMember', memberId: 'dee' }, 'dee');
   run(b, { type: 'removeMember', memberId: 'eve' }, 'eve');
   // Responsibilities.
   run(b, { type: 'addResponsibility', responsibility: { id: 'host', name: 'Host', headcount: 1, requiresConfirmation: false } }, 'ana');
@@ -116,8 +116,8 @@ describe('describeHistoryEntry', () => {
   it('describes coverage, with the Make-up Turn it creates', () => {
     expect(texts('decline')[0]).toBe("You can't make Sound on Sun, Nov 22. Coverage requested.");
     expect(first('decline').tone).toBe('bad');
-    // An Admin declining for someone else names them.
-    expect(texts('decline')[1]).toMatch(/^You said (Pat|Ben|Cal) can't make Greeter on Sun, Dec 13. Coverage requested.$/);
+    // Declining for a Stand-in names them.
+    expect(texts('decline')[1]).toMatch("You said Pat can't make Greeter on Sun, Dec 13. Coverage requested.");
     expect(texts('cover')).toEqual(['Ben covered Sound on Sun, Nov 22 for you.']);
     expect(first('cover').detail).toBe('You owe Ben a Sound Make-up Turn.');
     expect(texts('markCovered')[0]).toBe('You marked Greeter on Sun, Dec 13 covered by Jo (guest).');
@@ -134,7 +134,7 @@ describe('describeHistoryEntry', () => {
     expect(texts('addSkipDate')).toEqual(['Ben marked Sun, Jan 3 as a Skip Date. Turns move forward one Event.']);
     expect(texts('removeSkipDate')).toEqual(['You removed the Skip Date on Sun, Jan 3. The Rotation is restored.']);
     expect(texts('addTimeOff')).toEqual(['Cal added Time Off (Dec 26 – Dec 27).']);
-    expect(texts('removeTimeOff')).toEqual(['You removed Time Off for Cal.']);
+    expect(texts('removeTimeOff')).toEqual(['Cal removed Time Off.']);
   });
 
   it('describes membership', () => {
@@ -145,7 +145,7 @@ describe('describeHistoryEntry', () => {
     expect(texts('setAdmin')).toEqual(['You made Ben an Admin.', 'Ben stepped down as Admin.']);
     expect(texts('claimPlaceholder')).toEqual(['Deb joined and took their place in the Rotations.']);
     expect(texts('removeMember')).toEqual([
-      'You removed Deb from the group. Their future turns moved to others.',
+      'Deb left the group. Their future turns moved to others.',
       'Evie left the group. Their future turns moved to others.',
     ]);
   });
@@ -216,6 +216,19 @@ describe('one Assignment\'s history', () => {
     expect(lines[0].detail).toBe('You added 8 Events.');
     expect(lines[2].detail).toBe('Ben covered Sound on Sun, Nov 22 for you.');
     expect(lines.map((l) => l.tone)).toEqual(['neutral', 'bad', 'info']);
+  });
+
+  it('names a cover found straight away: a Member, someone picked for another’s turn, or an outside name', () => {
+    const b = buildGroup();
+    const ctx: HistoryContext = { state: b.state, myMemberId: 'ana', timeZone: ZONE };
+    const mine = seat(b.state, '2026-11-22', 'sound');
+    run(b, { type: 'decline', assignmentId: mine.id, reason: 'Away', coveredBy: { memberId: 'ben' } }, 'ana');
+    const others = seat(b.state, '2026-12-13', 'greeter');
+    run(b, { type: 'decline', assignmentId: others.id, coveredBy: { guestName: 'Jo' } }, 'ana');
+    const latest = (n: number) => describeHistoryEntry(b.history[b.history.length - n], { ...ctx, state: b.state });
+    expect(latest(2).text).toBe("You can't make Sound on Sun, Nov 22: “Away”. Ben is covering.");
+    expect(latest(1).text).toBe("You gave Pat's Greeter on Sun, Dec 13 to Jo (guest).");
+    expect(assignmentHistory(b.history, mine.id, { ...ctx, state: b.state }).map((l) => l.text).at(-1)).toBe('Covered by Ben');
   });
 
   it('includes a Make-up Turn being placed and paid', () => {

@@ -177,6 +177,11 @@ export interface TimeOff {
  */
 export type Confirmation = 'notRequired' | 'notYetRequested' | 'requested' | 'confirmed';
 
+/**
+ * Who covers a seat: a Member (a swap: they are owed a Make-up Turn), or `guest`, an outside
+ * cover: a typed name of someone not in the Group ("Not in group"), one-off, not in any
+ * Rotation, and owed nothing. History keeps the name.
+ */
 export type Cover =
   | { kind: 'member'; memberId: MemberId; arrangedBy: MemberId; coveredAt: Instant }
   | { kind: 'guest'; guestName: string; arrangedBy: MemberId; coveredAt: Instant };
@@ -314,8 +319,12 @@ export type Command =
   | { type: 'removeTimeOff'; timeOffId: TimeOffId }
   | { type: 'requestConfirmation'; assignmentIds: AssignmentId[] }
   | { type: 'confirm'; assignmentId: AssignmentId }
-  /** `reason`: optional, at most 300 characters; stored as the Coverage Request's `note`. */
-  | { type: 'decline'; assignmentId: AssignmentId; reason?: string | null }
+  /**
+   * "Can't make it". `reason`: optional, at most 300 characters; stored as the Coverage
+   * Request's `note`. `coveredBy`: the cover is found already ("I'll find someone to cover",
+   * or any Member's "Pick someone to do it"): the request is covered in the same step.
+   */
+  | { type: 'decline'; assignmentId: AssignmentId; reason?: string | null; coveredBy?: CoverTarget }
   /**
    * "I can make it after all": the Member who declined takes the seat back while no one has
    * covered it yet (an Admin may do it for a Placeholder Member). See commands.ts.

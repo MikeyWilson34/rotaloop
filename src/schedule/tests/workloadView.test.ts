@@ -52,7 +52,7 @@ describe('workloadSummary', () => {
 
   it('leaves out former Members', () => {
     const b = buildGroup();
-    run(b, { type: 'removeMember', memberId: 'cal' }, 'ana');
+    run(b, { type: 'removeMember', memberId: 'cal' }, 'cal');
     expect(workloadSummary(b.state, NOW).bars.has('cal')).toBe(false);
   });
 });
