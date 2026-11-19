@@ -82,7 +82,7 @@ export async function fetchMySchedule(userId: string, now: Date = new Date()): P
   const viewerTimeZone = deviceTimeZone();
   const memberships = await supabase
     .from('members')
-    .select(`id, group_id, groups(${GROUP_COLUMNS})`)
+    .select(`id, group_id, groups!members_group_id_fkey(${GROUP_COLUMNS})`)
     .eq('account_id', userId)
     .is('left_at', null);
   if (memberships.error) throw memberships.error;
