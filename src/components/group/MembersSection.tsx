@@ -47,7 +47,14 @@ export function MembersSection({
         ) : null}
         <AddRow label="Add stand-in" icon onPress={() => setAdding(true)} />
       </SettingsList>
-      {adding ? <AddStandInSheet groupName={group.name} run={run} onClose={() => setAdding(false)} /> : null}
+      {adding ? (
+        <AddStandInSheet
+          groupName={group.name}
+          jobIds={group.state.responsibilities.filter((r) => r.removedAt === null).map((r) => r.id)}
+          run={run}
+          onClose={() => setAdding(false)}
+        />
+      ) : null}
       <InviteSheet
         visible={claimFor !== null}
         onClose={() => setClaimFor(null)}
@@ -124,7 +131,18 @@ function AddRow({ label, icon, onPress }: { label: string; icon?: boolean; onPre
 }
 
 /** "Add stand-in": a name; they're in every job's turns like anyone else. */
-function AddStandInSheet({ groupName, run, onClose }: { groupName: string; run: RunCommand; onClose: () => void }) {
+function AddStandInSheet({
+  groupName,
+  jobIds,
+  run,
+  onClose,
+}: {
+  groupName: string;
+  /** Everyone does every job, stand-ins too. */
+  jobIds: string[];
+  run: RunCommand;
+  onClose: () => void;
+}) {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -137,7 +155,7 @@ function AddStandInSheet({ groupName, run, onClose }: { groupName: string; run: 
     }
     setBusy(true);
     setError(null);
-    const failed = await run({ type: 'addMember', member: { name: trimmed } }, 'addPlaceholder');
+    const failed = await run({ type: 'addMember', member: { name: trimmed }, qualifiedFor: jobIds }, 'addPlaceholder');
     setBusy(false);
     if (failed) {
       setError(failed);

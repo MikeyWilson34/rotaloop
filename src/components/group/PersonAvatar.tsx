@@ -8,7 +8,18 @@ import { useTheme } from '@/theme';
  * Round initials avatar (prototype `.av`). A stand-in or someone from outside the group gets a
  * dashed outline: they aren't on the app. `size` 28 is the small one in "Coming up" rows.
  */
-export function PersonAvatar({ name, dashed, size = 40 }: { name: string; dashed?: boolean; size?: number }) {
+export function PersonAvatar({
+  name,
+  dashed,
+  size = 40,
+  onTint,
+}: {
+  name: string;
+  dashed?: boolean;
+  size?: number;
+  /** On a tinted row (your own turn): a plain background so it still shows. */
+  onTint?: boolean;
+}) {
   const { colors, fonts } = useTheme();
   return (
     <View
@@ -18,7 +29,7 @@ export function PersonAvatar({ name, dashed, size = 40 }: { name: string; dashed
         width: size,
         height: size,
         borderRadius: size / 2,
-        backgroundColor: dashed ? colors.surfaceAlt : colors.primaryTint,
+        backgroundColor: dashed ? colors.surfaceAlt : onTint ? colors.surface : colors.primaryTint,
         borderWidth: dashed ? 1.5 : 0,
         borderStyle: 'dashed',
         borderColor: colors.borderStrong,

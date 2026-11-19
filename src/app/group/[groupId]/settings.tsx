@@ -103,7 +103,7 @@ function SettingsBody({
   run: RunCommand;
   reload: () => Promise<void>;
 }) {
-  const { space } = useTheme();
+  const { colors, fonts, space } = useTheme();
   const now = useMemo(() => new Date(), [group]); // eslint-disable-line react-hooks/exhaustive-deps
   const jobs = useMemo(() => jobViews(group.state, group.timeZone, now), [group, now]);
   const datesOff = useMemo(() => groupDatesOff(group.state, group.timeZone, now), [group, now]);
@@ -181,7 +181,7 @@ function SettingsBody({
         accessibilityLabel="More options"
         onPress={() => setMoreOpen((o) => !o)}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 48, marginTop: space.md }}>
-        {moreOpen ? <ChevronDown size={18} color={undefined} /> : <ChevronRight size={18} color={undefined} />}
+        {moreOpen ? <ChevronDown size={18} color={colors.textSecondary} /> : <ChevronRight size={18} color={colors.textSecondary} />}
         <Text color="textSecondary" style={{ fontWeight: '800', fontSize: 14 }}>
           More options
         </Text>
@@ -198,15 +198,16 @@ function SettingsBody({
       ) : null}
 
       <View style={{ marginTop: space.xxl, alignItems: 'center' }}>
-        <Button
-          label="Leave group"
-          variant="quiet"
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Leave group"
           onPress={() => {
             setError(null);
             setSheet('leave');
           }}
-          style={{ alignSelf: 'center' }}
-        />
+          style={({ pressed }) => ({ minHeight: 48, paddingHorizontal: space.lg, justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
+          <Text style={{ fontFamily: fonts.extrabold, color: colors.dangerText, fontSize: 15 }}>Leave group</Text>
+        </Pressable>
       </View>
 
       {editing ? (
@@ -395,7 +396,7 @@ function AddDateOffSheet({ group, run, onClose }: { group: GroupDetails; run: Ru
         onClose={onClose}
         title="Group date off"
         footer={<Button label="Close" variant="quiet" onPress={onClose} />}>
-        <Notice tone="info">Nothing is scheduled yet, so there's no date to take off.</Notice>
+        <Notice tone="info">{"Nothing is scheduled yet, so there's no date to take off."}</Notice>
       </Sheet>
     );
   }

@@ -195,7 +195,7 @@ function TurnRowView({
         </View>
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, maxWidth: '50%' }}>
-          {person.kind !== 'open' ? <PersonAvatar name={person.name} dashed={!!tag} size={28} /> : null}
+          {person.kind !== 'open' ? <PersonAvatar name={person.name} dashed={!!tag} size={28} onTint={row.mine} /> : null}
           <View style={{ flexShrink: 1 }}>
             <Text
               numberOfLines={1}

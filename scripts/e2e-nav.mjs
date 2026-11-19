@@ -7,9 +7,9 @@
 //
 // It signs up a fresh guest (real data in the Supabase project the build points at), creates a
 // Group through the 3-screen setup (name, jobs with the how-often and time sheets, who's in
-// with the invite link, QR code and a typed name), opens Settings → Add Responsibility / Add
-// Event Series, saves one of each, opens an Assignment from the Group's Schedule tab and
-// cycles the bottom tabs. It also reports how many requests the cold load made.
+// with the invite link, QR code and a typed name), checks the one-page group (Coming up, the
+// stand-in in Members), opens a turn's sheet and its details page, edits and adds a job in
+// group settings, and cycles the bottom tabs. It also reports how many requests the cold load made.
 //
 // Browser: Microsoft Edge on Windows, Chrome elsewhere (via playwright-core, no download).
 // Set E2E_BROWSER=<path to a Chromium-based browser> to use another one, E2E_HEADED=1 to watch.
@@ -117,16 +117,14 @@ const click = async (name) => {
   await button(name).click();
 };
 const fill = async (label, value) => page.getByLabel(label, { exact: true }).last().fill(value);
-const groupTab = (name) => page.getByRole('tab', { name, exact: true }).first();
-
-/** Taps the screen's Back button until the Group screen (its tabs) shows again. */
+/** Taps Back until the group page (its "Coming up" section) shows again. */
 async function backToGroup(tag) {
   for (let i = 0; i < 3; i++) {
-    if (await groupTab('Overview').isVisible().catch(() => false)) break;
+    if (await page.getByRole('button', { name: 'Group settings', exact: true }).isVisible().catch(() => false)) break;
     await page.getByRole('button', { name: 'Back', exact: true }).first().click();
     await sleep(800);
   }
-  await expectScreen(`${tag} → back to the Group`, /Overview/);
+  await expectScreen(`${tag} → back to the group`, /Coming up/);
 }
 
 const bottomTab = (name) =>
@@ -139,7 +137,9 @@ const stamp = Date.now().toString(36).slice(-4);
 const first = 'E2E';
 const last = `Nav ${stamp}`;
 const me = `${first} ${last}`;
-const respName = `E2E Greeter ${stamp}`;
+const jobName = `E2E Job ${stamp}`;
+const renamed = `E2E Teach ${stamp}`;
+const addedJob = `E2E Setup ${stamp}`;
 
 let exitCode = 0;
 try {
@@ -189,44 +189,38 @@ try {
   await click('Add');
   await expectScreen('setup 3: name added', new RegExp(`E2E Standin ${stamp}`));
   await click('Done');
-  await expectScreen('the new Group', /Overview/);
-  await groupTab('Schedule').click();
-  await expectScreen('the new Group: schedule filled', new RegExp(`E2E Job ${stamp}`));
-  await groupTab('Members').click();
-  await expectScreen('the new Group: typed name is a member', new RegExp(`E2E Standin ${stamp}`));
+  // One scrolling group page (simplify ticket 06): Coming up, then Members.
+  await expectScreen('the new group: coming up', /Coming up/);
+  await expectScreen('the new group: schedule filled', new RegExp(jobName));
+  await expectScreen('the new group: typed name is a stand-in', new RegExp(`E2E Standin ${stamp}[\\s\\S]*Stand-in`));
 
-  // Settings → Add Responsibility (saved, with this person Qualified).
+  // A turn → its details sheet → the full details page → back.
+  current = 'turn';
+  await page.locator(`[aria-label^="${jobName}"]`).filter({ visible: true }).first().click();
+  await expectScreen('turn details sheet', /See details/);
+  await click('See details');
+  await expectScreen('turn details page', /History/);
+  if (!page.url().includes('/assignment/')) throw new Error(`Turn details: unexpected URL ${page.url()}`);
+  await backToGroup('turn details');
+
+  // Gear → settings: edit a job (rename it), add a job.
   current = 'settings';
-  await groupTab('Settings').click();
-  await expectScreen('Group Settings', /Add Responsibility/);
-  await click('Add Responsibility');
-  await expectScreen('Settings → Add Responsibility', /Name/);
-  await fill('Name', respName);
-  const meChip = page.getByRole('checkbox', { name: me, exact: true });
-  if ((await meChip.getAttribute('aria-checked')) !== 'true') await meChip.click();
-  if ((await meChip.getAttribute('aria-checked')) !== 'true') throw new Error('Chip has no aria-checked state');
-  await click('Add Responsibility');
-  await expectScreen('Responsibility saved', new RegExp(respName));
-  await backToGroup('Responsibility saved');
-
-  // Settings → Add Event Series (saved, for that Responsibility).
-  if (!(await button('Add Event Series').isVisible().catch(() => false))) await groupTab('Settings').click();
-  await click('Add Event Series');
-  await expectScreen('Settings → Add Event Series', /Preview|Name/);
-  await fill('Name', `E2E Sundays ${stamp}`);
-  const respChip = page.getByRole('checkbox', { name: respName, exact: true });
-  if ((await respChip.count()) && (await respChip.getAttribute('aria-checked')) !== 'true') await respChip.click();
-  await click('Add Event Series');
-  await backToGroup('Event Series saved');
-
-  // Group Schedule tab → an Assignment.
-  current = 'assignment';
-  await groupTab('Schedule').click();
-  await expectScreen('Group Schedule', new RegExp(respName));
-  await page.locator(`[aria-label^="${respName}"]`).first().click();
-  await expectScreen('Assignment (from the Group Schedule)', /Also at this Event|History/);
-  if (!page.url().includes('/assignment/')) throw new Error(`Assignment: unexpected URL ${page.url()}`);
-  await backToGroup('Assignment');
+  await click('Group settings');
+  await expectScreen('group settings', /Jobs[\s\S]*Dates off[\s\S]*Invite link/);
+  await page.getByRole('button', { name: new RegExp(`^${jobName},`) }).filter({ visible: true }).first().click();
+  await expectScreen('edit job sheet', /Edit job/);
+  await fill('Job 1 name', renamed);
+  await click('Save job');
+  await expectScreen('job saved', new RegExp(renamed));
+  await click('Add a job');
+  await expectScreen('add job sheet', /Add a job/);
+  await fill('Job 1 name', addedJob);
+  await click('Add job');
+  await expectScreen('job added', new RegExp(addedJob));
+  await click('More options');
+  await expectScreen('more options', /Time zone/);
+  await backToGroup('settings');
+  await expectScreen('renamed job on the group page', new RegExp(renamed));
 
   // Bottom tabs (Home · Groups · Me), several rounds; Activity is the bell on Home.
   current = 'tabs';
@@ -287,7 +281,7 @@ try {
   for (const c of cards) if (await c.isVisible()) card = c;
   if (!card) throw new Error('Groups tab: the new Group card is not on screen');
   await card.click();
-  await expectScreen('Groups → the Group', /Overview/);
+  await expectScreen('Groups → the Group', /Coming up/);
   await page.getByRole('button', { name: 'Back', exact: true }).first().click();
   await expectScreen('back to Groups', /Groups/);
 
