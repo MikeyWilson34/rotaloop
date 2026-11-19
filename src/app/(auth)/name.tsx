@@ -7,7 +7,7 @@ import { ONBOARDING_STEPS } from '@/lib/gate';
 import { joinName } from '@/lib/validation';
 
 /**
- * "What's your name?" makes the guest account (step 1 of sign-up and onboarding). The name
+ * "What's your name?" makes the guest account (step 2 of sign-up and onboarding). The name
  * becomes the profile's display name through the sign-up trigger.
  */
 export default function NameScreen() {
@@ -31,7 +31,7 @@ export default function NameScreen() {
   return (
     <FormScreen
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/welcome'))}
-      topCenter={<StepDots count={ONBOARDING_STEPS} current={0} />}
+      topCenter={<StepDots count={ONBOARDING_STEPS} current={1} />}
       title="What's your name?"
       lead="So your groups know who's who."
       footer={
