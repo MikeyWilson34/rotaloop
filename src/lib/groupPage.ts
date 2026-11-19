@@ -451,3 +451,81 @@ function byLocalDate(state: GroupState, timeZone: string, now: Date) {
   }
   return [...days].map(([date, events]) => ({ date, events }));
 }
+
+// ---------------------------------------------------------------------------
+// Turn order (feedback-2 ticket 02, prototype `currentOrder` and the `turns` sheet)
+
+export type TurnOrderPerson = { memberId: MemberId; name: string; isStandIn: boolean };
+
+export type TurnOrderJob = {
+  responsibilityId: string;
+  name: string;
+  /** First name of whoever has the job's next date (null when nothing is coming up). */
+  nextName: string | null;
+  /** People with upcoming turns in date order, then everyone else in the order they joined. */
+  order: TurnOrderPerson[];
+  /** The job's upcoming dates (group time zone, YYYY-MM-DD), soonest first, dates off left out. */
+  dates: string[];
+};
+
+/**
+ * The group's Take turns jobs as the "Turn order" section shows them. Only people who take turns
+ * at the job (its Rotation) are listed, so the saved order names exactly them.
+ */
+export function turnOrderJobs(state: GroupState, timeZone: string, now: Date): TurnOrderJob[] {
+  const at = now.getTime();
+  const eventsById = new Map(state.events.map((e) => [e.id, e]));
+  return state.responsibilities
+    .filter((r) => r.removedAt === null && r.kind === 'turns')
+    .map((r) => {
+      const inLine = new Set(state.rotations.find((x) => x.responsibilityId === r.id)?.queue ?? []);
+      const upcoming = state.assignments
+        .filter((a) => {
+          const e = eventsById.get(a.eventId);
+          return a.responsibilityId === r.id && !!e && !e.skipDate && Date.parse(e.startsAt) > at;
+        })
+        .sort((a, b) => Date.parse(eventsById.get(a.eventId)!.startsAt) - Date.parse(eventsById.get(b.eventId)!.startsAt));
+
+      const ids: MemberId[] = [];
+      for (const a of upcoming) {
+        const owner = a.turnOf ?? a.memberId;
+        if (owner && inLine.has(owner) && !ids.includes(owner)) ids.push(owner);
+      }
+      for (const m of state.members) if (inLine.has(m.id) && !ids.includes(m.id)) ids.push(m.id);
+      const order = ids.map((id) => {
+        const m = memberById(state, id);
+        return { memberId: id, name: m?.name ?? 'Former member', isStandIn: !!m && m.accountId === null };
+      });
+
+      const dates: string[] = [];
+      const seen = new Set<string>();
+      for (const a of upcoming) {
+        if (seen.has(a.eventId)) continue;
+        seen.add(a.eventId);
+        dates.push(dateIn(eventsById.get(a.eventId)!.startsAt, timeZone));
+      }
+
+      const next = upcoming[0];
+      const guest = next?.coverageRequest?.cover?.kind === 'guest' ? next.coverageRequest.cover.guestName : null;
+      const nextMember = next?.memberId ? memberById(state, next.memberId) : undefined;
+      const nextName = guest ? firstName(guest) : nextMember ? firstName(nextMember.name) : null;
+      return { responsibilityId: r.id, name: r.name, nextName, order, dates };
+    });
+}
+
+/** Moves the person at `index` one place earlier (-1) or later (+1); out of range changes nothing. */
+export function moveInOrder<T>(order: T[], index: number, by: -1 | 1): T[] {
+  const to = index + by;
+  if (index < 0 || index >= order.length || to < 0 || to >= order.length) return order;
+  const next = [...order];
+  [next[index], next[to]] = [next[to], next[index]];
+  return next;
+}
+
+/** Saving the Turn order: the job's Rotation follows it from the next date. */
+export function turnOrderCommand(
+  job: TurnOrderJob,
+  order: TurnOrderPerson[],
+): Extract<ClientCommand, { type: 'reorderQueue' }> {
+  return { type: 'reorderQueue', responsibilityId: job.responsibilityId, queue: order.map((p) => p.memberId) };
+}

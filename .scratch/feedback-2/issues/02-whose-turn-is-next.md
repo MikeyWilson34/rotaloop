@@ -1,6 +1,6 @@
 # 02 Joining a rotation that's already going: "Whose turn is next?"
 
-Status: needs-triage (revised design in prototype, waiting for owner confirmation)
+Status: resolved
 Blocked by: none
 
 From the product owner (2026-11-19): when a group's rotation is already running before they start using the app, they need a way to say "I'm next and Thain has the week after". It must be optional.

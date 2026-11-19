@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinkButton } from '@/components/group/ComingUp';
 import { InviteSheet } from '@/components/group/InviteSheet';
 import { JobEditSheet } from '@/components/group/JobEditSheet';
+import { TurnOrderSheet } from '@/components/group/TurnOrderSheet';
 import type { RunCommand } from '@/components/group/runCommand';
 import { TimeZoneSheet } from '@/components/TimeZoneSheet';
 import {
@@ -21,9 +22,17 @@ import {
   TextField,
 } from '@/components/ui';
 import { APP_NAME } from '@/config/app';
-import { dateOffCandidates, groupDatesOff, jobViews, type GroupDateOff, type JobView } from '@/lib/groupPage';
+import {
+  dateOffCandidates,
+  groupDatesOff,
+  jobViews,
+  turnOrderJobs,
+  type GroupDateOff,
+  type JobView,
+  type TurnOrderJob,
+} from '@/lib/groupPage';
 import { NAME_MAX, validateGroupName } from '@/lib/groupSetup';
-import { myMember, timeZoneLabel } from '@/lib/groupViews';
+import { activeMemberCount, myMember, timeZoneLabel } from '@/lib/groupViews';
 import { GROUP_GONE, updateGroupDetails, useGroup, useRunCommand, type GroupDetails } from '@/lib/groups';
 import { inviteUrl } from '@/lib/invite';
 import { fetchGroupInviteToken, resetGroupInviteToken } from '@/lib/inviteLinks';
@@ -107,6 +116,10 @@ function SettingsBody({
   const now = useMemo(() => new Date(), [group]); // eslint-disable-line react-hooks/exhaustive-deps
   const jobs = useMemo(() => jobViews(group.state, group.timeZone, now), [group, now]);
   const datesOff = useMemo(() => groupDatesOff(group.state, group.timeZone, now), [group, now]);
+  const turnJobs = useMemo(() => turnOrderJobs(group.state, group.timeZone, now), [group, now]);
+  const showTurnOrder = activeMemberCount(group.state) >= 2 && turnJobs.length > 0;
+  const [ordering, setOrdering] = useState<string | null>(null);
+  const orderingJob = turnJobs.find((j) => j.responsibilityId === ordering);
   const [editing, setEditing] = useState<JobView | 'new' | null>(null);
   const [addingOff, setAddingOff] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -163,6 +176,17 @@ function SettingsBody({
         <AddRow label="Add a job" onPress={() => setEditing('new')} />
       </SettingsList>
 
+      {showTurnOrder ? (
+        <>
+          <Heading title="Turn order" />
+          <SettingsList>
+            {turnJobs.map((job) => (
+              <TurnOrderRow key={job.responsibilityId} job={job} onPress={() => setOrdering(job.responsibilityId)} />
+            ))}
+          </SettingsList>
+        </>
+      ) : null}
+
       <Heading title="Dates off" />
       <SettingsList>
         {datesOff.map((d) => (
@@ -213,6 +237,7 @@ function SettingsBody({
       {editing ? (
         <JobEditSheet group={group} job={editing === 'new' ? null : editing} run={run} onClose={() => setEditing(null)} />
       ) : null}
+      {orderingJob ? <TurnOrderSheet job={orderingJob} run={run} onClose={() => setOrdering(null)} /> : null}
       {addingOff ? <AddDateOffSheet group={group} run={run} onClose={() => setAddingOff(false)} /> : null}
       {sheet === 'name' ? (
         <RenameSheet initial={group.name} onClose={() => setSheet(null)} save={(name) => saveDetails(name, group.timeZone)} />
@@ -299,6 +324,18 @@ function ListRow({
       </View>
       <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.75} />
     </Pressable>
+  );
+}
+
+function TurnOrderRow({ job, onPress }: { job: TurnOrderJob; onPress: () => void }) {
+  const subtitle = `${job.nextName ? `Next: ${job.nextName} · ` : ''}Change the order`;
+  return (
+    <ListRow
+      title={job.name}
+      subtitle={subtitle}
+      accessibilityLabel={`Turn order for ${job.name}: ${subtitle}`}
+      onPress={onPress}
+    />
   );
 }
 

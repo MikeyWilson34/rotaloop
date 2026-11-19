@@ -13,6 +13,9 @@ import {
   jobEditCommands,
   jobViews,
   memberItems,
+  moveInOrder,
+  turnOrderCommand,
+  turnOrderJobs,
   newJobCommands,
   repeatFromPattern,
   type TurnRow,
@@ -204,6 +207,46 @@ describe('group dates off', () => {
     const state = act(sundayClass(4), { type: 'addSkipDate', eventId: 'w2' }, { by: 'jordan' }).state;
     expect(groupDatesOff(state, ZONE, now)).toEqual([{ date: week(2).slice(0, 10), eventIds: ['w2'] }]);
     expect(dateOffCandidates(state, ZONE, now).map((d) => d.eventIds)).toEqual([['w1'], ['w3'], ['w4']]);
+  });
+});
+
+describe('Turn order (feedback-2 ticket 02)', () => {
+  const at = new Date(NOW);
+
+  it('lists each Take turns job with who is next, the people in order and the dates', () => {
+    const [job] = turnOrderJobs(sundayClass(), ZONE, at);
+    expect(job.name).toBe('Teach');
+    expect(job.nextName).toBe('Jordan');
+    expect(job.order.map((p) => p.memberId)).toEqual(['jordan', 'sam', 'tom']);
+    expect(job.order.find((p) => p.memberId === 'tom')?.isStandIn).toBe(true);
+    expect(job.dates.length).toBe(8);
+    expect(job.dates[0] < job.dates[1]).toBe(true);
+  });
+
+  it('leaves out headcount jobs and dates off', () => {
+    let state = sundayClass();
+    state = act(state, { type: 'addSkipDate', eventId: 'w1', reason: null }, { by: 'jordan' }).state;
+    const [job] = turnOrderJobs(state, ZONE, at);
+    expect(job.dates.length).toBe(7);
+    expect(job.nextName).toBe('Jordan');
+    const headcount = { ...state, responsibilities: state.responsibilities.map((r) => ({ ...r, kind: 'headcount' as const })) };
+    expect(turnOrderJobs(headcount, ZONE, at)).toEqual([]);
+  });
+
+  it('moving and saving: the last person moved to the top gets the next date', () => {
+    const state = sundayClass();
+    const [job] = turnOrderJobs(state, ZONE, at);
+    let order = job.order;
+    expect(moveInOrder(order, 0, -1)).toBe(order);
+    expect(moveInOrder(order, 2, 1)).toBe(order);
+    order = moveInOrder(moveInOrder(order, 2, -1), 1, -1);
+    expect(order.map((p) => p.memberId)).toEqual(['tom', 'jordan', 'sam']);
+    const command = turnOrderCommand(job, order);
+    expect(command).toEqual({ type: 'reorderQueue', responsibilityId: 'teach', queue: ['tom', 'jordan', 'sam'] });
+    const after = act(state, command, { by: 'jordan' }).state;
+    const [saved] = turnOrderJobs(after, ZONE, at);
+    expect(saved.nextName).toBe('Tom');
+    expect(saved.order.map((p) => p.memberId)).toEqual(['tom', 'jordan', 'sam']);
   });
 });
 
