@@ -1,6 +1,6 @@
 # 08 Vocabulary sweep, glossary, docs, final e2e
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02, 03, 05, 06, 07
 
 - Grep all user-facing strings (screens, notifications, push text, edge-function messages, web metadata) for: Event Series, Responsibility, Qualified, Rebalance, Primary, Replacement Duty, Guest Cover, Coverage Policy, Make-up Turn, Skip Date. Replace with Job, Turn, Member, Cover, Dates off, Stand-in. Internal code names may stay.

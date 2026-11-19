@@ -1,6 +1,6 @@
 # 09 Headcount jobs (job kind, Yes/No responses, counts)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01, 03
 
 Reference: `design/prototype/simple.html` (`type:'headcount'`, `hcCounts`, `resp`, headcount hero and sheet). Spec: "Job types".

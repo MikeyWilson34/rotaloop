@@ -1,6 +1,6 @@
 # 06 App: one scrolling group page, own turns highlighted, settings simplified
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01, 02, 04
 
 Reference: `design/prototype/simple.html` `PAGES.group`, `PAGES.settings`. Spec: `.scratch/simplify/spec.md` → "Navigation".

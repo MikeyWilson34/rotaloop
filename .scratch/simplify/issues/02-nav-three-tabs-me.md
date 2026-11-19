@@ -1,6 +1,6 @@
 # 02 App: three tabs (Home · Groups · Me), Activity as a bell
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: none
 
 Reference: `design/prototype/simple.html` (tab bar, `lt-head` with bell, Me page, Activity page). Spec: `.scratch/simplify/spec.md` → "Navigation", "Me".

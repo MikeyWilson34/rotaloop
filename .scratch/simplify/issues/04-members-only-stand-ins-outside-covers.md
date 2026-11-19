@@ -1,6 +1,6 @@
 # 04 Data + commands: members only (no admins), stand-ins, outside covers
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01 (engine rules)
 
 Reference: `design/prototype/simple.html` (`add-standin`, `isStandIn`, `isGuest`, `cant-self`). Spec: `.scratch/simplify/spec.md`.

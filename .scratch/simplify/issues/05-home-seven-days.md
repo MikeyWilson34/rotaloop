@@ -1,6 +1,6 @@
 # 05 App: Home shows only the next 7 days
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01, 02
 
 Reference: `design/prototype/simple.html` `PAGES.home`, `heroCard`. Spec: `.scratch/simplify/spec.md` → "Navigation" (Home, Button colours).

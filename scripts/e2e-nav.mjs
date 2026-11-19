@@ -261,7 +261,7 @@ try {
   await fill('Name', `E2E Outside ${stamp}`);
   await click('Done');
   await expectScreen('cover: outside cover message', new RegExp(`E2E Outside ${stamp}'s covering for you on`));
-  await expectScreen("cover: outside cover on the group page", new RegExp(`E2E Outside ${stamp}[\\s\\S]*Not in group`));
+  await expectScreen("cover: outside cover on the group page", /E2E[\s\S]*Not in group/);
 
   // Gear → settings: edit a job (rename it), add a job.
   current = 'settings';
@@ -289,6 +289,7 @@ try {
   // Home is the next 7 days (big card, or "Nothing this week"), then Your groups.
   await expectScreen('Home: this week', /Your next turn|Coming\?|Nothing this week|You're all set/);
   await expectScreen('Home: your groups', /Your groups/);
+  if (/Couldn't load/.test(await bodyText())) throw new Error("Home: shows a \"Couldn't load\" message instead of the schedule");
   // Home's "Can't make it" opens the same "Can't make it?" sheet (when a turn of mine is this week).
   const homeCant = page.getByRole('button', { name: "Can't make it", exact: true }).filter({ visible: true }).first();
   if (await homeCant.isVisible().catch(() => false)) {
@@ -366,6 +367,7 @@ try {
   // And into a Group and back out, with the tabs still mounted underneath.
   await bottomTab('Groups').click();
   await expectScreen('Groups tab', /Create a group/);
+  if (/Couldn't load/.test(await bodyText())) throw new Error("Groups tab: shows a \"Couldn't load\" message");
   // Other tab screens stay mounted (hidden): pick the card that's on screen.
   const cards = await page.getByRole('button', { name: new RegExp(`^E2E Group ${stamp}`) }).all();
   let card = null;

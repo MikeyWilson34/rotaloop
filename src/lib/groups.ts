@@ -106,7 +106,7 @@ export function useMyGroups(): Loadable<GroupCardView[]> {
     if (!userId) return [];
     const { data: memberships, error } = await supabase
       .from('members')
-      .select('group_id, is_admin, groups(name, time_zone)')
+      .select('group_id, is_admin, groups!members_group_id_fkey(name, time_zone)')
       .eq('account_id', userId)
       .is('left_at', null);
     if (error) throw error;
