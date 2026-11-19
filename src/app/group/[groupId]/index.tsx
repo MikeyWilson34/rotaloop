@@ -1,47 +1,39 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, UserPlus } from 'lucide-react-native';
-import { useState } from 'react';
+import { ChevronLeft, Info, Settings } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GroupScheduleTab } from '@/components/group/GroupScheduleTab';
+import { ComingUp } from '@/components/group/ComingUp';
 import { GroupTile } from '@/components/group/GroupTile';
-import { InviteSheet } from '@/components/group/InviteSheet';
-import type { RunCommand } from '@/components/group/MemberActionsSheet';
-import { MembersTab } from '@/components/group/MembersTab';
-import { OverviewTab } from '@/components/group/OverviewTab';
-import { SettingsTab } from '@/components/group/SettingsTab';
-import { Badge, Button, Notice, SegmentedControl, Text } from '@/components/ui';
-import { APP_NAME } from '@/config/app';
+import { MembersSection } from '@/components/group/MembersSection';
+import type { RunCommand } from '@/components/group/runCommand';
+import { TurnSheet } from '@/components/group/TurnSheet';
+import { SectionHeading } from '@/components/schedule/parts';
+import { Button, InfoNote, Notice, Text } from '@/components/ui';
+import type { TurnRow } from '@/lib/groupPage';
 import { activeMemberCount, memberCountLabel, myMember } from '@/lib/groupViews';
 import { GROUP_GONE, useGroup, useRunCommand } from '@/lib/groups';
-import { fetchGroupInviteToken, resetGroupInviteToken } from '@/lib/inviteLinks';
 import { useSession } from '@/lib/session';
 import { useTheme } from '@/theme';
 
-const TABS = [
-  { value: 'overview', label: 'Overview' },
-  { value: 'schedule', label: 'Schedule' },
-  { value: 'members', label: 'Members' },
-  { value: 'settings', label: 'Settings' },
-] as const;
-type Tab = (typeof TABS)[number]['value'];
-
-function isTab(value: unknown): value is Tab {
-  return TABS.some((t) => t.value === value);
-}
-
-/** A Group: header, segmented tabs, Overview (setup or next Event, history), Schedule, Members and Settings. */
+/**
+ * A group (simplify ticket 06, prototype `PAGES.group`): one page that scrolls. Coming up (your
+ * own turns tinted), then Members. Settings sit behind the gear.
+ */
 export default function GroupScreen() {
-  const { groupId, tab: tabParam } = useLocalSearchParams<{ groupId: string; tab?: string }>();
+  const { groupId, tab } = useLocalSearchParams<{ groupId: string; tab?: string }>();
   const { colors, space, minTapTarget } = useTheme();
   const { session } = useSession();
   const accountId = session?.user.id ?? null;
   const { data, loading, error, refresh, reload, refreshing } = useGroup(groupId);
-  const [inviting, setInviting] = useState(false);
-  const tab: Tab = isTab(tabParam) ? tabParam : 'overview';
-
+  const [open, setOpen] = useState<TurnRow | null>(null);
   const run: RunCommand = useRunCommand(groupId, reload);
+
+  // Older links opened a tab of the group page; settings are their own page now.
+  useEffect(() => {
+    if (tab === 'settings' && groupId) router.replace({ pathname: '/group/[groupId]/settings', params: { groupId } });
+  }, [tab, groupId]);
 
   function back() {
     if (router.canGoBack()) router.back();
@@ -49,7 +41,6 @@ export default function GroupScreen() {
   }
 
   const me = data ? myMember(data.state, accountId) : undefined;
-  const isAdmin = !!me?.isAdmin;
 
   const topBar = (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.xs }}>
@@ -63,10 +54,10 @@ export default function GroupScreen() {
       {data && me ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Invite people"
-          onPress={() => setInviting(true)}
+          accessibilityLabel="Group settings"
+          onPress={() => router.push({ pathname: '/group/[groupId]/settings', params: { groupId: data.id } })}
           style={{ width: minTapTarget, height: minTapTarget, alignItems: 'center', justifyContent: 'center' }}>
-          <UserPlus size={24} color={colors.text} strokeWidth={1.75} />
+          <Settings size={24} color={colors.text} strokeWidth={1.75} />
         </Pressable>
       ) : null}
     </View>
@@ -92,54 +83,40 @@ export default function GroupScreen() {
       </View>
     );
   } else {
+    const count = activeMemberCount(data.state);
     body = (
-      <>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: space.lg, paddingBottom: space.lg }}>
+      <View style={{ paddingHorizontal: space.lg, gap: space.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingBottom: space.xs }}>
           <GroupTile groupId={data.id} size={56} />
           <View style={{ flex: 1, gap: 2 }}>
             <Text variant="title2" accessibilityRole="header" numberOfLines={2}>
               {data.name}
             </Text>
             <Text variant="subhead" color="textSecondary">
-              {memberCountLabel(activeMemberCount(data.state))}
+              {memberCountLabel(count)}
             </Text>
-            <View style={{ marginTop: 4 }}>
-              {isAdmin ? <Badge label="You're an Admin" tone="admin" /> : <Badge label="Member" />}
-            </View>
           </View>
         </View>
-        <View style={{ paddingHorizontal: space.lg, paddingBottom: space.md }}>
-          <SegmentedControl
-            accessibilityLabel="Group sections"
-            options={TABS}
-            value={tab}
-            onChange={(next) => router.setParams({ tab: next })}
-          />
+        {count < 2 ? (
+          <InfoNote icon={Info}>
+            <Text variant="subhead">All turns are yours until people join. Share the invite link from settings.</Text>
+          </InfoNote>
+        ) : null}
+
+        <View style={{ marginTop: space.md }}>
+          <SectionHeading title="Coming up" />
         </View>
-        <View style={{ paddingHorizontal: space.lg, gap: space.md }}>
-          {tab === 'overview' ? (
-            <OverviewTab group={data} accountId={accountId} isAdmin={isAdmin} run={run} onInvite={() => setInviting(true)} />
-          ) : null}
-          {tab === 'schedule' ? <GroupScheduleTab group={data} accountId={accountId} isAdmin={isAdmin} run={run} /> : null}
-          {tab === 'members' ? (
-            <MembersTab group={data} accountId={accountId} isAdmin={isAdmin} run={run} onInvite={() => setInviting(true)} />
-          ) : null}
-          {tab === 'settings' ? (
-            <SettingsTab group={data} me={me} isAdmin={isAdmin} run={run} reload={reload} onInvite={() => setInviting(true)} />
-          ) : null}
+        <ComingUp group={data} accountId={accountId} onOpen={setOpen} />
+
+        <View style={{ marginTop: space.lg }}>
+          <SectionHeading title="Members" />
         </View>
-        {/* Every Member can share the join link; only Admins can reset it. */}
-        <InviteSheet
-          visible={inviting}
-          onClose={() => setInviting(false)}
-          groupName={data.name}
-          title="Invite people"
-          message="Anyone with this link or QR code joins the group directly."
-          loadToken={() => fetchGroupInviteToken(data.id)}
-          resetToken={isAdmin ? () => resetGroupInviteToken(data.id) : undefined}
-          shareMessage={`Join ${data.name} on ${APP_NAME}:`}
-        />
-      </>
+        <MembersSection group={data} myMemberId={me.id} run={run} />
+
+        {open ? (
+          <TurnSheet group={data} row={open} myMemberId={me.id} run={run} onClose={() => setOpen(null)} />
+        ) : null}
+      </View>
     );
   }
 

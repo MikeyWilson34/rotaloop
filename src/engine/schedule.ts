@@ -127,6 +127,12 @@ export interface PlannedSeat {
   turnOf: MemberId | null;
   makeUpTurnId: MakeUpTurnId | null;
   coverageRequest: CoverageRequest | null;
+  /**
+   * Set when this seat went to someone else because the Member next in line had the
+   * previous date and rests (rule 2): that Member. For display only ("break for Tom");
+   * it is not stored on the Assignment.
+   */
+  restedFor?: MemberId;
 }
 
 /**
@@ -359,7 +365,9 @@ class SeatFiller {
         );
         if (stand >= 0) {
           partners.add(stand);
+          const before = this.seats.length;
           if (!this.paysBack(this.line[stand])) this.seat(this.line[stand], this.line[stand]);
+          if (this.seats.length > before) this.seats[this.seats.length - 1].restedFor = next;
         }
       } else if (this.isOnlyOnTimeOff(next) && this.input.state.settings.timeOffHandling === 'askVolunteer') {
         this.requestCoverage(next, 'timeOff');
