@@ -7,6 +7,7 @@ import { Button, Chip, ChipGroup, FieldLabel, SegmentedControl, Sheet, Text } fr
 import {
   NTH_OPTIONS,
   REPEAT_KIND_OPTIONS,
+  repeatDays,
   repeatText,
   TIME_MINUTES,
   timeFromParts,
@@ -78,7 +79,15 @@ function RepeatSheetBody({
           </ChipGroup>
         </View>
       ) : null}
-      {r.kind !== 'once' ? (
+      {r.kind === 'week' || r.kind === '2week' ? (
+        <View style={{ gap: space.sm }}>
+          <FieldLabel>Which days?</FieldLabel>
+          <DayToggles days={repeatDays(r)} onChange={(days) => setR({ ...r, weekdays: days, weekday: days[0] })} />
+          <Text variant="caption" color="textSecondary">
+            Same time on each day.
+          </Text>
+        </View>
+      ) : r.kind === 'month' ? (
         <View style={{ gap: space.sm }}>
           <FieldLabel>Day</FieldLabel>
           <ChipGroup>
@@ -104,6 +113,47 @@ function RepeatSheetBody({
         </View>
       )}
     </Sheet>
+  );
+}
+
+const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+/** A row of seven day toggles (S M T W T F S). Several can be on; at least one always stays on. */
+function DayToggles({ days, onChange }: { days: number[]; onChange: (days: number[]) => void }) {
+  const { colors, radii, fonts, space } = useTheme();
+  return (
+    <View accessibilityRole="toolbar" aria-label="Days" style={{ flexDirection: 'row', gap: space.xs }}>
+      {WEEKDAY_LONG.map((full, i) => {
+        const on = days.includes(i);
+        return (
+          <Pressable
+            key={full}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: on }}
+            aria-checked={on}
+            accessibilityLabel={full}
+            onPress={() => {
+              const next = on ? days.filter((d) => d !== i) : [...days, i].sort((a, b) => a - b);
+              if (next.length > 0) onChange(next);
+            }}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              minHeight: 44,
+              borderRadius: radii.md,
+              borderWidth: 1,
+              borderColor: on ? colors.chipOn : colors.borderStrong,
+              backgroundColor: on ? colors.chipOn : colors.surface,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <Text variant="subhead" style={{ fontFamily: fonts.bold, color: on ? colors.onChipOn : colors.text }}>
+              {DAY_LETTERS[i]}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 

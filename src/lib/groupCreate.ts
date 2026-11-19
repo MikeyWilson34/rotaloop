@@ -12,7 +12,24 @@ import { NAME_MAX, newId, todayIn, WEEKDAY_LONG } from './groupSetup';
 
 /** How often a Job happens. `nth` is 1-4, or -1 for the last, of the month (monthly only). */
 export type RepeatKind = 'week' | '2week' | 'month' | 'once';
-export type JobRepeat = { kind: RepeatKind; weekday: number; nth: number; /** One-off date, "YYYY-MM-DD". */ date: string };
+export type JobRepeat = {
+  kind: RepeatKind;
+  /** The one weekday of a monthly or one-off Job; the first of `weekdays` otherwise. */
+  weekday: number;
+  /** Every week / every 2 weeks only: all the weekdays (0 = Sunday), same time on each. Absent means just `weekday`. */
+  weekdays?: number[];
+  nth: number;
+  /** One-off date, "YYYY-MM-DD". */
+  date: string;
+};
+
+/** The weekdays a Job repeats on, sorted: several for the weekly kinds, else just the one. */
+export function repeatDays(r: JobRepeat): number[] {
+  if ((r.kind === 'week' || r.kind === '2week') && r.weekdays && r.weekdays.length > 0) {
+    return [...new Set(r.weekdays)].sort((a, b) => a - b);
+  }
+  return [r.weekday];
+}
 
 /**
  * - `turns`: one person each time, rotating fairly.
@@ -71,11 +88,14 @@ function monthDay(date: string): string {
 /** The "when" in the sentence row: "every Sunday", "every other Sunday", "1st Sunday monthly", "once, Dec 6". */
 export function repeatText(r: JobRepeat): string {
   const day = WEEKDAY_LONG[r.weekday];
+  const days = repeatDays(r);
+  // One day reads in full ("every Sunday"); several read short ("every Tue, Thu, Sat").
+  const list = days.length === 1 ? WEEKDAY_LONG[days[0]] : days.map((d) => WEEKDAY_LONG[d].slice(0, 3)).join(', ');
   switch (r.kind) {
     case 'week':
-      return `every ${day}`;
+      return `every ${list}`;
     case '2week':
-      return `every other ${day}`;
+      return `every other ${list}`;
     case 'month':
       return `${(NTH_OPTIONS.find((o) => o.value === r.nth)?.label ?? '1st').toLowerCase()} ${day} monthly`;
     case 'once':
@@ -138,13 +158,14 @@ function oneOffInstant(job: JobDraft, timeZone: string): string {
 
 /** The engine's repeat pattern for a repeating Job (null for a one-off). */
 export function jobPattern(job: JobDraft, timeZone: string, today: string): RepeatPattern | null {
-  const base = { daysOfWeek: [job.repeat.weekday], startTime: job.time, timeZone: zoneOrUtc(timeZone), intervalWeeks: null };
+  const days = repeatDays(job.repeat);
+  const base = { daysOfWeek: days, startTime: job.time, timeZone: zoneOrUtc(timeZone), intervalWeeks: null };
   switch (job.repeat.kind) {
     case 'week':
       return { ...base, frequency: 'weekly', weekOfMonth: null, startsOn: today };
     case '2week':
       // Counts from the first matching day on or after today, so that day is the first date.
-      return { ...base, frequency: 'biweekly', weekOfMonth: null, startsOn: firstOnOrAfter(today, job.repeat.weekday) };
+      return { ...base, frequency: 'biweekly', weekOfMonth: null, startsOn: firstOnOrAfter(today, days) };
     case 'month':
       return { ...base, frequency: 'monthly', weekOfMonth: job.repeat.nth, startsOn: today };
     case 'once':
@@ -152,9 +173,9 @@ export function jobPattern(job: JobDraft, timeZone: string, today: string): Repe
   }
 }
 
-function firstOnOrAfter(date: string, weekday: number): string {
+function firstOnOrAfter(date: string, weekdays: number[]): string {
   const day = dayNumber(date);
-  return dateOf(day + ((weekday - weekdayOf(day) + 7) % 7));
+  return dateOf(day + Math.min(...weekdays.map((w) => (w - weekdayOf(day) + 7) % 7)));
 }
 
 /**

@@ -148,3 +148,34 @@ describe("Who's in?", () => {
     ]);
   });
 });
+
+describe('several weekdays per job', () => {
+  const tts = { ...newJobDraft(TODAY).repeat, weekday: 2, weekdays: [6, 2, 4] };
+
+  it('reads "every Tue, Thu, Sat"; one day keeps its full name', () => {
+    expect(repeatText({ ...tts, kind: 'week' })).toBe('every Tue, Thu, Sat');
+    expect(repeatText({ ...tts, kind: '2week', weekdays: [2, 4] })).toBe('every other Tue, Thu');
+    expect(repeatText({ ...tts, kind: 'week', weekdays: [0] })).toBe('every Sunday');
+    expect(repeatText({ ...tts, kind: '2week', weekdays: [0] })).toBe('every other Sunday');
+  });
+
+  it('monthly and one-off use the single weekday, not the list', () => {
+    expect(repeatText({ ...tts, kind: 'month', nth: 1 })).toBe('1st Tuesday monthly');
+  });
+
+  it('writes every chosen day to the pattern', () => {
+    expect(jobPattern(job({ repeat: { ...tts, kind: 'week' } }), 'UTC', TODAY)).toMatchObject({ frequency: 'weekly', daysOfWeek: [2, 4, 6] });
+    // 2026-11-19 is a Thursday: the first of Tue/Thu/Sat on or after it is today.
+    expect(jobPattern(job({ repeat: { ...tts, kind: '2week' } }), 'UTC', TODAY)).toMatchObject({
+      frequency: 'biweekly',
+      daysOfWeek: [2, 4, 6],
+      startsOn: '2026-11-19',
+    });
+    expect(jobPattern(job({ repeat: { ...tts, kind: 'month', nth: 2 } }), 'UTC', TODAY)).toMatchObject({ daysOfWeek: [2] });
+  });
+
+  it('creating a group keeps all the days', () => {
+    const req = createGroupRequest({ name: 'G', memberName: 'Ana', timeZone: 'UTC', now: NOW, jobs: [job({ name: 'Coffee', repeat: { ...tts, kind: 'week' } })] });
+    expect(req.eventSeries?.[0].repeat?.daysOfWeek).toEqual([2, 4, 6]);
+  });
+});

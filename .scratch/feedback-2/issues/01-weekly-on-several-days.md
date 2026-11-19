@@ -1,6 +1,6 @@
 # 01 Weekly on several days
 
-Status: needs-triage
+Status: resolved
 Blocked by: none
 
 From the product owner (2026-11-19): "We should be able to select multiple days weekly. Like an event that would happen every Tues, Thurs, and Saturday at 6am weekly."

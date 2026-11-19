@@ -141,6 +141,7 @@ const me = `${first} ${last}`;
 const jobName = `E2E Job ${stamp}`;
 const renamed = `E2E Teach ${stamp}`;
 const addedJob = `E2E Setup ${stamp}`;
+const multiName = `E2E Multi ${stamp}`;
 
 let exitCode = 0;
 try {
@@ -179,6 +180,15 @@ try {
   await click('Add another job');
   await fill('Job 2 name', `E2E Coffee ${stamp}`);
   await page.getByRole('radio', { name: 'Headcount' }).last().click();
+  // Several weekdays for one job (feedback-2 ticket 01): Tue + Thu + Sat, same time.
+  await click('Add another job');
+  await fill('Job 3 name', multiName);
+  await page.locator(`[aria-label^="${multiName}: how often"]`).filter({ visible: true }).first().click();
+  await expectScreen('setup 2: how often sheet (days)', /Which days\?[\s\S]*Same time on each day/);
+  for (const day of ['Tuesday', 'Thursday', 'Saturday']) await page.getByRole('checkbox', { name: day, exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Sunday', exact: true }).click();
+  await click('Done · every Tue, Thu, Sat');
+  await expectScreen('setup 2: several days row', /every Tue, Thu, Sat/);
   await click('Next');
   await expectScreen("setup 3: who's in", /Who's in\?/);
   await expectScreen('setup 3: invite link', /\/join\/[0-9a-f]{64}/);
@@ -193,6 +203,14 @@ try {
   // One scrolling group page (simplify ticket 06): Coming up, then Members.
   await expectScreen('the new group: coming up', /Coming up/);
   await expectScreen('the new group: schedule filled', new RegExp(jobName));
+  // Several weekdays: the multi-day job's dates fall on Tue, Thu and Sat only.
+  {
+    const labels = await page.locator(`[aria-label^="${multiName},"]`).evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+    const days = new Set(labels.map((l) => (l.match(/\b(Sun|Mon|Tue|Wed|Thu|Fri|Sat)[a-z]*\b/) ?? [])[1]).filter(Boolean));
+    if (!labels.length || ['Tue', 'Thu', 'Sat'].some((d) => !days.has(d)) || [...days].some((d) => !['Tue', 'Thu', 'Sat'].includes(d))) {
+      throw new Error(`several weekdays: expected dates only on Tue, Thu, Sat, got ${[...days].join(', ') || 'none'} from ${labels.slice(0, 4).join(' | ')}`);
+    }
+  }
   await expectScreen('the new group: typed name is a stand-in', new RegExp(`E2E Standin ${stamp}[\\s\\S]*Stand-in`));
 
   // Headcount jobs (simplify ticket 09): Coffee asks "Coming?" instead of taking turns. This
