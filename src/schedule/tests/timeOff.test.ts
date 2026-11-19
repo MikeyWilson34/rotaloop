@@ -160,7 +160,7 @@ describe('preview', () => {
       expect.objectContaining({ title: 'Sound, Sun, Dec 13', text: 'Ben takes it, and you take Ben’s turn on Dec 20.', kind: 'route' }),
     ]);
     expect(preview.othersAffected).toBe(1);
-    expect(savedToast(preview)).toBe('Time Off saved. Routed around 1 Assignment.');
+    expect(savedToast(preview)).toBe('Dates off saved. Routed around 1 Assignment.');
   });
 
   it('asks for a volunteer: it becomes a Coverage Request', () => {
@@ -174,13 +174,13 @@ describe('preview', () => {
         kind: 'coverage',
       }),
     ]);
-    expect(savedToast(preview)).toBe('Time Off saved. 1 Coverage Request sent.');
+    expect(savedToast(preview)).toBe('Dates off saved. 1 Coverage Request sent.');
   });
 
   it('nothing to change on days I am not serving', () => {
     const preview = timeOffPreview(timeOffPlan(draft(['2026-12-06']), [group()], 'tox'), NOW, VIEWER);
     expect(preview.lines).toEqual([]);
-    expect(savedToast(preview)).toBe('Time Off saved. We’ll schedule around it.');
+    expect(savedToast(preview)).toBe('Dates off saved. We’ll schedule around it.');
   });
 
   it('reports a Group where the engine refuses', () => {

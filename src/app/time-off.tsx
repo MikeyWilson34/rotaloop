@@ -54,9 +54,9 @@ type Mode = (typeof MODES)[number]['value'];
 const MONTHS_AHEAD = 12;
 
 /**
- * Time Off (prototype `screenAvailability`): pick single days or a range on a month calendar,
- * choose a repeat, which Responsibilities it applies to and a note, see what saving would
- * change, then save it to each of the person's Groups. Below, "Your Time Off" with remove.
+ * Dates off (prototype `screenAvailability`): pick single days or a range on a month calendar,
+ * choose a repeat, which jobs it applies to and a note, see what saving would
+ * change, then save it to each of the person's Groups. Below, "Your dates off" with remove.
  */
 export default function TimeOffScreen() {
   const { colors, fonts, space, minTapTarget } = useTheme();
@@ -98,7 +98,7 @@ export default function TimeOffScreen() {
 
   function back() {
     if (router.canGoBack()) router.back();
-    else router.replace('/schedule');
+    else router.replace('/');
   }
 
   function pick(date: string) {
@@ -150,7 +150,7 @@ export default function TimeOffScreen() {
       return;
     }
     setRemoving(null);
-    showToast('Time Off removed. Swaps already made stay.', Trash2);
+    showToast('Dates off removed.', Trash2);
   }
 
   const topBar = (
@@ -165,7 +165,7 @@ export default function TimeOffScreen() {
       <Text
         accessibilityRole="header"
         style={{ flex: 1, textAlign: 'center', fontFamily: fonts.extrabold, fontSize: 17, lineHeight: 22 }}>
-        Time Off
+        Dates off
       </Text>
       <View style={{ width: minTapTarget }} />
     </View>
@@ -247,7 +247,7 @@ export default function TimeOffScreen() {
           </ChipGroup>
           {repeat === 'monthly' ? (
             <Text variant="caption" color="textSecondary">
-              Saved for the next 12 months, each as its own Time Off.
+              Saved for the next 12 months, each as its own entry.
             </Text>
           ) : repeat !== 'none' ? (
             <Text variant="caption" color="textSecondary">
@@ -259,7 +259,7 @@ export default function TimeOffScreen() {
         <View style={{ gap: space.sm }}>
           <FieldLabel>Applies to</FieldLabel>
           <ChipGroup>
-            <Chip label="All Responsibilities" selected={scope === 'all'} onPress={() => setScope('all')} />
+            <Chip label="All jobs" selected={scope === 'all'} onPress={() => setScope('all')} />
             {names.map((n) => (
               <Chip
                 key={n}
@@ -301,10 +301,10 @@ export default function TimeOffScreen() {
           </InfoNote>
         ) : null}
         {dates.length > 0 && plan.length === 0 ? (
-          <Notice tone="info">None of your groups has those Responsibilities. Pick All Responsibilities or another one.</Notice>
+          <Notice tone="info">None of your groups has those jobs. Pick All jobs or another job.</Notice>
         ) : null}
         {preview.refused.length > 0 ? (
-          <Notice>{`This Time Off can't be added in ${preview.refused.map((r) => r.groupName).join(', ')}. Pull down to refresh, then try again.`}</Notice>
+          <Notice>{`These dates off can't be added in ${preview.refused.map((r) => r.groupName).join(', ')}. Pull down to refresh, then try again.`}</Notice>
         ) : null}
         {saveError ? <Notice>{saveError}</Notice> : null}
 
@@ -320,11 +320,11 @@ export default function TimeOffScreen() {
         </View>
 
         <View style={{ gap: space.sm, marginTop: space.lg }}>
-          <FieldLabel>Your Time Off</FieldLabel>
+          <FieldLabel>Your dates off</FieldLabel>
           {items.length === 0 ? (
             <Card>
               <Text color="textSecondary" style={{ textAlign: 'center' }}>
-                No Time Off yet
+                No dates off yet
               </Text>
             </Card>
           ) : (
@@ -354,7 +354,7 @@ export default function TimeOffScreen() {
                   </View>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Remove Time Off: ${item.label}`}
+                    accessibilityLabel={`Remove dates off: ${item.label}`}
                     onPress={() => {
                       setRemoveError(null);
                       setRemoving(item);
@@ -375,9 +375,9 @@ export default function TimeOffScreen() {
         </View>
         <ConfirmSheet
           visible={removing !== null}
-          title="Remove this Time Off?"
-          message={`${removing?.label ?? ''}. You can be scheduled on these days again. Swaps already made stay: whoever took your turn keeps it, and you keep theirs.`}
-          confirmLabel="Remove Time Off"
+          title="Remove these dates off?"
+          message={`${removing?.label ?? ''}. You can be scheduled on these days again. `}
+          confirmLabel="Remove"
           tone="destructive"
           loading={removeBusy}
           error={removeError}

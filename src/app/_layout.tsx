@@ -136,6 +136,7 @@ function RootNavigator() {
         <Stack.Screen name="group/[groupId]/responsibility/[responsibilityId]" />
         <Stack.Screen name="group/[groupId]/series/[seriesId]" />
         <Stack.Screen name="assignment/[groupId]/[assignmentId]" />
+        <Stack.Screen name="activity" />
         <Stack.Screen name="time-off" />
         <Stack.Screen name="join/index" />
       </Stack.Protected>
