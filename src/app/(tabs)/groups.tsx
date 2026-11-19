@@ -3,7 +3,7 @@ import { ChevronRight, Link, Plus } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, RefreshControl, View } from 'react-native';
 
 import { GroupTile } from '@/components/group/GroupTile';
-import { Badge, Button, Card, Notice, Screen, Text } from '@/components/ui';
+import { Button, Card, Notice, Screen, Text } from '@/components/ui';
 import { formatEventTime, type GroupCardView } from '@/lib/groupViews';
 import { useMyGroups } from '@/lib/groups';
 import { useTheme } from '@/theme';
@@ -70,11 +70,11 @@ export default function GroupsScreen() {
 
 function GroupCard({ group }: { group: GroupCardView }) {
   const { colors, radii, space, fonts, shadows } = useTheme();
-  const next = group.nextEventAt ? formatEventTime(group.nextEventAt, group.timeZone) : 'No Events yet';
+  const next = group.nextEventAt ? formatEventTime(group.nextEventAt, group.timeZone) : 'Nothing scheduled yet';
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${group.name}. ${group.nextEventAt ? `Next Event ${next}` : next}.${group.isAdmin ? ' You are an Admin.' : ''}`}
+      accessibilityLabel={`${group.name}. ${group.nextEventAt ? `Next ${next}` : next}.`}
       onPress={() => router.push({ pathname: '/group/[groupId]', params: { groupId: group.groupId } })}
       style={({ pressed }) => ({
         flexDirection: 'row',
@@ -98,7 +98,6 @@ function GroupCard({ group }: { group: GroupCardView }) {
           {next}
         </Text>
       </View>
-      {group.isAdmin ? <Badge label="Admin" tone="admin" /> : null}
       <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.75} />
     </Pressable>
   );

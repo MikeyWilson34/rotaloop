@@ -132,18 +132,18 @@ describe('describeHistoryEntry', () => {
   });
 
   it('describes Skip Dates and Time Off', () => {
-    expect(texts('addSkipDate')).toEqual(['Ben marked Sun, Jan 3 as a Skip Date. Turns move forward one Event.']);
-    expect(texts('removeSkipDate')).toEqual(['You removed the Skip Date on Sun, Jan 3. The Rotation is restored.']);
+    expect(texts('addSkipDate')).toEqual(['Ben marked Sun, Jan 3 as a day off. Turns move forward one date.']);
+    expect(texts('removeSkipDate')).toEqual(['You removed the day off on Sun, Jan 3. The turns are back as they were.']);
     expect(texts('addTimeOff')).toEqual(['Cal added Time Off (Dec 26 – Dec 27).']);
     expect(texts('removeTimeOff')).toEqual(['Cal removed Time Off.']);
   });
 
   it('describes membership', () => {
-    expect(texts('addMember')).toEqual(['You added Dee as a Placeholder Member.', 'Eve joined the group.']);
-    expect(texts('qualifyMember')).toEqual(['You made Deb a Qualified Member for Sound.']);
+    expect(texts('addMember')).toEqual(['You added Dee as a stand-in.', 'Eve joined the group.']);
+    expect(texts('qualifyMember')).toEqual(['You added Deb to the Sound turns.']);
     expect(texts('unqualifyMember')).toEqual(['You took Deb out of the Sound Rotation.']);
     expect(texts('renameMember')).toEqual(['You renamed a Member to Deb.', 'Evie changed their name.']);
-    expect(texts('setAdmin')).toEqual(['You made Ben an Admin.', 'Ben stepped down as Admin.']);
+    expect(texts('setAdmin')).toEqual(["You changed Ben's group permissions.", 'Ben changed their group permissions.']);
     expect(texts('claimPlaceholder')).toEqual(['Deb joined and took their place in the Rotations.']);
     expect(texts('removeMember')).toEqual([
       'Deb left the group. Their future turns moved to others.',
@@ -152,22 +152,22 @@ describe('describeHistoryEntry', () => {
   });
 
   it('describes Responsibilities and Rotations', () => {
-    expect(texts('addResponsibility')).toEqual(['You added the Responsibility Host.']);
+    expect(texts('addResponsibility')).toEqual(['You added the job Host.']);
     expect(texts('editResponsibility')).toEqual(['You changed Host: set it to 2 people per Event and turned on confirmation.']);
     expect(texts('setPrimaryResponsibility')).toEqual([
-      'You made Sound the Primary Responsibility.',
-      'You cleared the Primary Responsibility.',
+      "You made Sound the group's main job.",
+      "You cleared the group's main job.",
     ]);
-    expect(texts('reorderResponsibilities')).toEqual(['You changed the order Responsibilities are filled in.']);
-    expect(texts('removeResponsibility')).toEqual(['You removed the Responsibility Host.']);
+    expect(texts('reorderResponsibilities')).toEqual(['You changed the order jobs are filled in.']);
+    expect(texts('removeResponsibility')).toEqual(['You removed the job Host.']);
     expect(texts('reorderQueue')).toEqual(['You reordered the Sound Rotation.']);
     expect(texts('rebalance')).toEqual(['You reordered Sound so whoever has done the fewest turns goes first.']);
   });
 
   it('describes Event Series and one-off Events', () => {
-    expect(texts('addEventSeries')).toEqual(['You added the Event Series Saturday prep (1 Event).']);
-    expect(texts('editEventSeries')).toEqual(['You changed the Event Series Prep.']);
-    expect(texts('removeEventSeries')).toEqual(['You removed the Event Series Prep.']);
+    expect(texts('addEventSeries')).toEqual(['You added dates for Saturday prep (1 date).']);
+    expect(texts('editEventSeries')).toEqual(['You changed when Prep happens.']);
+    expect(texts('removeEventSeries')).toEqual(['You removed the dates for Prep.']);
     expect(texts('removeEvent')).toEqual(['You removed the Event.']);
   });
 
@@ -252,7 +252,7 @@ describe('one Assignment\'s history', () => {
     run(b, { type: 'addSkipDate', eventId: eventId('2026-11-29') }, 'cal');
     const ctx: HistoryContext = { state: b.state, myMemberId: 'ana', timeZone: ZONE };
     expect(movedNotice(b.history, a.id, ctx)).toBe(
-      'Moved from Sun, Nov 29 to Sun, Dec 6. Cal marked Sun, Nov 29 as a Skip Date. Turns move forward one Event.',
+      'Moved from Sun, Nov 29 to Sun, Dec 6. Cal marked Sun, Nov 29 as a day off. Turns move forward one date.',
     );
     const never = seat(b.state, '2026-11-22', 'sound');
     expect(movedNotice(b.history, never.id, ctx)).toBeNull();

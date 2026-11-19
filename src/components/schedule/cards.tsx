@@ -210,7 +210,7 @@ export function EventCard({
           event.slots.map((s) => <SlotRow key={s.key} slot={s} />)
         ) : (
           <Text variant="subhead" color="textSecondary" style={{ paddingVertical: 8 }}>
-            No Responsibilities at this Event.
+            No jobs on this date.
           </Text>
         )}
       </View>
@@ -226,7 +226,7 @@ export function SkipCard({ event, showGroup = true }: { event: EventView; showGr
   return (
     <View
       accessible
-      accessibilityLabel={`Skip Date, ${formatDayShort(event.date)}${showGroup ? `, ${event.groupName}` : ''}. ${text}`}
+      accessibilityLabel={`Day off, ${formatDayShort(event.date)}${showGroup ? `, ${event.groupName}` : ''}. ${text}`}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -242,7 +242,7 @@ export function SkipCard({ event, showGroup = true }: { event: EventView; showGr
       <DateBox date={event.date} skipped />
       <View style={{ flex: 1, minWidth: 0, gap: space.xs }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' }}>
-          <StatusPill status="skipped" label="Skip Date" />
+          <StatusPill status="skipped" label="Day off" />
           <Text
             variant="caption"
             color="textSecondary"

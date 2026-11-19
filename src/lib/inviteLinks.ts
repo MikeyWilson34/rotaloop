@@ -5,13 +5,13 @@
 import { supabase } from './supabase';
 
 const OFFLINE = "Couldn't load the invite link. Check your connection and try again.";
-const ADMINS_ONLY = 'Only Admins can share invite links.';
+const ADMINS_ONLY = 'Only people in this group can share its invite link.';
 
 /** The Group's join link token (any active Member, via `group_invite_link`). */
 export async function fetchGroupInviteToken(groupId: string): Promise<string> {
   const { data, error } = await supabase.rpc('group_invite_link', { p_group_id: groupId });
-  if (error) throw new Error(error.code === '42501' ? "You're no longer a Member of this group." : OFFLINE);
-  if (!data) throw new Error('This group has no invite link right now. Ask an Admin to reset it.');
+  if (error) throw new Error(error.code === '42501' ? "You're no longer in this group." : OFFLINE);
+  if (!data) throw new Error("This group has no invite link right now. Reset it in the group's settings.");
   return data;
 }
 

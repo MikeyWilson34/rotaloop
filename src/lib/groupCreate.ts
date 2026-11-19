@@ -205,7 +205,7 @@ export function createGroupRequest(input: CreateGroupInput): Extract<GroupComman
   return {
     action: 'createGroup',
     name: input.name.trim(),
-    memberName: input.memberName.trim() || 'Admin',
+    memberName: input.memberName.trim() || 'Group creator',
     timeZone,
     settings: SIMPLE_GROUP_SETTINGS,
     primaryResponsibilityId: null,

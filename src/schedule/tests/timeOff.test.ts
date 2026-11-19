@@ -215,7 +215,7 @@ describe('"Your Time Off" and the calendar', () => {
     const groups = saved(draft(['2026-12-13'], { note: 'Family trip' }), [group(), group(buildGroup().state, 'cal', 'Other', 'g2')]);
     const items = timeOffItems(groups, NOW);
     expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ key: 'tox', label: 'Sun, Dec 13', detail: 'All Responsibilities · Sunday Team, Other · Family trip' });
+    expect(items[0]).toMatchObject({ key: 'tox', label: 'Sun, Dec 13', detail: 'All jobs · Sunday Team, Other · Family trip' });
     expect(items[0].entries).toEqual([
       { groupId: 'g1', timeOffId: 'tox-r1' },
       { groupId: 'g2', timeOffId: 'tox-r1' },
@@ -263,7 +263,7 @@ describe('history with reasons and repeats', () => {
     const ctx = { state: b.state, myMemberId: 'ana', timeZone: ZONE };
     const texts = b.history.slice(-2).map((h) => describeHistoryEntry(h, ctx).text);
     expect(texts).toEqual([
-      'Ben marked Sun, Jan 3 as a Skip Date (Holiday: Building closed). Turns move forward one Event.',
+      'Ben marked Sun, Jan 3 as a day off (Holiday: Building closed). Turns move forward one date.',
       'Cal added Time Off (Dec 13, repeats weekly).',
     ]);
   });

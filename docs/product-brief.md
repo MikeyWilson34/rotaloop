@@ -1,6 +1,8 @@
 # Volunteer Scheduling App — Master Product & Design Brief
 
 > Source of truth from the product owner (received 2026-11-15). Working name: Rotaloop (not final).
+>
+> **Simplified 2026-11-18** after tester feedback ("too complex"): see `.scratch/simplify/spec.md`. Where this brief and the simplification differ, the simplification wins. In short: user-facing words are Group, Member, Stand-in, Job, Turn, Headcount, Cover and Dates off (`GLOSSARY.md`); there are no Admins for now, so everyone in a group can manage it ([ADR 0006](adr/0006-members-only.md)); Stand-ins and outside covers are in [ADR 0007](adr/0007-stand-ins-and-outside-covers.md); rotation rules are in [ADR 0005](adr/0005-rotation-rules.md). The admin overview, fairness settings and Rebalance below are deferred.
 
 **Product category:** Group scheduling and shared-responsibility management
 **Initial audience:** Church volunteer teams

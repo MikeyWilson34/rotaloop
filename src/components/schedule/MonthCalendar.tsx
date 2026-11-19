@@ -92,7 +92,7 @@ export function MonthCalendar({
           swatch={
             <View style={{ width: 14, height: 14, borderRadius: 4, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.borderStrong }} />
           }
-          label="Skip Date"
+          label="Day off"
         />
         {legendGroups.map((g) => (
           <LegendItem key={g.id} swatch={<GroupDot groupId={g.id} />} label={g.name} />
@@ -119,7 +119,7 @@ function DayCell({ day, selected, onPress }: { day: MonthDay; selected: boolean;
   const parts = [formatDayLong(day.date)];
   if (day.isToday) parts.push('today');
   if (day.mine) parts.push("you're serving");
-  if (day.skipOnly) parts.push('Skip Date');
+  if (day.skipOnly) parts.push('Day off');
   if (!day.mine && day.groupIds.length) parts.push(day.groupIds.length === 1 ? '1 group' : `${day.groupIds.length} groups`);
   return (
     <Pressable

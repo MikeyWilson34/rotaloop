@@ -11,7 +11,7 @@ describe('withdrawDecline and Decline reason messages (ticket 16)', () => {
     expect(groupCommandMessage('notPermitted', 'withdrawDecline')).toBe('Only the person who said they can’t make it can take it back.');
     expect(groupCommandMessage('invalid', 'withdrawDecline')).toMatch(/^The turns changed/);
     expect(groupCommandMessage('eventHasPassed', 'withdrawDecline')).toBe(
-      'That Event has already happened, so it can no longer change.',
+      'That date has already passed, so it can no longer change.',
     );
   });
 

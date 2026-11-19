@@ -135,7 +135,7 @@ export function slotView(group: ScheduleGroup, assignment: Assignment, startsAt:
     assignmentId: assignment.id,
     eventId: assignment.eventId,
     responsibilityId: assignment.responsibilityId,
-    responsibilityName: state.responsibilities.find((r) => r.id === assignment.responsibilityId)?.name ?? 'Responsibility',
+    responsibilityName: state.responsibilities.find((r) => r.id === assignment.responsibilityId)?.name ?? 'Job',
     startsAt,
     status: slotStatus(assignment, startsAt, now, state.settings),
     who,

@@ -199,7 +199,7 @@ describe('activityItems', () => {
     const items = activityItems(entries, [asGroup(b.state)], { now: NOW, viewerTimeZone: ZONE, lastSeenAt: '2026-11-17T00:00:00.000Z' });
     expect(items.map((i) => i.kind)).toEqual(['change', 'coverage', 'confirm', 'confirm']);
     const [skip, decline, confirm] = items;
-    expect(skip.text).toMatch(/^You marked Sun, Jan 10 as a Skip Date/);
+    expect(skip.text).toMatch(/^You marked Sun, Jan 10 as a day off/);
     expect(skip.icon).toBe('calX');
     expect(skip.unread).toBe(false); // my own
     expect(decline.text).toBe("Cal can't make Sound on Sun, Dec 6. The group was asked to cover.");

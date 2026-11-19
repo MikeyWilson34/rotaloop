@@ -58,7 +58,7 @@ export default function CreateGroupScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const creatorName = profile.display_name?.trim() || 'Admin';
+  const creatorName = profile.display_name?.trim() || 'Group creator';
 
   function leave() {
     if (router.canGoBack()) router.back();

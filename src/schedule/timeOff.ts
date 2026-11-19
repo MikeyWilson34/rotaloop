@@ -414,7 +414,7 @@ export function timeOffItems(groups: TimeOffGroup[], now: Instant): TimeOffItem[
     const allScope = all.some((x) => x.timeOff.responsibilityIds === null);
     const groupNames = [...new Set(all.map((x) => x.group.name))];
     const detail = [
-      allScope || scopeNames.length === 0 ? 'All Responsibilities' : scopeNames.join(', '),
+      allScope || scopeNames.length === 0 ? 'All jobs' : scopeNames.join(', '),
       groups.length > 1 ? groupNames.join(', ') : '',
       sample.note ?? '',
     ]

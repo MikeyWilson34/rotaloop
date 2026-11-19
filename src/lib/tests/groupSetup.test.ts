@@ -107,8 +107,8 @@ describe('Responsibilities', () => {
   it('lists active ones in fill order with a summary', () => {
     const views = responsibilityViews(sample());
     expect(views.map((v) => v.id)).toEqual(['sound', 'greeter']);
-    expect(views[0]).toMatchObject({ isPrimary: true, qualifiedCount: 2, summary: '2 Qualified Members · 1 per Event · Needs confirmation' });
-    expect(views[1].summary).toBe('0 Qualified Members · 2 per Event · No confirmation');
+    expect(views[0]).toMatchObject({ isPrimary: true, qualifiedCount: 2, summary: '2 members · 1 per Event · Needs confirmation' });
+    expect(views[1].summary).toBe('0 members · 2 per Event · No confirmation');
   });
 
   it('shows the Rotation queue in order and qualification options by name', () => {
@@ -152,8 +152,8 @@ describe('Responsibilities', () => {
     };
     expect(outstandingMakeUpTurns(state)).toBe(1);
     expect(outstandingMakeUpTurns(state, 'greeter')).toBe(0);
-    expect(countRealWorkWarning(state)).toMatch(/1 outstanding Make-up Turn will be cancelled/);
-    expect(countRealWorkWarning(sample())).toMatch(/no outstanding Make-up Turns/);
+    expect(countRealWorkWarning(state)).toMatch(/1 swapped turn still waiting will be cancelled/);
+    expect(countRealWorkWarning(sample())).toMatch(/no swapped turns waiting/);
   });
 });
 

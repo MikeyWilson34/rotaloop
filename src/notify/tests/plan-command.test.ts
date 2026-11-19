@@ -162,7 +162,7 @@ describe('schedule changes', () => {
     const anaFirst = items.find((i) => i.accountId === ACCOUNT.ana && i.assignmentId === 'a1')!;
     expect(anaFirst.title).toBe('Schedule change: Sound, Sun, Nov 29');
     expect(anaFirst.body).toBe(
-      'Moved from Sun, Nov 22 to Sun, Nov 29. Cal marked Sun, Nov 22 as a Skip Date (Holiday). Turns move forward one Event. · Sunday Team',
+      'Moved from Sun, Nov 22 to Sun, Nov 29. Cal marked Sun, Nov 22 as a day off (Holiday). Turns move forward one date. · Sunday Team',
     );
   });
 

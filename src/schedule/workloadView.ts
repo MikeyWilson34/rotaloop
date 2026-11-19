@@ -107,7 +107,7 @@ export function makeUpTurnLines(state: GroupState, myMemberId: MemberId | null, 
   return state.makeUpTurns
     .filter((t) => t.status === 'outstanding')
     .map((t) => {
-      const what = state.responsibilities.find((r) => r.id === t.responsibilityId)?.name ?? 'a Responsibility';
+      const what = state.responsibilities.find((r) => r.id === t.responsibilityId)?.name ?? 'a job';
       const paying = state.assignments.find((a) => a.makeUpTurnId === t.id);
       const event = paying && state.events.find((e) => e.id === paying.eventId);
       const debtor = name(t.debtorId);

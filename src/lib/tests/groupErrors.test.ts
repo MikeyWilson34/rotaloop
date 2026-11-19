@@ -62,9 +62,10 @@ describe('groupCommandMessage', () => {
   });
 
   it('explains the last-Admin guard for leaving and stepping down', () => {
-    expect(groupCommandMessage('lastAdmin', 'leave')).toMatch(/only Admin.*can't leave/);
-    expect(groupCommandMessage('lastAdmin', 'stepDown')).toMatch(/only Admin.*can't step down/);
-    expect(groupCommandMessage('lastAdmin', 'removeMember')).toMatch(/only Admin/);
+    // No Admins in the app (ADR 0006): one plain message, never the word Admin.
+    for (const action of ['leave', 'stepDown', 'removeMember'] as const) {
+      expect(groupCommandMessage('lastAdmin', action)).toBe("That can't be changed right now. Pull down to refresh, then try again.");
+    }
   });
 
   it('explains why a Placeholder cannot be made an Admin', () => {
@@ -83,14 +84,14 @@ describe('groupCommandMessage', () => {
 
 describe('group setup messages', () => {
   it('explains setup refusals in plain words', () => {
-    expect(groupCommandMessage('invalid', 'removeEvent')).toMatch(/Skip Date/);
+    expect(groupCommandMessage('invalid', 'removeEvent')).toMatch(/dates off/);
     expect(groupCommandMessage('invalid', 'saveSeries')).toMatch(/days, time/);
-    expect(groupCommandMessage('notFound', 'removeSeries')).toMatch(/Event Series/);
-    expect(groupCommandMessage('notPermitted', 'changeSettings')).toMatch(/Only Admins/);
+    expect(groupCommandMessage('notFound', 'removeSeries')).toMatch(/That job isn't in the group/);
+    expect(groupCommandMessage('notPermitted', 'changeSettings')).toMatch(/You can't change that/);
   });
 
   it('maps update_group_details errors', () => {
-    expect(groupDetailsMessage({ code: '42501' })).toMatch(/Only Admins/);
+    expect(groupDetailsMessage({ code: '42501' })).toMatch(/You can't change that/);
     expect(groupDetailsMessage({ code: '23514' })).toMatch(/group name and time zone/);
     expect(groupDetailsMessage(null)).toMatch(/connection/);
   });
@@ -105,11 +106,11 @@ describe('Assignment action messages (ticket 09)', () => {
     expect(groupCommandMessage('invalid', 'markCovered')).toMatch(/Enter their name/);
     expect(groupCommandMessage('alreadyNeedsCoverage', 'confirm')).toMatch(/needs cover now/);
     expect(groupCommandMessage('notPermitted', 'decline')).toMatch(/Only the person whose turn it is/);
-    expect(groupCommandMessage('eventHasPassed', 'confirm')).toMatch(/already happened/);
+    expect(groupCommandMessage('eventHasPassed', 'confirm')).toMatch(/already passed/);
   });
 
   it('keeps the general messages for other actions', () => {
-    expect(groupCommandMessage('notPermitted', 'rebalance')).toMatch(/Only Admins/);
+    expect(groupCommandMessage('notPermitted', 'rebalance')).toMatch(/You can't change that/);
     expect(groupCommandMessage('invalid')).toMatch(/isn't possible/);
   });
 });

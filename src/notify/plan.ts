@@ -141,7 +141,7 @@ function eventOf(state: GroupState, eventId: string): Event | undefined {
 }
 
 function responsibilityName(state: GroupState, id: string): string {
-  return state.responsibilities.find((r) => r.id === id)?.name ?? 'a Responsibility';
+  return state.responsibilities.find((r) => r.id === id)?.name ?? 'a job';
 }
 
 

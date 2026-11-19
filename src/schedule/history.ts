@@ -56,11 +56,11 @@ function actorName(ctx: HistoryContext, actorId: MemberId | null): string {
 }
 
 function responsibilityName(ctx: HistoryContext, id: string | null | undefined): string {
-  return ctx.state.responsibilities.find((r) => r.id === id)?.name ?? 'a Responsibility';
+  return ctx.state.responsibilities.find((r) => r.id === id)?.name ?? 'a job';
 }
 
 function seriesName(ctx: HistoryContext, id: string): string {
-  return ctx.state.eventSeries.find((s) => s.id === id)?.name ?? 'an Event Series';
+  return ctx.state.eventSeries.find((s) => s.id === id)?.name ?? 'a job';
 }
 
 function eventDate(ctx: HistoryContext, eventId: string | null | undefined, short = true): string | null {
@@ -144,12 +144,12 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
     }
     case 'addSkipDate':
       return {
-        text: `${actor} marked ${eventDate(ctx, cause.eventId) ?? 'an Event'} as a Skip Date${skipReasonPhrase(cause.reason)}. Turns move forward one Event.`,
+        text: `${actor} marked ${eventDate(ctx, cause.eventId) ?? 'an Event'} as a day off${skipReasonPhrase(cause.reason)}. Turns move forward one date.`,
         tone: 'neutral',
       };
     case 'removeSkipDate':
       return {
-        text: `${actor} removed the Skip Date${onDate(eventDate(ctx, cause.eventId))}. The Rotation is restored.`,
+        text: `${actor} removed the day off${onDate(eventDate(ctx, cause.eventId))}. The turns are back as they were.`,
         tone: 'neutral',
       };
     case 'addTimeOff': {
@@ -226,11 +226,11 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
       const name = cause.member.name;
       if (self(cause.member.id)) return { text: `${name} joined the group.`, tone: 'neutral' };
       const placeholder = !cause.member.accountId;
-      return { text: `${actor} added ${name}${placeholder ? ' as a Placeholder Member' : ''}.`, tone: 'neutral' };
+      return { text: `${actor} added ${name}${placeholder ? ' as a stand-in' : ''}.`, tone: 'neutral' };
     }
     case 'qualifyMember':
       return {
-        text: `${actor} made ${object(nameOf(ctx, cause.memberId))} a Qualified Member for ${responsibilityName(ctx, cause.responsibilityId)}.`,
+        text: `${actor} added ${object(nameOf(ctx, cause.memberId))} to the ${responsibilityName(ctx, cause.responsibilityId)} turns.`,
         tone: 'neutral',
       };
     case 'unqualifyMember':
@@ -250,12 +250,11 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
         ? { text: `You changed your name to ${cause.name}.`, tone: 'neutral' }
         : { text: `${cause.name} changed their name.`, tone: 'neutral' };
     case 'setAdmin':
-      if (!cause.isAdmin && self(cause.memberId)) return { text: `${actor} stepped down as Admin.`, tone: 'neutral' };
-      return cause.isAdmin
-        ? { text: `${actor} made ${object(nameOf(ctx, cause.memberId))} an Admin.`, tone: 'neutral' }
-        : { text: `${actor} removed ${object(nameOf(ctx, cause.memberId))} as Admin.`, tone: 'neutral' };
+      // No Admins in the app for now (ADR 0006); older history still has these entries.
+      if (self(cause.memberId)) return { text: `${actor} changed their group permissions.`, tone: 'neutral' };
+      return { text: `${actor} changed ${object(nameOf(ctx, cause.memberId))}'s group permissions.`, tone: 'neutral' };
     case 'addResponsibility':
-      return { text: `${actor} added the Responsibility ${cause.responsibility.name}.`, tone: 'neutral' };
+      return { text: `${actor} added the job ${cause.responsibility.name}.`, tone: 'neutral' };
     case 'editResponsibility': {
       const { changes } = cause;
       const parts: string[] = [];
@@ -266,33 +265,33 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
       if (changes.requiresConfirmation !== undefined) {
         parts.push(changes.requiresConfirmation ? 'turned on confirmation' : 'turned off confirmation');
       }
-      const name = changes.name !== undefined ? 'a Responsibility' : responsibilityName(ctx, cause.responsibilityId);
+      const name = changes.name !== undefined ? 'a job' : responsibilityName(ctx, cause.responsibilityId);
       return { text: `${actor} changed ${name}${parts.length ? `: ${joinPhrases(parts)}` : ''}.`, tone: 'neutral' };
     }
     case 'removeResponsibility':
-      return { text: `${actor} removed the Responsibility ${responsibilityName(ctx, cause.responsibilityId)}.`, tone: 'warn' };
+      return { text: `${actor} removed the job ${responsibilityName(ctx, cause.responsibilityId)}.`, tone: 'warn' };
     case 'reorderResponsibilities':
-      return { text: `${actor} changed the order Responsibilities are filled in.`, tone: 'neutral' };
+      return { text: `${actor} changed the order jobs are filled in.`, tone: 'neutral' };
     case 'setPrimaryResponsibility':
       return cause.responsibilityId
-        ? { text: `${actor} made ${responsibilityName(ctx, cause.responsibilityId)} the Primary Responsibility.`, tone: 'neutral' }
-        : { text: `${actor} cleared the Primary Responsibility.`, tone: 'neutral' };
+        ? { text: `${actor} made ${responsibilityName(ctx, cause.responsibilityId)} the group's main job.`, tone: 'neutral' }
+        : { text: `${actor} cleared the group's main job.`, tone: 'neutral' };
     case 'reorderQueue':
       return { text: `${actor} reordered the ${responsibilityName(ctx, cause.responsibilityId)} Rotation.`, tone: 'neutral' };
     case 'addEventSeries': {
       const n = cause.events?.length ?? 0;
-      return { text: `${actor} added the Event Series ${cause.series.name}${n ? ` (${plural(n, 'Event')})` : ''}.`, tone: 'neutral' };
+      return { text: `${actor} added dates for ${cause.series.name}${n ? ` (${plural(n, 'date')})` : ''}.`, tone: 'neutral' };
     }
     case 'editEventSeries': {
       const moved = cause.replaceFutureEvents !== undefined || cause.changes.repeat !== undefined;
       const name = cause.changes.name ?? seriesName(ctx, cause.seriesId);
       return {
-        text: `${actor} changed the Event Series ${name}${moved ? '. Turns follow to the new dates' : ''}.`,
+        text: `${actor} changed when ${name} happens${moved ? '. Turns follow to the new dates' : ''}.`,
         tone: moved ? 'warn' : 'neutral',
       };
     }
     case 'removeEventSeries':
-      return { text: `${actor} removed the Event Series ${seriesName(ctx, cause.seriesId)}.`, tone: 'warn' };
+      return { text: `${actor} removed the dates for ${seriesName(ctx, cause.seriesId)}.`, tone: 'warn' };
     case 'removeEvent':
       return { text: `${actor} removed the Event${onDate(eventDate(ctx, cause.eventId))}.`, tone: 'warn' };
     case 'makeUpTurnPaid': {
