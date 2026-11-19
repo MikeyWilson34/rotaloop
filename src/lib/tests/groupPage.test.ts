@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import type { GroupState } from '../../engine';
+import type { GroupState, RepeatPattern } from '../../engine';
 import { act, NOW, setup, sundays, timeOff, week } from '../../engine/tests/scenario';
+import { repeatText } from '../groupCreate';
 import {
   checkJob,
   comingUp,
@@ -16,6 +17,7 @@ import {
   turnOrderCommand,
   turnOrderJobs,
   newJobCommands,
+  repeatFromPattern,
   type TurnRow,
 } from '../groupPage';
 
@@ -245,5 +247,24 @@ describe('Turn order (feedback-2 ticket 02)', () => {
     const [saved] = turnOrderJobs(after, ZONE, at);
     expect(saved.nextName).toBe('Tom');
     expect(saved.order.map((p) => p.memberId)).toEqual(['tom', 'jordan', 'sam']);
+  });
+});
+
+describe('jobs on several weekdays', () => {
+  const now = new Date(NOW);
+  it('a stored Tue/Thu/Sat pattern reads back as all three days', () => {
+    const pattern: RepeatPattern = { frequency: 'weekly', intervalWeeks: null, daysOfWeek: [6, 2, 4], weekOfMonth: null, startTime: '06:00', timeZone: 'UTC', startsOn: '2026-11-17' };
+    expect(repeatFromPattern(pattern)).toMatchObject({ kind: 'week', weekdays: [2, 4, 6] });
+    expect(repeatText({ ...repeatFromPattern(pattern), date: '2026-11-26' })).toBe('every Tue, Thu, Sat');
+  });
+
+  it('editing a Sunday job to Tue, Thu, Sat sends the new days; an unchanged list sends nothing', () => {
+    const state = sundayClass();
+    const [job] = jobViews(state, ZONE, now);
+    const draft = { ...job.draft, repeat: { ...job.draft.repeat, weekday: 2, weekdays: [2, 4, 6] } };
+    const [cmd] = jobEditCommands(state, job, draft, ZONE, now);
+    expect(cmd).toMatchObject({ type: 'editEventSeries', changes: { repeat: { frequency: 'weekly', daysOfWeek: [2, 4, 6] } } });
+    const [again] = jobViews(state, ZONE, now);
+    expect(jobEditCommands(state, again, { ...again.draft, repeat: { ...again.draft.repeat, weekdays: [0] } }, ZONE, now)).toEqual([]);
   });
 });
