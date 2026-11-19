@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { RepeatPattern } from '../../engine';
-import { localTime } from '../../schedule/expandSeries';
+import { dayNumber, localDate, localTime, weekdayOf } from '../../schedule/expandSeries';
 import { stateFromRows } from '../groupRows';
 import { extendHorizons, handleGroupCommand, missingSeriesEvents, type HandlerContext } from '../handleGroupCommand';
 import type { ClientCommand, GroupCommandResponse } from '../protocol';
@@ -198,5 +198,72 @@ describe('extendHorizons (the daily job)', () => {
     await command({ type: 'addEventSeries', series: { id: 'sun', name: 'Sundays', responsibilityIds: ['sound'], repeat: sundays10 } });
     await command({ type: 'removeEventSeries', seriesId: 'sun' });
     expect(missingSeriesEvents(await loadState(groupId), '2027-01-24T12:00:00.000Z')).toEqual([]);
+  });
+});
+
+describe('one job on several weekdays (Tue, Thu, Sat)', () => {
+  const TUE_THU_SAT = [2, 4, 6];
+  const zone = 'America/Chicago';
+
+  /** The job's dates in order, each with its weekday and who holds the one seat. */
+  async function turns(groupId: string, seriesId: string) {
+    const state = await loadState(groupId);
+    return state.events
+      .filter((e) => e.seriesId === seriesId)
+      .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))
+      .map((e) => ({
+        id: e.id,
+        day: dayNumber(localDate(e.startsAt, zone)),
+        weekday: weekdayOf(dayNumber(localDate(e.startsAt, zone))),
+        member: state.assignments.find((a) => a.eventId === e.id && a.responsibilityId === 'sound')?.memberId,
+      }));
+  }
+
+  function expectRotation(list: { member?: string | null }[]) {
+    expect(list.length).toBeGreaterThanOrEqual(9);
+    for (const t of list) expect(t.member).toBeTruthy();
+    // No one on two consecutive dates, even across different weekdays.
+    for (let i = 1; i < list.length; i++) expect(list[i].member).not.toBe(list[i - 1].member);
+    // One rotation across all the days: three people, one date each in a row, then around again.
+    expect(new Set(list.slice(0, 3).map((t) => t.member)).size).toBe(3);
+    for (let i = 3; i < list.length; i++) expect(list[i].member).toBe(list[i - 3].member);
+  }
+
+  it('every week: one rotation across Tue, Thu and Sat, no one twice in a row', async () => {
+    const { groupId, command } = await setupGroup();
+    await command({
+      type: 'addEventSeries',
+      series: { id: 'multi', name: 'Coffee', responsibilityIds: ['sound'], repeat: { ...sundays10, daysOfWeek: TUE_THU_SAT } },
+    });
+    const list = await turns(groupId, 'multi');
+    expect(new Set(list.map((t) => t.weekday))).toEqual(new Set(TUE_THU_SAT));
+    expect(list.slice(0, 6).map((t) => t.weekday)).toEqual([2, 4, 6, 2, 4, 6]);
+    expectRotation(list);
+  });
+
+  it('every 2 weeks: Tue, Thu, Sat of every other week, same rotation', async () => {
+    const { groupId, command } = await setupGroup();
+    await command({
+      type: 'addEventSeries',
+      series: { id: 'multi', name: 'Coffee', responsibilityIds: ['sound'], repeat: { ...sundays10, frequency: 'biweekly', daysOfWeek: TUE_THU_SAT } },
+    });
+    const list = await turns(groupId, 'multi');
+    expect(list).toHaveLength(18);
+    expect(new Set(list.map((t) => t.weekday))).toEqual(new Set(TUE_THU_SAT));
+    // Sat to the next Tue skips a whole week: 10 days.
+    expect(list[3].day - list[2].day).toBe(10);
+    expectRotation(list);
+  });
+
+  it('editing a Sunday job to Tue, Thu, Sat replaces its future dates', async () => {
+    const { groupId, command } = await setupGroup();
+    await command({ type: 'addEventSeries', series: { id: 'multi', name: 'Coffee', responsibilityIds: ['sound'], repeat: sundays10 } });
+    expect(new Set((await turns(groupId, 'multi')).map((t) => t.weekday))).toEqual(new Set([0]));
+
+    await command({ type: 'editEventSeries', seriesId: 'multi', changes: { repeat: { ...sundays10, daysOfWeek: TUE_THU_SAT } } });
+    const list = await turns(groupId, 'multi');
+    expect(new Set(list.map((t) => t.weekday))).toEqual(new Set(TUE_THU_SAT));
+    expect(list.some((t) => t.weekday === 0)).toBe(false);
+    expectRotation(list);
   });
 });

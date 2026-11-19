@@ -15,7 +15,7 @@ import { dateOf, dayNumber, localDate, localTime, seriesEventId, weekdayOf, zone
 import { dateIn } from '../schedule/format';
 import { answerOf, headcountCounts, headcountText, type HeadcountCounts } from '../schedule/headcount';
 import { eventViews, type ScheduleGroup } from '../schedule/views';
-import { jobPattern, jobTimeText, repeatText, type JobDraft, type JobRepeat } from './groupCreate';
+import { jobPattern, jobTimeText, repeatDays, repeatText, type JobDraft, type JobRepeat } from './groupCreate';
 import { newId, todayIn } from './groupSetup';
 
 // ---------------------------------------------------------------------------
@@ -243,12 +243,14 @@ function activeSeriesFor(state: GroupState, responsibilityId: string): EventSeri
 
 /** The sentence row's "when" for a stored pattern (an older custom pattern reads as weekly). */
 export function repeatFromPattern(p: RepeatPattern): Omit<JobRepeat, 'date'> {
-  const weekday = p.daysOfWeek[0] ?? 0;
+  const sorted = [...p.daysOfWeek].sort((a, b) => a - b);
+  const weekdays = sorted.length ? sorted : [0];
+  const weekday = weekdays[0];
   if (p.frequency === 'monthly') return { kind: 'month', weekday, nth: p.weekOfMonth ?? 1 };
   if (p.frequency === 'biweekly' || (p.frequency === 'custom' && p.intervalWeeks === 2)) {
-    return { kind: '2week', weekday, nth: 1 };
+    return { kind: '2week', weekday, weekdays, nth: 1 };
   }
-  return { kind: 'week', weekday, nth: 1 };
+  return { kind: 'week', weekday, weekdays, nth: 1 };
 }
 
 /** The group's jobs in its order, each as the sentence row it is edited with. */
@@ -304,7 +306,7 @@ function draftOf(
 function sameWhen(a: JobDraft, b: JobDraft): boolean {
   if (a.time !== b.time || a.repeat.kind !== b.repeat.kind) return false;
   if (a.repeat.kind === 'once') return a.repeat.date === b.repeat.date;
-  if (a.repeat.weekday !== b.repeat.weekday) return false;
+  if (repeatDays(a.repeat).join() !== repeatDays(b.repeat).join()) return false;
   return a.repeat.kind !== 'month' || a.repeat.nth === b.repeat.nth;
 }
 
