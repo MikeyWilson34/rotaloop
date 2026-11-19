@@ -214,13 +214,15 @@ describe('the notify runner against the database', () => {
     expect(await sql('select * from public.expo_push_tickets')).toEqual([]);
   });
 
-  it('after a Decline: the Qualified Members are told, the decliner is not', async () => {
+  it('after a Decline: the free Members are told, the decliner is not', async () => {
     await t.asUser(ANA, () => t.db.query('select public.register_web_push($1::jsonb)', [JSON.stringify(sub(1))]));
     await t.asUser(BEN, () => t.db.query('select public.register_web_push($1::jsonb)', [JSON.stringify(sub(2))]));
-    // Everyone serves every Sunday here, so let the Group allow doubling: Ana and Cal are asked.
-    const doubling = run(state, { type: 'changeSettings', settings: { allowDoubling: true } }, 'ana');
-    const seat = doubling.state.assignments.find((a) => a.responsibilityId === 'sound' && a.memberId === 'ben')!;
-    const declined = run(doubling.state, { type: 'decline', assignmentId: seat.id, reason: 'Away' }, 'ben');
+    // Everyone serves every Sunday here, and nobody with another job that day is asked: someone
+    // outside the group takes Ana's seat that day first, so Ana is free and is asked.
+    const seat = state.assignments.find((a) => a.responsibilityId === 'sound' && a.memberId === 'ben')!;
+    const anas = state.assignments.find((a) => a.eventId === seat.eventId && a.memberId === 'ana')!;
+    const freed = run(state, { type: 'decline', assignmentId: anas.id, coveredBy: { guestName: 'Jo' } }, 'ana');
+    const declined = run(freed.state, { type: 'decline', assignmentId: seat.id, reason: 'Away' }, 'ben');
     const version = await t.store.persist({ groupId: GROUP, expectedVersion: 1, rows: rowsFromState(declined.state), history: declined.history });
     const { deps, sent } = senders();
     const report = await notifyAfterCommand(deps, { groupId: GROUP, history: declined.history as HistoryEntry[], stateVersion: version!, now: '2026-12-01T00:00:00.000Z' });

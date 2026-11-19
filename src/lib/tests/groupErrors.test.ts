@@ -99,12 +99,12 @@ describe('group setup messages', () => {
 describe('Assignment action messages (ticket 09)', () => {
   it('explains coverage refusals in plain words', () => {
     expect(groupCommandMessage('alreadyCovered', 'cover')).toBe('Someone else already covered that.');
-    expect(groupCommandMessage('notQualified', 'cover')).toMatch(/Only Qualified Members/);
-    expect(groupCommandMessage('alreadyAssignedAtEvent', 'cover')).toMatch(/already have an Assignment at this Event/);
-    expect(groupCommandMessage('notPermitted', 'markCovered')).toMatch(/finding a replacement, or an Admin/);
-    expect(groupCommandMessage('invalid', 'markCovered')).toMatch(/guest's name/);
-    expect(groupCommandMessage('alreadyNeedsCoverage', 'confirm')).toMatch(/needs coverage now/);
-    expect(groupCommandMessage('notPermitted', 'decline')).toMatch(/Only the person assigned/);
+    expect(groupCommandMessage('notQualified', 'cover')).toMatch(/not in the turns for this job/);
+    expect(groupCommandMessage('alreadyAssignedAtEvent', 'cover')).toMatch(/already have another job then/);
+    expect(groupCommandMessage('notPermitted', 'markCovered')).toMatch(/Only people in this group/);
+    expect(groupCommandMessage('invalid', 'markCovered')).toMatch(/Enter their name/);
+    expect(groupCommandMessage('alreadyNeedsCoverage', 'confirm')).toMatch(/needs cover now/);
+    expect(groupCommandMessage('notPermitted', 'decline')).toMatch(/Only the person whose turn it is/);
     expect(groupCommandMessage('eventHasPassed', 'confirm')).toMatch(/already happened/);
   });
 

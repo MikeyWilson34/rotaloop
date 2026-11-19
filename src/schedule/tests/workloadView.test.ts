@@ -77,9 +77,9 @@ describe('Make-up Turns', () => {
   const paying = b.state.assignments.find((a) => a.makeUpTurnId !== null)!;
 
   it('lists outstanding ones with the turn they are placed on', () => {
-    expect(makeUpTurnLines(b.state, 'ana', ZONE)).toEqual(['You owe Ben a Make-up Turn: Nov 29 Sound.']);
-    expect(makeUpTurnLines(b.state, 'ben', ZONE)).toEqual(['Ana owes you a Make-up Turn: Nov 29 Sound.']);
-    expect(makeUpTurnLines(b.state, 'cal', ZONE)).toEqual(['Ana owes Ben a Make-up Turn: Nov 29 Sound.']);
+    expect(makeUpTurnLines(b.state, 'ana', ZONE)).toEqual(["You take Ben's next Sound turn on Nov 29."]);
+    expect(makeUpTurnLines(b.state, 'ben', ZONE)).toEqual(['Ana takes your next Sound turn on Nov 29.']);
+    expect(makeUpTurnLines(b.state, 'cal', ZONE)).toEqual(["Ana takes Ben's next Sound turn on Nov 29."]);
   });
 
   it('explains them on the Assignments involved', () => {
@@ -92,7 +92,7 @@ describe('Make-up Turns', () => {
     );
     expect(assignmentMakeUpNotices(b.state, ana.id, 'cal', ZONE)).toEqual({
       paying: null,
-      created: 'Ana owes Ben a Make-up Turn: Nov 29 Sound.',
+      created: "Ana takes Ben's next Sound turn on Nov 29.",
     });
     expect(assignmentMakeUpNotices(b.state, 'missing', 'ana', ZONE)).toEqual({ paying: null, created: null });
   });

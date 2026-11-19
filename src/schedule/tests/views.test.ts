@@ -69,35 +69,26 @@ describe('slotStatus (via the engine assignmentStatus)', () => {
     expect(slotStatus(covered, EVENT_AT, NOW)).toBe('covered');
     expect(slotStatus({ ...covered, confirmation: 'requested' }, EVENT_AT, NOW)).toBe('pending');
   });
-  it('Find a replacement once the "find a replacement by" deadline passes with no taker', () => {
+  it('stays "Needs cover" for everyone after the old "find a replacement by" deadline', () => {
     const declined = { ...base, coverageRequest: { reason: 'declined' as const, requestedBy: 'ana', requestedAt: NOW, cover: null } };
-    // Default deadline: 3 days before the Event (Nov 26, 15:00 UTC).
-    const justBefore = '2026-11-26T14:59:59.000Z';
     const atDeadline = '2026-11-26T15:00:00.000Z';
-    expect(slotStatus(declined, EVENT_AT, justBefore, DEFAULT_GROUP_SETTINGS)).toBe('needsCoverage');
-    expect(slotStatus(declined, EVENT_AT, atDeadline, DEFAULT_GROUP_SETTINGS)).toBe('findReplacement');
-    expect(slotStatus(declined, EVENT_AT, atDeadline, { ...DEFAULT_GROUP_SETTINGS, replacementDuty: 'admins' })).toBe(
-      'findReplacement',
-    );
-    // A longer deadline starts earlier.
-    const week = { ...DEFAULT_GROUP_SETTINGS, replacementDeadlineMs: 7 * 24 * 60 * 60 * 1000 };
-    expect(slotStatus(declined, EVENT_AT, '2026-11-23T12:00:00.000Z', week)).toBe('findReplacement');
-    // Without settings (callers that don't know them) it stays "Needs coverage".
-    expect(slotStatus(declined, EVENT_AT, atDeadline)).toBe('needsCoverage');
-    expect(displayStatusLabel('findReplacement')).toBe('Find a replacement');
+    expect(slotStatus(declined, EVENT_AT, atDeadline, DEFAULT_GROUP_SETTINGS)).toBe('needsCoverage');
+    expect(slotStatus(declined, EVENT_AT, atDeadline, { ...DEFAULT_GROUP_SETTINGS, replacementDuty: 'admins' })).toBe('needsCoverage');
+    expect(displayStatusLabel('needsCoverage')).toBe('Needs cover');
+    expect(displayStatusLabel('findReplacement')).toBe('Needs cover');
   });
-  it('a covered Assignment never shows Find a replacement', () => {
+  it('a covered Assignment shows Covered', () => {
     const cover = { kind: 'guest' as const, guestName: 'Jo', arrangedBy: 'ana', coveredAt: NOW };
     const covered = { ...base, memberId: null, coverageRequest: { reason: 'declined' as const, requestedBy: 'ana', requestedAt: NOW, cover } };
     expect(slotStatus(covered, EVENT_AT, '2026-11-28T12:00:00.000Z', DEFAULT_GROUP_SETTINGS)).toBe('covered');
   });
-  it('slotView uses the Group settings', () => {
+  it('slotView: a request needs cover until someone takes it', () => {
     const built = buildGroup();
     const sound = seat(built.state, '2026-11-29', 'sound');
     run(built, { type: 'decline', assignmentId: sound.id }, sound.memberId);
     const a = built.state.assignments.find((x) => x.id === sound.id)!;
     expect(slotView(asGroup(built.state), a, EVENT_AT, NOW).status).toBe('needsCoverage');
-    expect(slotView(asGroup(built.state), a, EVENT_AT, '2026-11-27T12:00:00.000Z').status).toBe('findReplacement');
+    expect(slotView(asGroup(built.state), a, EVENT_AT, '2026-11-27T12:00:00.000Z').status).toBe('needsCoverage');
   });
 });
 
@@ -132,11 +123,11 @@ describe('slotView: who fills a seat', () => {
     expect(asBen.coveredFor).toBe('Ana');
   });
 
-  it('labels a Guest Cover "Name (guest)"', () => {
+  it('labels an outside cover "Name (not in group)"', () => {
     const a = built.state.assignments.find((x) => x.id === greeter.id)!;
     const v = slotView(asGroup(built.state), a, '2026-11-29T15:00:00.000Z', NOW);
     expect(v.who).toEqual({ kind: 'guest', name: 'Jo' });
-    expect(v.whoLabel).toBe('Jo (guest)');
+    expect(v.whoLabel).toBe('Jo (not in group)');
     expect(v.coveredFor).toBe(greeterName);
     expect(v.status).toBe('covered');
   });

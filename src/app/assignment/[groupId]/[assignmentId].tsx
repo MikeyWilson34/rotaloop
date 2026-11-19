@@ -167,7 +167,7 @@ export default function AssignmentScreen() {
               others.map((o, i) => <OtherRow key={o.key} slot={o} first={i === 0} />)
             ) : (
               <Text color="textSecondary" style={{ padding: space.lg, textAlign: 'center' }}>
-                Just this Responsibility
+                Just this job
               </Text>
             )}
           </View>

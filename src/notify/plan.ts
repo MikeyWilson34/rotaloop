@@ -27,7 +27,6 @@
  *   added and removed Assignments. Reminders, anything about your own turn being covered,
  *   and confirmation requests are always on (with push).
  */
-import { isUnconfirmed } from '../engine/status';
 import type { Assignment, AssignmentChange, Event, GroupState, HistoryEntry, Instant, MemberId } from '../engine/types';
 import { localDate, zonedTimeToInstant } from '../schedule/expandSeries';
 import { addDays, dateIn, formatDayShort, formatTimeIn, relativeDay, safeZone } from '../schedule/format';
@@ -144,9 +143,6 @@ function responsibilityName(state: GroupState, id: string): string {
   return state.responsibilities.find((r) => r.id === id)?.name ?? 'a Responsibility';
 }
 
-function nameOf(state: GroupState, id: MemberId | null | undefined): string {
-  return state.members.find((m) => m.id === id)?.name ?? 'Someone';
-}
 
 /** "Sound, Sun, Nov 22" in the recipient's time zone. */
 function seatLabel(state: GroupState, a: Assignment, zone: string): string {
@@ -207,7 +203,9 @@ function firstNameOf(state: GroupState, id: MemberId | null | undefined): string
 /** "Grace can't make Greeter on Sun, Nov 29 at 10:00 AM." or "Greeter on ... needs cover." */
 function needsCoverLine(state: GroupState, a: Assignment, zone: string): string {
   const who = firstNameOf(state, a.coverageRequest?.requestedBy ?? a.turnOf);
-  return who ? `${who} can't make ${seatSentence(state, a, zone)}.` : `${seatSentence(state, a, zone)} needs cover.`;
+  const note = a.coverageRequest?.note?.trim();
+  const why = note ? `: “${note}”` : '';
+  return who ? `${who} can't make ${seatSentence(state, a, zone)}${why}.` : `${seatSentence(state, a, zone)} needs cover.`;
 }
 
 const FIRST_TAP = "The first to tap \"I'll cover\" takes it.";
@@ -281,6 +279,7 @@ export function planCommandNotifications(input: CommandInput): NotificationItem[
 
     // Who heard about a cover in this entry: the swap it makes isn't also a "schedule change".
     const told = new Set<MemberId>();
+    const swapTurns = new Set(entry.makeUpTurns.filter((c) => c.before === null).map((c) => c.makeUpTurnId));
     const coveredNow = (c: AssignmentChange) => !!c.before && !!c.after?.coverageRequest?.cover && !c.before.coverageRequest?.cover;
     const ordered = [...entry.changes.filter(coveredNow), ...entry.changes.filter((c) => !coveredNow(c))];
 
@@ -366,7 +365,8 @@ export function planCommandNotifications(input: CommandInput): NotificationItem[
       }
 
       planScheduleChange(change, added, (memberId, a) => {
-        if (told.has(memberId)) return;
+        // The swapped turn itself was just told in the cover sentence.
+        if (told.has(memberId) && after?.makeUpTurnId && swapTurns.has(after.makeUpTurnId)) return;
         const r = recipientOf(state, profiles, memberId);
         if (!r || !r.profile.notifyChanges) return;
         const ctx = historyContext(state, r);
@@ -452,17 +452,10 @@ export function confirmationRequestsDue(state: GroupState, now: Instant, windowM
  * - **Reminders**: for each of the holder's `reminderDaysBefore`, at `reminderDueAt`, if
  *   that moment passed less than `graceMs` ago. Not for a seat the holder asked to have
  *   covered (it is the coverer's then; a Guest Cover gets none).
- * - **Coverage Request follow-up**: at the Group's "find a replacement by" deadline, once,
- *   to the Qualified Members (as for a new request), unless the request only opened after it.
- * - **Replacement Duty**: once the deadline passes with no taker, to whoever holds it: the
- *   Member who declined (the default; a Placeholder's falls to the Admins) or the Admins
- *   (not the decliner, unless they are the only Admin). Sent even if the job was late. The
- *   Member who declined after the deadline already knows, so isn't told.
- * - **Admin alerts**: at each Admin's `adminAlertLeadTimeMs` before the Event, for each
- *   Assignment that is Unconfirmed or Needs coverage in a Group they administer, once per
- *   Assignment and status (also when it only turns Unconfirmed or Needs coverage later).
- *   Not about the Admin's own seat, and not when the same run already sends them
- *   Replacement Duty for it.
+ * - **"Still needs cover"**: at the old "find a replacement by" moment (the Group's stored
+ *   deadline), once, to every Member free that day (as for a new request), unless the request
+ *   only opened after it. There is no Replacement Duty and there are no Admin alerts any more
+ *   (simplify ticket 07): the group page shows "Needs cover" to everyone.
  */
 export function planScheduledNotifications(input: ScheduledInput): NotificationItem[] {
   const { profiles, now } = input;

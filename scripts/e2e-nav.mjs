@@ -226,6 +226,37 @@ try {
   await page.locator(`[aria-label^="${respName}"]`).first().click();
   await expectScreen('Assignment (from the Group Schedule)', /Also at this Event|History/);
   if (!page.url().includes('/assignment/')) throw new Error(`Assignment: unexpected URL ${page.url()}`);
+
+  // The cover flow (simplify ticket 07).
+  current = 'cover flow';
+  // That seat is open (I already have another job that day): anyone may still pick who covers.
+  await click("Pick who's covering");
+  await expectScreen("cover: Pick who's covering", /Who is covering\?[\s\S]*Someone else/);
+  await click('Cancel');
+  await sleep(600);
+  // My own job that day, from "Also at this Event".
+  await page.getByRole('button', { name: `E2E Job ${stamp}: You`, exact: true }).first().click();
+  await expectScreen('cover: my turn', /Can't make it/);
+  // "Ask the group for cover": the sheet just closes and it needs cover.
+  await click("Can't make it");
+  await expectScreen("cover: Can't make it? sheet", /Ask the group for cover[\s\S]*I'll find someone to cover/);
+  await click('Ask the group for cover');
+  await expectScreen('cover: asked the group', /We’ll tell you when someone takes it/);
+  if (/Pick how to get it covered/.test(await bodyText())) throw new Error('cover: the sheet stayed open after asking the group');
+  await click('I can make it after all');
+  await expectScreen('cover: back on', /You’re back on/);
+  // "I'll find someone to cover" → "Who is covering?" → "Someone else" (an empty name isn't
+  // accepted) → covered straight away, with no swap.
+  await click("Can't make it");
+  await click("I'll find someone to cover");
+  await expectScreen('cover: Who is covering? picker', /Who is covering\?[\s\S]*Someone else/);
+  await click('Someone else');
+  await expectScreen('cover: their name', /Their name/);
+  if (await button('Done').isEnabled()) throw new Error('cover: an empty outside name was accepted');
+  await fill('Name', `E2E Outside ${stamp}`);
+  await click('Done');
+  await expectScreen('cover: outside cover set', new RegExp(`E2E Outside ${stamp}'s covering for you on`));
+  await expectScreen('cover: shown as not in group', /not in group/);
   await backToGroup('Assignment');
 
   // Bottom tabs (Home · Groups · Me), several rounds; Activity is the bell on Home.
@@ -235,6 +266,14 @@ try {
   // Home is the next 7 days (big card, or "Nothing this week"), then Your groups.
   await expectScreen('Home: this week', /Your next turn|Nothing this week/);
   await expectScreen('Home: your groups', /Your groups/);
+  // Home's "Can't make it" opens the same "Can't make it?" sheet (when a turn of mine is this week).
+  const homeCant = page.getByRole('button', { name: "Can't make it", exact: true }).filter({ visible: true }).first();
+  if (await homeCant.isVisible().catch(() => false)) {
+    await homeCant.click();
+    await expectScreen("Home → Can't make it? sheet", /Pick how to get it covered[\s\S]*Ask the group for cover/);
+    await page.goto(`${BASE}/`);
+    await expectScreen('Home again', /Your groups/);
+  }
   if (process.env.E2E_SHOTS) {
     // Home at 375px in both schemes, for review (E2E_SHOTS=<folder>).
     await page.setViewportSize({ width: 375, height: 812 });

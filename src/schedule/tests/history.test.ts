@@ -113,15 +113,16 @@ describe('describeHistoryEntry', () => {
     expect(texts('fillSchedule')).toEqual(['The schedule was filled from the Rotations.']);
   });
 
-  it('describes coverage, with the Make-up Turn it creates', () => {
-    expect(texts('decline')[0]).toBe("You can't make Sound on Sun, Nov 22. Coverage requested.");
+  it('describes coverage in plain words, with the swap it makes', () => {
+    expect(texts('decline')[0]).toBe("You can't make Sound on Sun, Nov 22. The group was asked to cover.");
     expect(first('decline').tone).toBe('bad');
     // Declining for a Stand-in names them.
-    expect(texts('decline')[1]).toMatch("You said Pat can't make Greeter on Sun, Dec 13. Coverage requested.");
-    expect(texts('cover')).toEqual(['Ben covered Sound on Sun, Nov 22 for you.']);
-    expect(first('cover').detail).toBe('You owe Ben a Sound Make-up Turn.');
-    expect(texts('markCovered')[0]).toBe('You marked Greeter on Sun, Dec 13 covered by Jo (guest).');
-    expect(texts('markCovered')[1]).toMatch(/^You marked Greeter on Sun, Dec 20 covered by (Ben|Pat|Cal)\.$/);
+    expect(texts('decline')[1]).toMatch("You said Pat can't make Greeter on Sun, Dec 13. The group was asked to cover.");
+    // The swap was settled later (by the old Rebalance), so the sentence no longer promises it.
+    expect(texts('cover')).toEqual(["Ben's covering for you on Nov 22."]);
+    expect(first('cover').detail).toBeNull();
+    expect(texts('markCovered')[0]).toBe("Jo is covering Pat's Greeter turn on Dec 13.");
+    expect(texts('markCovered')[1]).toMatch(/^(Ben|Pat|Cal) is covering (Ben|Pat|Cal)'s Greeter turn on Dec 20\./);
   });
 
   it('describes confirmation', () => {
@@ -160,7 +161,7 @@ describe('describeHistoryEntry', () => {
     expect(texts('reorderResponsibilities')).toEqual(['You changed the order Responsibilities are filled in.']);
     expect(texts('removeResponsibility')).toEqual(['You removed the Responsibility Host.']);
     expect(texts('reorderQueue')).toEqual(['You reordered the Sound Rotation.']);
-    expect(texts('rebalance')).toEqual(['You rebalanced the Sound Rotation by workload.']);
+    expect(texts('rebalance')).toEqual(['You reordered Sound so whoever has done the fewest turns goes first.']);
   });
 
   it('describes Event Series and one-off Events', () => {
@@ -170,13 +171,13 @@ describe('describeHistoryEntry', () => {
     expect(texts('removeEvent')).toEqual(['You removed the Event.']);
   });
 
-  it('describes settings and Make-up Turns being paid or cancelled', () => {
+  it('describes settings and swapped turns being taken', () => {
     expect(texts('changeSettings')).toEqual([
-      'You changed Replacement Duty to Admins and "Find a replacement by" to 2 days before.',
-      'You changed the Coverage Policy to Count Real Work.',
+      'You changed how covers work.',
+      'You changed how covers work.',
     ]);
     // Ana's Sound swap keeps waiting (she greets on Ben's Sound dates), so Cal's is the one paid.
-    expect(texts('makeUpTurnPaid')).toEqual(['Cal paid back the Greeter Make-up Turn owed to Pat.']);
+    expect(texts('makeUpTurnPaid')).toEqual(["Cal took Pat's Greeter turn, as swapped."]);
     expect(first('makeUpTurnPaid').tone).toBe('ok');
   });
 
@@ -195,7 +196,7 @@ describe('describeHistoryEntry', () => {
 
   it('lists newest first', () => {
     const list = historyLines(b.history, ctx);
-    expect(list[0].text).toBe('You changed the Coverage Policy to Count Real Work.');
+    expect(list[0].text).toBe('You changed how covers work.');
     expect(list[list.length - 1].text).toBe('You added 8 Events.');
   });
 });
@@ -210,11 +211,11 @@ describe('one Assignment\'s history', () => {
     const lines = assignmentHistory(b.history, a.id, ctx);
     expect(lines.map((l) => l.text)).toEqual([
       'Assigned to you by Rotation',
-      "You can't make it. Needs coverage",
+      "You can't make it. Needs cover",
       'Covered by Ben',
     ]);
     expect(lines[0].detail).toBe('You added 8 Events.');
-    expect(lines[2].detail).toBe('Ben covered Sound on Sun, Nov 22 for you.');
+    expect(lines[2].detail).toBe("Ben's covering for you on Nov 22. You'll take Ben's next turn on Nov 29.");
     expect(lines.map((l) => l.tone)).toEqual(['neutral', 'bad', 'info']);
   });
 
@@ -226,12 +227,12 @@ describe('one Assignment\'s history', () => {
     const others = seat(b.state, '2026-12-13', 'greeter');
     run(b, { type: 'decline', assignmentId: others.id, coveredBy: { guestName: 'Jo' } }, 'ana');
     const latest = (n: number) => describeHistoryEntry(b.history[b.history.length - n], { ...ctx, state: b.state });
-    expect(latest(2).text).toBe("You can't make Sound on Sun, Nov 22: “Away”. Ben is covering.");
-    expect(latest(1).text).toBe("You gave Pat's Greeter on Sun, Dec 13 to Jo (guest).");
+    expect(latest(2).text).toBe("Ben's covering for you on Nov 22. You'll take Ben's next turn on Nov 29.");
+    expect(latest(1).text).toBe("Jo is covering Pat's Greeter turn on Dec 13.");
     expect(assignmentHistory(b.history, mine.id, { ...ctx, state: b.state }).map((l) => l.text).at(-1)).toBe('Covered by Ben');
   });
 
-  it('includes a Make-up Turn being placed and paid', () => {
+  it('includes a swapped turn being placed and taken', () => {
     const b = buildGroup();
     const a = seat(b.state, '2026-11-22', 'sound');
     run(b, { type: 'decline', assignmentId: a.id }, 'ana');
@@ -241,8 +242,8 @@ describe('one Assignment\'s history', () => {
     run(b, { type: 'fillSchedule' }, null, new Date(Date.parse(payAt) + 3_600_000).toISOString());
     const ctx: HistoryContext = { state: b.state, myMemberId: 'ana', timeZone: ZONE };
     const lines = assignmentHistory(b.history, paying.id, ctx);
-    expect(lines.some((l) => l.text === 'Make-up Turn paid')).toBe(true);
-    expect(lines.some((l) => /Make-up Turn|Reassigned/.test(l.text))).toBe(true);
+    expect(lines.some((l) => l.text === 'Swapped turn taken')).toBe(true);
+    expect(lines.some((l) => /swapped turn|Reassigned/.test(l.text))).toBe(true);
   });
 
   it('notices a move to another date', () => {
@@ -265,20 +266,20 @@ describe('one Assignment\'s history', () => {
       describeAssignmentChange({ assignmentId: a.id, before, after, reason: { type: 'fillSchedule' } }, ctx).text;
     const request = { reason: 'declined' as const, requestedBy: 'ana', requestedAt: NOW, cover: null };
     expect(d(null, { ...a, memberId: null })).toBe('Added. No one was available yet');
-    expect(d(null, { ...a, makeUpTurnId: 'm1' })).toBe('Assigned to you as a Make-up Turn');
+    expect(d(null, { ...a, makeUpTurnId: 'm1' })).toBe('Assigned to you as a swapped turn');
     expect(d(a, null)).toBe('Removed from the schedule');
     expect(d(a, { ...a, memberId: 'ben' })).toBe('Reassigned from you to Ben');
     expect(d(a, { ...a, confirmation: 'confirmed' })).toBe('Confirmed by you');
     expect(d(a, { ...a, confirmation: 'requested' })).toBe('You asked to confirm');
-    expect(d(a, { ...a, coverageRequest: { ...request, reason: 'timeOff' } })).toBe('You are on Time Off. Needs coverage');
+    expect(d(a, { ...a, coverageRequest: { ...request, reason: 'timeOff' } })).toBe('You have dates off. Needs cover');
     expect(d(a, { ...a, coverageRequest: { ...request, reason: 'noOneAvailable', requestedBy: null } })).toBe(
-      'No one available. Needs coverage',
+      'No one available. Needs cover',
     );
     const covered = { ...a, coverageRequest: { ...request, cover: { kind: 'guest' as const, guestName: 'Jo', arrangedBy: 'ana', coveredAt: NOW } } };
-    expect(d({ ...a, coverageRequest: request }, covered)).toBe('Covered by Jo (guest)');
-    expect(d(covered, { ...a, coverageRequest: request })).toBe('Cover withdrawn. Needs coverage again');
+    expect(d({ ...a, coverageRequest: request }, covered)).toBe('Covered by Jo (not in group)');
+    expect(d(covered, { ...a, coverageRequest: request })).toBe('Cover withdrawn. Needs cover again');
     expect(d({ ...a, coverageRequest: request }, a)).toBe('Back with you');
-    expect(d(a, { ...a, makeUpTurnId: 'm1' })).toBe('Now a Make-up Turn');
+    expect(d(a, { ...a, makeUpTurnId: 'm1' })).toBe('Now a swapped turn');
     expect(d(a, a)).toBe('Updated');
   });
 

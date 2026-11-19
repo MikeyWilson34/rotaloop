@@ -158,27 +158,22 @@ describe('assignment reminders', () => {
   });
 });
 
-describe('Coverage Request follow-up and Replacement Duty', () => {
-  /** Nov 29's "find a replacement by" deadline (3 days before 15:00Z). */
+describe('"Still needs cover" follow-up (no Replacement Duty, no Admin alerts)', () => {
+  /** Nov 29's stored "find a replacement by" moment (3 days before 15:00Z). */
   const DEADLINE = '2026-11-26T15:00:00.000Z';
 
-  it('at the deadline: one follow-up to the Qualified Members, Replacement Duty to the decliner', () => {
+  it('at the deadline: one follow-up to every Member free that day, in plain words; nothing else', () => {
     const t = new TestGroup();
     t.run({ type: 'decline', assignmentId: 'a3' }, 'ben');
-    const now = plusMinutes(DEADLINE, 5);
-    const items = plan(t, now).filter((i) => i.assignmentId === 'a3');
-    expect(who(items)).toEqual([
-      `${ACCOUNT.ana}:adminAlert:a3:needsCoverage`,
-      `${ACCOUNT.ana}:coverageFollowUp:a3:deadline`,
-      `${ACCOUNT.ben}:replacementDuty:a3:deadline`,
-    ]);
-    const follow = items.find((i) => i.kind === 'coverageFollowUp')!;
+    const items = plan(t, plusMinutes(DEADLINE, 5)).filter((i) => i.assignmentId === 'a3');
+    // Cal greets that day, Ben asked: only Ana. No duty notice to Ben, no alert to the Admin.
+    expect(who(items)).toEqual([`${ACCOUNT.ana}:coverageFollowUp:a3:deadline`]);
+    const [follow] = items;
     expect(follow.title).toBe('Still needs cover: Sound, Sun, Nov 29');
-    expect(follow.body).toBe("Ben's Sound on Sun, Nov 29 at 9:00 AM still needs someone. Can you cover? · Sunday Team");
+    expect(follow.body).toBe(
+      "Ben can't make Sound on Sun, Nov 29 at 9:00 AM. It still needs cover. The first to tap \"I'll cover\" takes it. · Sunday Team",
+    );
     expect(follow.url).toBe('/assignment/g1/a3?action=cover');
-    const duty = items.find((i) => i.kind === 'replacementDuty')!;
-    expect(duty.url).toBe('/assignment/g1/a3?action=markCovered');
-    expect(duty.body).toBe('No one has covered your turn yet. Please find someone and mark it covered. · Sunday Team');
   });
 
   it('nothing before the deadline; the follow-up respects the topic toggle', () => {
@@ -189,92 +184,33 @@ describe('Coverage Request follow-up and Replacement Duty', () => {
     expect(off.some((i) => i.kind === 'coverageFollowUp')).toBe(false);
   });
 
-  it('a late job skips the follow-up but still sends Replacement Duty', () => {
+  it('a late job, or a request opened after the deadline, sends nothing', () => {
     const t = new TestGroup();
     t.run({ type: 'decline', assignmentId: 'a3' }, 'ben');
-    const kinds = plan(t, plusMinutes(DEADLINE, 120)).filter((i) => i.assignmentId === 'a3').map((i) => i.kind);
-    expect(kinds).not.toContain('coverageFollowUp');
-    expect(kinds).toContain('replacementDuty');
-  });
-
-  it('a Decline after the deadline: no follow-up and no duty notice to the decliner (they know)', () => {
-    const t = new TestGroup();
+    expect(plan(t, plusMinutes(DEADLINE, 120)).filter((i) => i.assignmentId === 'a3' && i.kind !== 'reminder')).toEqual([]);
+    const u = new TestGroup();
     const late = plusMinutes(DEADLINE, 30);
-    t.run({ type: 'decline', assignmentId: 'a3' }, 'ben', late);
-    const kinds = who(plan(t, plusMinutes(late, 15)).filter((i) => i.assignmentId === 'a3'));
-    expect(kinds).toEqual([`${ACCOUNT.ana}:adminAlert:a3:needsCoverage`]);
+    u.run({ type: 'decline', assignmentId: 'a3' }, 'ben', late);
+    expect(plan(u, plusMinutes(late, 15)).filter((i) => i.assignmentId === 'a3' && i.kind !== 'reminder')).toEqual([]);
   });
 
-  it('with Replacement Duty on Admins, the Admins hold it (and get no separate alert)', () => {
+  it('never sends Replacement Duty or Admin alerts, whatever the old settings say', () => {
     const t = new TestGroup();
     t.run({ type: 'changeSettings', settings: { replacementDuty: 'admins' } }, 'ana');
     t.run({ type: 'decline', assignmentId: 'a3' }, 'ben');
-    const items = plan(t, DEADLINE).filter((i) => i.assignmentId === 'a3');
-    expect(who(items)).toEqual([`${ACCOUNT.ana}:coverageFollowUp:a3:deadline`, `${ACCOUNT.ana}:replacementDuty:a3:deadline`]);
-    expect(items.find((i) => i.kind === 'replacementDuty')!.body).toBe(
-      "No one has covered Ben's Sound on Sun, Nov 29 at 9:00 AM yet. As an Admin, please find someone and mark it covered. · Sunday Team",
+    t.run({ type: 'decline', assignmentId: 'a2' }, 'ana'); // Pat's (a Stand-in's) Greeter, Nov 22
+    const kinds = ['2026-11-19T15:00:00.000Z', DEADLINE, plusMinutes(DEADLINE, 24 * 60)].flatMap((now) =>
+      plan(t, now).map((i) => i.kind),
     );
+    expect(kinds).not.toContain('replacementDuty');
+    expect(kinds).not.toContain('adminAlert');
   });
 
-  it("a Placeholder's request falls to the Admins", () => {
-    const t = new TestGroup();
-    t.run({ type: 'decline', assignmentId: 'a2' }, 'ana'); // Pat's Greeter, Nov 22
-    const items = plan(t, '2026-11-19T15:00:00.000Z').filter((i) => i.assignmentId === 'a2');
-    expect(items.filter((i) => i.kind === 'replacementDuty').map((i) => i.accountId)).toEqual([ACCOUNT.ana]);
-  });
-
-  it('a covered request gets neither', () => {
+  it('a covered request gets no follow-up', () => {
     const t = new TestGroup();
     t.run({ type: 'decline', assignmentId: 'a3' }, 'ben');
     t.run({ type: 'cover', assignmentId: 'a3' }, 'ana');
-    const kinds = plan(t, DEADLINE).map((i) => i.kind);
-    expect(kinds).not.toContain('coverageFollowUp');
-    expect(kinds).not.toContain('replacementDuty');
-  });
-});
-
-describe('Admin alerts', () => {
-  /** Ana's default lead time: 3 days before Nov 29's 15:00Z. */
-  const ALERT = '2026-11-26T15:00:00.000Z';
-
-  it('Unconfirmed at the Admin’s lead time, once per Assignment and status', () => {
-    const t = new TestGroup();
-    const alerts = (now: string, p = profiles()) => plan(t, now, p).filter((i) => i.kind === 'adminAlert');
-    expect(alerts(plusMinutes(ALERT, -1)).filter((i) => i.assignmentId === 'a3')).toEqual([]);
-    const [item] = alerts(ALERT).filter((i) => i.assignmentId === 'a3');
-    expect(item).toMatchObject({
-      accountId: ACCOUNT.ana,
-      title: 'Unconfirmed: Sound, Sun, Nov 29',
-      body: "Ben hasn't confirmed Sound on Sun, Nov 29 at 9:00 AM yet. Nothing is declined automatically. · Sunday Team",
-      dedupeKey: `adminAlert:g1:a3:sun@2026-11-29:unconfirmed:${ACCOUNT.ana}`,
-    });
-    // Each Admin's own lead time: 1 day means not yet.
-    expect(alerts(ALERT, profiles({ ana: { adminAlertLeadTimeMs: 24 * 60 * 60 * 1000 } })).filter((i) => i.assignmentId === 'a3')).toEqual([]);
-  });
-
-  it('none once confirmed, none for the Admin’s own seat, none for Members', () => {
-    const t = new TestGroup();
-    t.run({ type: 'confirm', assignmentId: 'a3' }, 'ben');
-    expect(plan(t, ALERT).some((i) => i.kind === 'adminAlert' && i.assignmentId === 'a3')).toBe(false);
-    // Ana's own Nov 22 seat is Unconfirmed from Nov 19, but it's hers.
-    expect(plan(t, '2026-11-19T15:00:00.000Z').some((i) => i.kind === 'adminAlert' && i.assignmentId === 'a1')).toBe(false);
-    expect(plan(t, ALERT).filter((i) => i.kind === 'adminAlert').every((i) => i.accountId === ACCOUNT.ana)).toBe(true);
-  });
-
-  it('catches up when it only turns Needs coverage later', () => {
-    const t = new TestGroup();
-    const late = plusMinutes(ALERT, 24 * 60);
-    t.run({ type: 'confirm', assignmentId: 'a3' }, 'ben');
-    t.run({ type: 'decline', assignmentId: 'a3' }, 'ben', late);
-    const [item] = plan(t, plusMinutes(late, 15)).filter((i) => i.kind === 'adminAlert' && i.assignmentId === 'a3');
-    expect(item.offsetKey).toBe('needsCoverage');
-    expect(item.title).toBe('Needs coverage: Sound, Sun, Nov 29');
-    expect(item.body).toBe("Sound on Sun, Nov 29 at 9:00 AM still needs someone (Ben can't make it). · Sunday Team");
-  });
-
-  it('Placeholders and non-push Admins get nothing', () => {
-    const t = new TestGroup();
-    expect(plan(t, ALERT, profiles({ ana: { pushEnabled: false } })).some((i) => i.kind === 'adminAlert')).toBe(false);
+    expect(plan(t, DEADLINE).map((i) => i.kind)).not.toContain('coverageFollowUp');
   });
 });
 

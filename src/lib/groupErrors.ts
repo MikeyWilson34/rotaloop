@@ -105,35 +105,37 @@ const NOT_FOUND: Partial<Record<GroupAction, string>> = {
   removeSkipDate: "That Skip Date was already removed. Pull down to refresh.",
 };
 
-/** Assignment actions (ticket 09): messages that replace the general ones for that action. */
+/** The cover flow's actions (simplify ticket 07): messages that replace the general ones for that action. */
 const ASSIGNMENT: Partial<Record<GroupAction, Partial<Record<string, string>>>> = {
   confirm: {
-    notPermitted: "Only the person assigned can confirm this. Pull down to refresh.",
-    alreadyNeedsCoverage: "You've already said you can't make it, so this needs coverage now.",
+    notPermitted: "Only the person whose turn it is can confirm this. Pull down to refresh.",
+    alreadyNeedsCoverage: "You've already said you can't make it, so this needs cover now.",
   },
   decline: {
-    notPermitted: "Only the person assigned can say they can't make it. Pull down to refresh.",
-    alreadyNeedsCoverage: 'This already needs coverage. Qualified Members have been asked.',
-    invalid: 'No one holds this Assignment anymore. Pull down to refresh.',
+    notPermitted: "Only the person whose turn it is can say they can't make it. Pull down to refresh.",
+    alreadyNeedsCoverage: 'This already needs cover. The group has been asked.',
+    alreadyAssignedAtEvent: 'They already have another job then. Pick someone else.',
+    invalid: "Enter their name, or pick someone other than the person who can't make it.",
+    notFound: "That person isn't in the group anymore. Pick someone else.",
   },
   cover: {
-    notPermitted: 'Only Members of this group can cover.',
-    notQualified: "Only Qualified Members for this Responsibility can cover it. Ask an Admin to add you.",
-    noCoverageRequest: "This doesn't need coverage anymore. Pull down to refresh.",
-    alreadyAssignedAtEvent: "You already have an Assignment at this Event, so you can't cover this one too.",
-    invalid: "You asked for coverage on this one, so you can't cover it yourself.",
+    notPermitted: 'Only people in this group can cover.',
+    notQualified: "You're not in the turns for this job, so you can't cover it.",
+    noCoverageRequest: "This doesn't need cover anymore. Pull down to refresh.",
+    alreadyAssignedAtEvent: "You already have another job then, so you can't cover this one too.",
+    invalid: "You can't make this one, so you can't cover it yourself.",
   },
   withdrawDecline: {
     alreadyCovered: 'Someone already covered this, so it’s theirs now. Pull down to refresh.',
     noCoverageRequest: "You're already back on this one. Pull down to refresh.",
     notPermitted: 'Only the person who said they can’t make it can take it back.',
-    invalid:
-      'The Rotation changed since you said you can’t make it, so this turn has moved on. Ask an Admin, or cover someone else’s turn.',
+    invalid: 'The turns changed since you said you can’t make it, so this one has moved on. Cover someone else’s turn instead.',
   },
   markCovered: {
-    notPermitted: 'Only whoever is finding a replacement, or an Admin, can mark this covered.',
-    noCoverageRequest: "This doesn't need coverage anymore. Pull down to refresh.",
-    invalid: "Enter the guest's name, or pick someone other than the person who can't make it.",
+    notPermitted: 'Only people in this group can say who is covering.',
+    noCoverageRequest: "This doesn't need cover anymore. Pull down to refresh.",
+    alreadyAssignedAtEvent: 'They already have another job then. Pick someone else.',
+    invalid: "Enter their name, or pick someone other than the person who can't make it.",
     notFound: "That person isn't in the group anymore. Pick someone else.",
   },
 };
