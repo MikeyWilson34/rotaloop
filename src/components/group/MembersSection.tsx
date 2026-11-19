@@ -4,12 +4,12 @@ import { Pressable, View } from 'react-native';
 
 import { Badge, Button, Notice, SettingsList, Sheet, showToast, Text, TextField } from '@/components/ui';
 import { NAME_MAX } from '@/lib/groupSetup';
-import { memberItems, type MemberItem } from '@/lib/groupPage';
+import { firstName, memberItems, type MemberItem } from '@/lib/groupPage';
 import type { GroupDetails } from '@/lib/groups';
-import { APP_NAME } from '@/config/app';
-import { fetchClaimToken, fetchGroupInviteToken, resetGroupInviteToken } from '@/lib/inviteLinks';
+import { fetchClaimToken } from '@/lib/inviteLinks';
 import { useTheme } from '@/theme';
 
+import { InviteCard } from './InviteCard';
 import { InviteSheet } from './InviteSheet';
 import { PersonAvatar } from './PersonAvatar';
 import type { RunCommand } from './runCommand';
@@ -25,16 +25,18 @@ export function MembersSection({
   group,
   myMemberId,
   run,
+  showInviteCard = true,
 }: {
   group: GroupDetails;
   myMemberId: string | null;
   run: RunCommand;
+  /** False when the group page already shows the invite card higher up. */
+  showInviteCard?: boolean;
 }) {
-  const { space } = useTheme();
+  const { space, colors, fonts } = useTheme();
   const members = useMemo(() => memberItems(group.state, myMemberId), [group.state, myMemberId]);
   const [showAll, setShowAll] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [inviting, setInviting] = useState(false);
   const [claimFor, setClaimFor] = useState<MemberItem | null>(null);
   const shown = showAll ? members : members.slice(0, FIRST);
 
@@ -42,14 +44,30 @@ export function MembersSection({
     <View style={{ gap: space.md }}>
       <SettingsList>
         {shown.map((m) => (
-          <MemberRow key={m.id} member={m} onPress={m.isStandIn ? () => setClaimFor(m) : undefined} />
+          <MemberRow
+            key={m.id}
+            member={m}
+            onPress={m.isStandIn ? () => setClaimFor(m) : undefined}
+            onInvite={m.isStandIn ? () => setClaimFor(m) : undefined}
+          />
         ))}
         {members.length > FIRST && !showAll ? (
           <AddRow label={`Show all ${members.length}`} onPress={() => setShowAll(true)} />
         ) : null}
-        <AddRow label="Add stand-in" icon onPress={() => setAdding(true)} />
-        <AddRow label="Invite people" icon onPress={() => setInviting(true)} />
       </SettingsList>
+      {showInviteCard ? <InviteCard group={group} /> : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Add a stand-in"
+        onPress={() => setAdding(true)}
+        style={({ pressed }) => ({ minHeight: 44, justifyContent: 'center', alignItems: 'center', opacity: pressed ? 0.7 : 1 })}>
+        <Text variant="subhead" color="textSecondary">
+          {'Not on the app? '}
+          <Text variant="subhead" style={{ fontFamily: fonts.bold, color: colors.primary, textDecorationLine: 'underline' }}>
+            Add a stand-in
+          </Text>
+        </Text>
+      </Pressable>
       {adding ? (
         <AddStandInSheet
           groupName={group.name}
@@ -58,16 +76,6 @@ export function MembersSection({
           onClose={() => setAdding(false)}
         />
       ) : null}
-      <InviteSheet
-        visible={inviting}
-        onClose={() => setInviting(false)}
-        groupName={group.name}
-        title="Invite people"
-        message="Anyone with this link or QR code joins the group directly."
-        loadToken={() => fetchGroupInviteToken(group.id)}
-        resetToken={() => resetGroupInviteToken(group.id)}
-        shareMessage={`Join ${group.name} on ${APP_NAME}:`}
-      />
       <InviteSheet
         visible={claimFor !== null}
         onClose={() => setClaimFor(null)}
@@ -81,10 +89,11 @@ export function MembersSection({
   );
 }
 
-function MemberRow({ member, onPress }: { member: MemberItem; onPress?: () => void }) {
+function MemberRow({ member, onPress, onInvite }: { member: MemberItem; onPress?: () => void; onInvite?: () => void }) {
   const { colors, fonts } = useTheme();
-  const label = `${member.name}${member.isMe ? ' (you)' : ''}${member.isStandIn ? ', stand-in. Not on the app. You keep track for them.' : ''}`;
+  const label = `${member.name}${member.isMe ? ' (you)' : ''}${member.isStandIn ? ', stand-in' : ''}`;
   return (
+    <View>
     <Pressable
       accessibilityRole={onPress ? 'button' : undefined}
       accessibilityLabel={label}
@@ -110,15 +119,30 @@ function MemberRow({ member, onPress }: { member: MemberItem; onPress?: () => vo
             </Text>
           ) : null}
         </Text>
-        {member.isStandIn ? (
-          <Text variant="subhead" color="textSecondary">
-            Not on the app. You keep track for them.
-          </Text>
-        ) : null}
       </View>
       {member.isStandIn ? <Badge label="Stand-in" /> : null}
       {onPress ? <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.75} /> : null}
     </Pressable>
+    {onInvite ? (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Invite ${firstName(member.name)}`}
+        onPress={onInvite}
+        style={({ pressed }) => ({
+          marginLeft: 68,
+          marginTop: -8,
+          marginBottom: 4,
+          minHeight: 44,
+          justifyContent: 'center',
+          alignSelf: 'flex-start',
+          opacity: pressed ? 0.7 : 1,
+        })}>
+        <Text variant="subhead" style={{ fontFamily: fonts.extrabold, color: colors.primary }}>
+          {`Invite ${firstName(member.name)}`}
+        </Text>
+      </Pressable>
+    ) : null}
+    </View>
   );
 }
 
