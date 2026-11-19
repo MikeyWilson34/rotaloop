@@ -51,7 +51,7 @@ export default function AssignmentScreen() {
 
   function back() {
     if (router.canGoBack()) router.back();
-    else router.replace('/schedule');
+    else router.replace('/');
   }
 
   const navbar = (
@@ -88,7 +88,7 @@ export default function AssignmentScreen() {
     body = (
       <View style={{ gap: space.md }}>
         <Notice tone="info">{"This Assignment isn't on the schedule anymore. The schedule may have changed."}</Notice>
-        <Button label="Back to Schedule" variant="secondary" onPress={() => router.replace('/schedule')} />
+        <Button label="Back to Home" variant="secondary" onPress={() => router.replace('/')} />
       </View>
     );
   } else {

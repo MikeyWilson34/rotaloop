@@ -1,15 +1,7 @@
-import {
-  Mail,
-  MessageSquare,
-  Repeat,
-  ShieldCheck,
-  Smartphone,
-  CalendarX,
-  CalendarOff,
-} from 'lucide-react-native';
+import { CalendarOff, Pencil, Plus, Smartphone, Trash2 } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 
 import { SignOutButton } from '@/components/SignOutButton';
 import {
@@ -17,53 +9,27 @@ import {
   Card,
   Chip,
   ChipGroup,
+  ConfirmSheet,
   FieldLabel,
+  IconTile,
   Notice,
   Screen,
   SettingsList,
+  showToast,
   SwitchRow,
   Text,
   TextField,
-  ValueRow,
 } from '@/components/ui';
 import { APP_NAME } from '@/config/app';
-import {
-  REMINDER_DAY_OPTIONS,
-  REMINDER_TIME_OPTIONS,
-  alertLeadLabel,
-  formatTime,
-  nextAlertLead,
-  normalizeTime,
-  toggleReminderDay,
-} from '@/lib/notificationPrefs';
+import { REMINDER_TIME_OPTIONS, formatTime, normalizeTime } from '@/lib/notificationPrefs';
 import { disablePushNotifications, enablePushNotifications, PUSH_PLATFORM } from '@/lib/push';
 import { blockedHint, canTogglePush, INSTALL_HINT, pushStatusText, shownPushStatus } from '@/lib/pushStatus';
-import { usePushStatus } from '@/lib/usePushStatus';
 import { useProfile, useSession, type ProfilePatch } from '@/lib/session';
-import { supabase } from '@/lib/supabase';
-import { initials, isValidPhone, joinName, normalizePhone, splitName } from '@/lib/validation';
+import { outcomeErrors, removeTimeOff, useMyGroupStates } from '@/lib/timeOff';
+import { usePushStatus } from '@/lib/usePushStatus';
+import { initials, joinName, splitName } from '@/lib/validation';
+import { timeOffItems, type TimeOffItem } from '@/schedule/timeOff';
 import { useTheme } from '@/theme';
-
-/** How many Groups the person belongs to, and how many of those they're an Admin of. */
-function useMembershipCounts(userId: string) {
-  const [counts, setCounts] = useState<{ groups: number; admin: number } | null>(null);
-  useEffect(() => {
-    let current = true;
-    supabase
-      .from('members')
-      .select('group_id, is_admin')
-      .eq('account_id', userId)
-      .is('left_at', null)
-      .then(({ data }) => {
-        if (!current || !data) return;
-        setCounts({ groups: data.length, admin: data.filter((m) => m.is_admin).length });
-      });
-    return () => {
-      current = false;
-    };
-  }, [userId]);
-  return counts;
-}
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   const { space } = useTheme();
@@ -75,17 +41,118 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-export default function ProfileScreen() {
+/** "My dates off": the person's own list. Add opens the dates-off screen; remove happens here. */
+function DatesOff() {
+  const { colors, fonts, space, minTapTarget } = useTheme();
+  const { data, reload } = useMyGroupStates();
+  const groups = useMemo(() => data ?? [], [data]);
+  const now = useMemo(() => new Date().toISOString(), [data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const items = useMemo(() => timeOffItems(groups, now), [groups, now]);
+  const [removing, setRemoving] = useState<TimeOffItem | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function confirmRemove() {
+    if (!removing) return;
+    setBusy(true);
+    setError(null);
+    const message = outcomeErrors(await removeTimeOff(removing.entries, groups), 'remove');
+    await reload();
+    setBusy(false);
+    if (message) return setError(message);
+    setRemoving(null);
+    showToast('Dates off removed', Trash2);
+  }
+
+  return (
+    <Section label="My dates off">
+      {items.length > 0 ? (
+        <Card style={{ paddingVertical: space.xs, paddingHorizontal: 0 }}>
+          {items.map((item, i) => (
+            <View
+              key={item.key}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                paddingLeft: 16,
+                paddingRight: 4,
+                paddingVertical: 8,
+                minHeight: 60,
+                borderTopWidth: i === 0 ? 0 : 1,
+                borderTopColor: colors.border,
+              }}>
+              <IconTile icon={CalendarOff} bg="dangerTint" fg="dangerText" />
+              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <Text variant="subhead" style={{ fontFamily: fonts.bold }}>
+                  {item.label}
+                </Text>
+                <Text variant="caption" color="textSecondary">
+                  {item.detail}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Remove dates off: ${item.label}`}
+                onPress={() => {
+                  setError(null);
+                  setRemoving(item);
+                }}
+                style={({ pressed }) => ({
+                  width: minTapTarget,
+                  height: minTapTarget,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.6 : 1,
+                })}>
+                <Trash2 size={20} color={colors.textSecondary} strokeWidth={1.75} />
+              </Pressable>
+            </View>
+          ))}
+        </Card>
+      ) : (
+        <Text variant="subhead" color="textSecondary">
+          No dates off yet.
+        </Text>
+      )}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Add dates off"
+        onPress={() => router.push('/time-off')}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          minHeight: minTapTarget,
+          opacity: pressed ? 0.6 : 1,
+        })}>
+        <Plus size={20} color={colors.primary} strokeWidth={2} />
+        <Text style={{ color: colors.primary, fontFamily: fonts.bold }}>Add dates off</Text>
+      </Pressable>
+      <ConfirmSheet
+        visible={removing !== null}
+        title="Remove these dates off?"
+        message={`${removing?.label ?? ''}. You can be scheduled on these days again.`}
+        confirmLabel="Remove"
+        tone="destructive"
+        loading={busy}
+        error={error}
+        onConfirm={confirmRemove}
+        onCancel={() => setRemoving(null)}
+      />
+    </Section>
+  );
+}
+
+export default function MeScreen() {
   const profile = useProfile();
   const { isGuest, session, setDisplayName, updateProfile } = useSession();
   const { colors, space, fonts } = useTheme();
-  const counts = useMembershipCounts(profile.id);
   const [error, setError] = useState<string | null>(null);
   const [pushNote, setPushNote] = useState<string | null>(null);
   const [pushBusy, setPushBusy] = useState(false);
   const push = usePushStatus();
-  const [phone, setPhone] = useState(profile.phone ?? '');
-  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   const [firstName, setFirstName] = useState(() => splitName(profile.display_name).first);
   const [lastName, setLastName] = useState(() => splitName(profile.display_name).last);
   const [savingName, setSavingName] = useState(false);
@@ -93,12 +160,14 @@ export default function ProfileScreen() {
   const nameChanged = joinName(firstName, lastName) !== profile.display_name;
 
   async function saveName() {
-    if (savingName || !firstName.trim() || !nameChanged) return;
+    if (savingName || !firstName.trim()) return;
+    if (!nameChanged) return setEditing(false);
     setNameNote(null);
     setSavingName(true);
     const result = await setDisplayName(joinName(firstName, lastName));
     setSavingName(false);
     if (result.error) setNameNote(result.error);
+    else setEditing(false);
   }
 
   async function save(patch: ProfilePatch) {
@@ -107,11 +176,7 @@ export default function ProfileScreen() {
     if (result.error) setError(result.error);
   }
 
-  /**
-   * The push switch: on asks for permission and registers this device or browser (Web Push
-   * on the website); off turns push off for the account and, on the website, unsubscribes
-   * this browser.
-   */
+  /** On asks for permission and registers this device or browser; off turns push off for the account. */
   async function setPushEnabled(on: boolean) {
     setPushNote(null);
     setPushBusy(true);
@@ -132,138 +197,111 @@ export default function ProfileScreen() {
     }
   }
 
-  function savePhone() {
-    if (!phone.trim()) {
-      setPhoneError('Enter a mobile number to get text messages.');
-      return;
-    }
-    if (!isValidPhone(phone)) {
-      setPhoneError('Enter a mobile number, like (555) 123-4567.');
-      return;
-    }
-    setPhoneError(null);
-    const normalized = normalizePhone(phone);
-    if (normalized !== profile.phone) save({ phone: normalized });
-  }
-
   const reminderTime = normalizeTime(profile.reminder_time);
   const pushStatus = push.status === null ? null : shownPushStatus(push.status, profile.push_enabled);
   const name = profile.display_name || 'Add your name';
-  const meta =
-    counts === null
-      ? null
-      : `${counts.groups} ${counts.groups === 1 ? 'group' : 'groups'}` +
-        (counts.admin > 0 ? ` · Admin of ${counts.admin}` : '');
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Screen title="Profile" keyboardShouldPersistTaps="handled">
-        <Card style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-          <View
-            accessible={false}
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 28,
-              backgroundColor: colors.primaryTint,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            <Text variant="title3" color="primary" style={{ fontFamily: fonts.extrabold }}>
-              {initials(profile.display_name)}
-            </Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text variant="title3" style={{ fontSize: 20, lineHeight: 26, fontFamily: fonts.extrabold }}>
-              {name}
-            </Text>
-            <Text variant="subhead" color="textSecondary">
-              {isGuest ? 'Guest account · on this device' : (session?.user.email ?? '')}
-            </Text>
-            {meta ? (
-              <Text variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
-                {meta}
-              </Text>
-            ) : null}
-          </View>
-        </Card>
-
-        {/* Time Off (ticket 10). */}
-        <SettingsList>
-          <ValueRow
-            icon={CalendarOff}
-            label="Time Off"
-            description="Days you can’t serve"
-            onPress={() => router.push('/time-off')}
-          />
-        </SettingsList>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen title="Me" keyboardShouldPersistTaps="handled">
+        {editing ? (
+          <Card style={{ gap: space.sm }}>
+            <TextField
+              label="First name"
+              value={firstName}
+              onChangeText={(text) => {
+                setFirstName(text);
+                setNameNote(null);
+              }}
+              placeholder="First name"
+              autoComplete="given-name"
+              textContentType="givenName"
+              autoCapitalize="words"
+              returnKeyType="next"
+              maxLength={60}
+            />
+            <TextField
+              label="Last name"
+              value={lastName}
+              onChangeText={(text) => {
+                setLastName(text);
+                setNameNote(null);
+              }}
+              placeholder="Last name"
+              autoComplete="family-name"
+              textContentType="familyName"
+              autoCapitalize="words"
+              returnKeyType="done"
+              onSubmitEditing={saveName}
+              maxLength={60}
+            />
+            {nameNote ? <Notice>{nameNote}</Notice> : null}
+            <View style={{ flexDirection: 'row', gap: space.sm }}>
+              <Button
+                label="Cancel"
+                variant="secondary"
+                style={{ flex: 1 }}
+                onPress={() => {
+                  const parts = splitName(profile.display_name);
+                  setFirstName(parts.first);
+                  setLastName(parts.last);
+                  setNameNote(null);
+                  setEditing(false);
+                }}
+              />
+              <Button label="Save name" loading={savingName} disabled={!firstName.trim()} onPress={saveName} style={{ flex: 1 }} />
+            </View>
+          </Card>
+        ) : (
+          <Pressable accessibilityRole="button" accessibilityLabel={`${name}. Edit name`} onPress={() => setEditing(true)}>
+            <Card style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+              <View
+                accessible={false}
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  backgroundColor: colors.primaryTint,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <Text variant="title3" color="primary" style={{ fontFamily: fonts.extrabold }}>
+                  {initials(profile.display_name)}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant="title3" style={{ fontSize: 20, lineHeight: 26, fontFamily: fonts.extrabold }}>
+                  {name}
+                </Text>
+                <Text variant="subhead" color="textSecondary">
+                  {isGuest ? 'Guest account · on this device' : (session?.user.email ?? '')}
+                </Text>
+              </View>
+              <Pencil size={18} color={colors.textTertiary} strokeWidth={1.75} />
+            </Card>
+          </Pressable>
+        )}
 
         {error ? <Notice>{error}</Notice> : null}
 
-        <Section label="Your name">
-          <TextField
-            label="First name"
-            value={firstName}
-            onChangeText={(text) => {
-              setFirstName(text);
-              setNameNote(null);
-            }}
-            placeholder="First name"
-            autoComplete="given-name"
-            textContentType="givenName"
-            autoCapitalize="words"
-            returnKeyType="next"
-            maxLength={60}
-          />
-          <TextField
-            label="Last name"
-            value={lastName}
-            onChangeText={(text) => {
-              setLastName(text);
-              setNameNote(null);
-            }}
-            placeholder="Last name"
-            autoComplete="family-name"
-            textContentType="familyName"
-            autoCapitalize="words"
-            returnKeyType="done"
-            onSubmitEditing={saveName}
-            maxLength={60}
-          />
-          {nameChanged ? (
-            <Button
-              label="Save name"
-              loading={savingName}
-              disabled={!firstName.trim()}
-              onPress={saveName}
+        <Section label="Notifications">
+          <SettingsList>
+            <SwitchRow
+              icon={Smartphone}
+              label="Notifications"
+              description={pushStatus ? pushStatusText(pushStatus, PUSH_PLATFORM) : 'Checking…'}
+              value={profile.push_enabled && pushStatus === 'on'}
+              onValueChange={setPushEnabled}
+              disabled={pushBusy || pushStatus === null || !canTogglePush(pushStatus)}
             />
+          </SettingsList>
+          {pushNote ? (
+            <Notice tone="info">{pushNote}</Notice>
+          ) : pushStatus === 'needsInstall' ? (
+            <Notice tone="info">{INSTALL_HINT}</Notice>
+          ) : pushStatus === 'blocked' ? (
+            <Notice tone="info">{blockedHint(PUSH_PLATFORM, APP_NAME)}</Notice>
           ) : null}
-          {nameNote ? <Notice>{nameNote}</Notice> : null}
-          <Text variant="caption" color="textSecondary">
-            Your groups see this name.
-          </Text>
-        </Section>
-
-        <Section label="Remind me before an Assignment">
-          <ChipGroup>
-            {REMINDER_DAY_OPTIONS.map((option) => (
-              <Chip
-                key={option.days}
-                label={option.label}
-                selected={profile.reminder_days_before.includes(option.days)}
-                onPress={() =>
-                  save({
-                    reminder_days_before: toggleReminderDay(
-                      profile.reminder_days_before,
-                      option.days,
-                    ),
-                  })
-                }
-              />
-            ))}
-          </ChipGroup>
         </Section>
 
         <Section label="Reminder time">
@@ -279,96 +317,7 @@ export default function ProfileScreen() {
           </ChipGroup>
         </Section>
 
-        <Section label="How to reach me">
-          <SettingsList>
-            <SwitchRow
-              icon={Smartphone}
-              label="Push notifications"
-              description={pushStatus ? pushStatusText(pushStatus, PUSH_PLATFORM) : 'Checking…'}
-              value={profile.push_enabled && pushStatus === 'on'}
-              onValueChange={setPushEnabled}
-              disabled={pushBusy || pushStatus === null || !canTogglePush(pushStatus)}
-            />
-            <SwitchRow
-              icon={Mail}
-              label="Email"
-              description="Optional"
-              value={profile.email_enabled}
-              onValueChange={(on) => save({ email_enabled: on })}
-            />
-            <SwitchRow
-              icon={MessageSquare}
-              label="Text message"
-              description="Optional · standard rates may apply"
-              value={profile.sms_enabled}
-              onValueChange={(on) => {
-                setPhoneError(null);
-                save({ sms_enabled: on });
-              }}
-            />
-          </SettingsList>
-          {pushNote ? (
-            <Notice tone="info">{pushNote}</Notice>
-          ) : pushStatus === 'needsInstall' ? (
-            <Notice tone="info">{INSTALL_HINT}</Notice>
-          ) : pushStatus === 'blocked' ? (
-            <Notice tone="info">{blockedHint(PUSH_PLATFORM, APP_NAME)}</Notice>
-          ) : null}
-          {profile.sms_enabled ? (
-            <TextField
-              label="Mobile number"
-              value={phone}
-              onChangeText={(text) => {
-                setPhone(text);
-                if (phoneError) setPhoneError(null);
-              }}
-              onBlur={savePhone}
-              onSubmitEditing={savePhone}
-              error={phoneError}
-              placeholder="(555) 123-4567"
-              keyboardType="phone-pad"
-              autoComplete="tel"
-              textContentType="telephoneNumber"
-              returnKeyType="done"
-              maxLength={32}
-            />
-          ) : null}
-        </Section>
-
-        <Section label="Tell me about">
-          <SettingsList>
-            <SwitchRow
-              icon={Repeat}
-              label="Coverage Requests"
-              description="When someone needs cover for a Responsibility I'm Qualified for"
-              value={profile.notify_coverage_requests}
-              onValueChange={(on) => save({ notify_coverage_requests: on })}
-            />
-            <SwitchRow
-              icon={CalendarX}
-              label="Schedule changes"
-              description="Skip Dates, Time Off routing and Make-up Turns that affect me"
-              value={profile.notify_changes}
-              onValueChange={(on) => save({ notify_changes: on })}
-            />
-          </SettingsList>
-        </Section>
-
-        {counts && counts.admin > 0 ? (
-          <Section label="As an Admin">
-            <SettingsList>
-              <ValueRow
-                icon={ShieldCheck}
-                label="Alert me about Unconfirmed / Needs coverage Assignments"
-                description="In the groups you manage. Nothing is ever declined automatically."
-                value={alertLeadLabel(profile.admin_alert_lead_time_ms)}
-                onPress={() =>
-                  save({ admin_alert_lead_time_ms: nextAlertLead(profile.admin_alert_lead_time_ms) })
-                }
-              />
-            </SettingsList>
-          </Section>
-        ) : null}
+        <DatesOff />
 
         <View style={{ marginTop: space.xl }}>
           <SignOutButton />

@@ -1,5 +1,6 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft } from 'lucide-react-native';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -27,7 +28,7 @@ import { useTheme } from '@/theme';
  * everything seen; the dots stay for this visit so the person can still spot what's new.
  */
 export default function ActivityScreen() {
-  const { colors, space } = useTheme();
+  const { colors, fonts, space, minTapTarget } = useTheme();
   const params = useLocalSearchParams<{ filter?: string }>();
   const filter = parseActivityFilter(params.filter);
   const { session } = useSession();
@@ -62,6 +63,11 @@ export default function ActivityScreen() {
     [feed.entries, feed.schedule, now, viewerTimeZone, visitSeen],
   );
   const sections = useMemo(() => groupActivityByDay(filterActivity(items, filter), now, viewerTimeZone), [items, filter, now, viewerTimeZone]);
+
+  function back() {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  }
 
   let body: React.ReactNode;
   if (feed.loading) {
@@ -120,13 +126,22 @@ export default function ActivityScreen() {
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: space.lg, paddingBottom: space.xxxl, gap: space.md }}
         refreshControl={<RefreshControl refreshing={feed.refreshing} onRefresh={feed.refresh} tintColor={colors.primary} />}>
-        <View style={{ gap: 2 }}>
-          <Text variant="title1" accessibilityRole="header">
-            Activity
-          </Text>
-          <Text variant="subhead" color="textSecondary">
-            Across all your groups
-          </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs, marginLeft: -space.sm }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            onPress={back}
+            style={{ width: minTapTarget, height: minTapTarget, alignItems: 'center', justifyContent: 'center' }}>
+            <ChevronLeft size={26} color={colors.text} strokeWidth={1.75} />
+          </Pressable>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text variant="title1" accessibilityRole="header" style={{ fontFamily: fonts.extrabold }}>
+              Activity
+            </Text>
+            <Text variant="subhead" color="textSecondary">
+              Across all your groups
+            </Text>
+          </View>
         </View>
         <FilterChips<ActivityFilter>
           label="Filter activity"

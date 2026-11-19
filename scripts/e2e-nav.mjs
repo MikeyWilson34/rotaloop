@@ -204,7 +204,6 @@ try {
   const respChip = page.getByRole('checkbox', { name: respName, exact: true });
   if ((await respChip.count()) && (await respChip.getAttribute('aria-checked')) !== 'true') await respChip.click();
   await click('Add Event Series');
-  await sleep(1500);
   await backToGroup('Event Series saved');
 
   // Group Schedule tab → an Assignment.
@@ -216,22 +215,56 @@ try {
   if (!page.url().includes('/assignment/')) throw new Error(`Assignment: unexpected URL ${page.url()}`);
   await backToGroup('Assignment');
 
-  // Bottom tabs, several rounds (Home, Schedule and Activity share live subscriptions).
+  // Bottom tabs (Home · Groups · Me), several rounds; Activity is the bell on Home.
   current = 'tabs';
   await page.goto(`${BASE}/`);
   await expectScreen('Home', /Home/);
+  const tabCount = await page.getByRole('tab').count();
+  if (tabCount !== 3) throw new Error(`Expected 3 bottom tabs, found ${tabCount}`);
   for (let round = 1; round <= 3; round++) {
     for (const [tab, expected] of [
       ['Home', /Home/],
-      ['Schedule', /Schedule/],
-      ['Activity', /Activity/],
+      ['Me', /My dates off/],
+      ['Groups', /Create a group/],
       ['Home', /Home/],
-      ['Schedule', /Schedule/],
     ]) {
       await bottomTab(tab).click();
       await expectScreen(`round ${round}: ${tab} tab`, expected);
     }
+    // The bell opens Activity as a pushed page; Back returns to Home.
+    await page.getByRole('button', { name: /^Activity/ }).filter({ visible: true }).first().click();
+    await expectScreen(`round ${round}: bell → Activity`, /Across all your groups/);
+    await page.getByRole('button', { name: 'Back', exact: true }).first().click();
+    await expectScreen(`round ${round}: Activity → back`, /Home/);
   }
+
+  // Me → dates off: add one, see it listed, remove it.
+  current = 'dates off';
+  await bottomTab('Me').click();
+  await expectScreen('Me', /My dates off/);
+  await page.getByRole('button', { name: 'Add dates off', exact: true }).last().click();
+  await expectScreen('Me → Add dates off', /Dates off/);
+  // Pick the last day shown in the month (a future day unless it's the month's end; the
+  // calendar disables past days, so fall back to any enabled one).
+  const days = page.getByRole('checkbox', { name: /^\w+day, \w+ \d+/ }).filter({ visible: true });
+  let picked = false;
+  for (let i = (await days.count()) - 1; i >= 0 && !picked; i--) {
+    if ((await days.nth(i).getAttribute('aria-disabled')) !== 'true') {
+      await days.nth(i).click();
+      picked = true;
+    }
+  }
+  if (!picked) throw new Error('Dates off: no day to pick');
+  await click('Save 1 day');
+  await expectScreen('dates off saved', /Dates off saved/);
+  await page.getByRole('button', { name: 'Back', exact: true }).first().click();
+  await expectScreen('dates off → back to Me', /My dates off/);
+  const remove = page.getByRole('button', { name: /^Remove dates off:/ }).filter({ visible: true }).first();
+  await remove.waitFor();
+  await remove.click();
+  await expectScreen('remove dates off', /Remove these dates off/);
+  await click('Remove');
+  await expectScreen('dates off removed', /No dates off yet/);
   // And into a Group and back out, with the tabs still mounted underneath.
   await bottomTab('Groups').click();
   await expectScreen('Groups tab', /Create a group/);

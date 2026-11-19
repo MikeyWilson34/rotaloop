@@ -1,15 +1,16 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { CalendarOff, UserPlus, type LucideIcon } from 'lucide-react-native';
+import { Bell, CalendarOff, UserPlus, type LucideIcon } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useActivityUnreadCount } from '@/activity/data';
 import { InviteSheet } from '@/components/group/InviteSheet';
 import { AttentionCard } from '@/components/home/AttentionCard';
 import { ManagedGroupCard, MemberGroupCard } from '@/components/home/GroupCards';
 import { Hero, HeroEmpty } from '@/components/home/Hero';
 import { CaughtUp, FilterChips, HomeSkeleton, SectionHead } from '@/components/home/parts';
-import { Avatar, Button, Notice, showToast, Text } from '@/components/ui';
+import { Button, Notice, showToast, Text } from '@/components/ui';
 import { APP_NAME } from '@/config/app';
 import { CAN_WITHDRAW_DECLINE } from '@/coverage/actions';
 import { successMessage } from '@/coverage/sheets';
@@ -20,7 +21,6 @@ import {
   greeting,
   groupCards,
   groupFilterCounts,
-  initialsOf,
   parseGroupFilter,
   selectHero,
   showGroupFilters,
@@ -56,6 +56,7 @@ export default function HomeScreen() {
   const { colors, fonts, space } = useTheme();
   const params = useLocalSearchParams<{ filter?: string }>();
   const { profile } = useSession();
+  const unread = useActivityUnreadCount();
   const { data, loading, error, refresh, refreshing, reload } = useHomeData();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
@@ -128,10 +129,15 @@ export default function HomeScreen() {
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Profile"
-        onPress={() => router.push('/profile')}
+        accessibilityLabel={unread > 0 ? `Activity, ${unread} new` : 'Activity'}
+        onPress={() => router.push('/activity')}
         style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}>
-        <Avatar initials={name ? initialsOf(name) : '?'} />
+        <Bell size={24} color={colors.text} strokeWidth={1.75} />
+        {unread > 0 ? (
+          <View
+            style={{ position: 'absolute', top: 10, right: 11, width: 10, height: 10, borderRadius: 5, backgroundColor: colors.danger, borderWidth: 2, borderColor: colors.bg }}
+          />
+        ) : null}
       </Pressable>
     </View>
   );
@@ -198,7 +204,7 @@ export default function HomeScreen() {
         )}
 
         <View style={{ flexDirection: 'row', gap: space.md, marginTop: space.md }}>
-          <QuickAction icon={CalendarOff} label="Add Time Off" onPress={() => router.push('/time-off')} />
+          <QuickAction icon={CalendarOff} label="Add dates off" onPress={() => router.push('/time-off')} />
           <QuickAction
             icon={UserPlus}
             label="Invite someone"
