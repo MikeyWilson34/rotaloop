@@ -6,7 +6,8 @@ import { Badge, Button, Notice, SettingsList, Sheet, showToast, Text, TextField 
 import { NAME_MAX } from '@/lib/groupSetup';
 import { memberItems, type MemberItem } from '@/lib/groupPage';
 import type { GroupDetails } from '@/lib/groups';
-import { fetchClaimToken } from '@/lib/inviteLinks';
+import { APP_NAME } from '@/config/app';
+import { fetchClaimToken, fetchGroupInviteToken, resetGroupInviteToken } from '@/lib/inviteLinks';
 import { useTheme } from '@/theme';
 
 import { InviteSheet } from './InviteSheet';
@@ -33,6 +34,7 @@ export function MembersSection({
   const members = useMemo(() => memberItems(group.state, myMemberId), [group.state, myMemberId]);
   const [showAll, setShowAll] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [inviting, setInviting] = useState(false);
   const [claimFor, setClaimFor] = useState<MemberItem | null>(null);
   const shown = showAll ? members : members.slice(0, FIRST);
 
@@ -46,6 +48,7 @@ export function MembersSection({
           <AddRow label={`Show all ${members.length}`} onPress={() => setShowAll(true)} />
         ) : null}
         <AddRow label="Add stand-in" icon onPress={() => setAdding(true)} />
+        <AddRow label="Invite people" icon onPress={() => setInviting(true)} />
       </SettingsList>
       {adding ? (
         <AddStandInSheet
@@ -55,6 +58,16 @@ export function MembersSection({
           onClose={() => setAdding(false)}
         />
       ) : null}
+      <InviteSheet
+        visible={inviting}
+        onClose={() => setInviting(false)}
+        groupName={group.name}
+        title="Invite people"
+        message="Anyone with this link or QR code joins the group directly."
+        loadToken={() => fetchGroupInviteToken(group.id)}
+        resetToken={() => resetGroupInviteToken(group.id)}
+        shareMessage={`Join ${group.name} on ${APP_NAME}:`}
+      />
       <InviteSheet
         visible={claimFor !== null}
         onClose={() => setClaimFor(null)}

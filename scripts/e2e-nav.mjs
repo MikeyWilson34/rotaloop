@@ -230,6 +230,16 @@ try {
     }
   }
   await expectScreen('the new group: typed name is a stand-in', new RegExp(`E2E Standin ${stamp}[\\s\\S]*Stand-in`));
+  // Invite from the group page (feedback-2 ticket 03): no trip through settings.
+  if (process.env.E2E_SHOTS) {
+    await page.getByRole('button', { name: 'Invite people', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+    await shoot('group-members-invite');
+  }
+  await click('Invite people');
+  await expectScreen('group page: invite sheet shows the join link', /Anyone with this link[\s\S]*\/join\/[0-9a-f]{64}/);
+  if (process.env.E2E_SHOTS) await shoot('group-invite-sheet');
+  await click('Done');
+  await sleep(600);
 
   // Headcount jobs (simplify ticket 09): Coffee asks "Coming?" instead of taking turns. This
   // needs the 20261124000000_headcount_jobs migration and the new group-command function; until
