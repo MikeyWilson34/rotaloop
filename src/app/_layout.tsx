@@ -133,8 +133,7 @@ function RootNavigator() {
       </Stack.Protected>
       <Stack.Protected guard={gate === 'app'}>
         <Stack.Screen name="group/[groupId]/index" />
-        <Stack.Screen name="group/[groupId]/responsibility/[responsibilityId]" />
-        <Stack.Screen name="group/[groupId]/series/[seriesId]" />
+        <Stack.Screen name="group/[groupId]/settings" />
         <Stack.Screen name="assignment/[groupId]/[assignmentId]" />
         <Stack.Screen name="activity" />
         <Stack.Screen name="time-off" />

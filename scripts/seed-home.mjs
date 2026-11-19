@@ -191,13 +191,63 @@ const hs = await load(B, hospId);
 const caseyHost = turnsOf(hs, hids.casey, 'host');
 report('Casey can’t make her Host turn (another request Alex can cover)', caseyHost.length > 0 && ok(await H(C, { type: 'decline', assignmentId: caseyHost[0].id })));
 
+// ---------------------------------------------------------------------------
+// Sunday class (simplify ticket 06; the prototype's "Sunday class"): Jordan, Sam and Tom (a
+// stand-in) share a weekly Teach job. Sam can't make his first turn and Tom covers it, so Sam
+// takes Tom's next turn (a swap). Jordan is the viewer for the group page screenshots.
+
+const J = await guest('Jordan Reyes');
+const SL = await guest('Sam Lee');
+const seeded = {};
+const cls = await call(J.client, {
+  action: 'createGroup',
+  name: `Sunday class ${stamp}`,
+  memberName: 'Jordan Reyes',
+  timeZone: ZONE,
+  responsibilities: [{ id: 'teach', name: 'Teach', headcount: 1, requiresConfirmation: false }],
+  eventSeries: [
+    {
+      id: 'teach',
+      name: 'Teach',
+      responsibilityIds: ['teach'],
+      repeat: { frequency: 'weekly', intervalWeeks: null, daysOfWeek: [0], weekOfMonth: null, startTime: '11:00', timeZone: ZONE, startsOn: today },
+    },
+  ],
+  creatorQualifiedFor: ['teach'],
+});
+if (report('Jordan creates the Sunday class (weekly Teach)', ok(cls))) {
+  const classId = cls.groupId;
+  const K = (who, command) => call(who.client, { action: 'command', groupId: classId, command });
+  const classLink = await J.client.rpc('group_invite_link', { p_group_id: classId });
+  const samJoined = await call(SL.client, { action: 'join', token: classLink.data, memberName: 'Sam Lee' });
+  report('Sam joins the Sunday class', ok(samJoined));
+  report('Jordan adds Tom as a stand-in', ok(await K(J, { type: 'addMember', member: { name: 'Tom Hart' } })));
+  let cs = await load(J, classId);
+  // Everyone does every job (the deployed function may predate that default, so say it).
+  for (const m of cs.members.filter((x) => x.id !== cls.memberId)) {
+    report(`${m.name} takes turns teaching`, ok(await K(J, { type: 'qualifyMember', memberId: m.id, responsibilityId: 'teach' })));
+  }
+  cs = await load(J, classId);
+  const tom = cs.members.find((m) => m.name === 'Tom Hart');
+  const samTurn = turnsOf(cs, samJoined.memberId, 'teach')[0];
+  report('Sam can’t make his first Teach turn', !!samTurn && ok(await K(SL, { type: 'decline', assignmentId: samTurn.id })));
+  report(
+    'Tom covers it (Sam takes Tom’s next turn)',
+    !!samTurn && !!tom && ok(await K(J, { type: 'markCovered', assignmentId: samTurn.id, by: { memberId: tom.id } })),
+  );
+  cs = await load(J, classId);
+  report('the swap is on the schedule', cs.assignments.some((a) => a.makeUpTurnId && a.memberId === samJoined.memberId));
+  seeded.sundayClass = classId;
+  seeded.jordan = J.session;
+}
+
 if (sessionFile) {
   writeFileSync(
     sessionFile,
     JSON.stringify({
       storageKey: `sb-${new URL(url).hostname.split('.')[0]}-auth-token`,
-      sessions: { alex: A.session, ben: B.session, casey: C.session, dana: D.session, evan: E.session, fran: F.session },
-      groups: { team: teamId, hospitality: hospId },
+      sessions: { alex: A.session, ben: B.session, casey: C.session, dana: D.session, evan: E.session, fran: F.session, jordan: seeded.jordan },
+      groups: { team: teamId, hospitality: hospId, sundayClass: seeded.sundayClass },
     }),
   );
   report('saved the sessions for screenshots', true);
