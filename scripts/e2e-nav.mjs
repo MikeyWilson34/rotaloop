@@ -8,7 +8,7 @@
 // It signs up a fresh guest (real data in the Supabase project the build points at), creates a
 // Group through the 3-screen setup (name, jobs with the how-often and time sheets, who's in
 // with the invite link, QR code and a typed name), checks the one-page group (Coming up, the
-// stand-in in Members), opens a turn's sheet and its details page, runs the cover flow
+// stand-in in Members), changes a job's turn order in group settings, opens a turn's sheet and its details page, runs the cover flow
 // (ask the group, pick who's covering, take it back, an outside cover by name), edits and adds a job in
 // group settings, and cycles the bottom tabs. It also reports how many requests the cold load made.
 //
@@ -128,6 +128,19 @@ async function backToGroup(tag) {
   await expectScreen(`${tag} → back to the group`, /Coming up/);
 }
 
+/** Screenshots the current screen at 375px in light and dark (E2E_SHOTS=<folder>). */
+async function shoot(name) {
+  await page.setViewportSize({ width: 375, height: 812 });
+  for (const scheme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await sleep(500);
+    await page.screenshot({ path: join(process.env.E2E_SHOTS, `${name}-375-${scheme}.png`) });
+  }
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await sleep(300);
+}
+
 const bottomTab = (name) =>
   page
     .getByRole('tab', { name: new RegExp(`^${name}`) })
@@ -141,6 +154,8 @@ const me = `${first} ${last}`;
 const jobName = `E2E Job ${stamp}`;
 const renamed = `E2E Teach ${stamp}`;
 const addedJob = `E2E Setup ${stamp}`;
+// A second stand-in with its own first name, so the turn-order step can tell people apart.
+const second = 'Zoe';
 
 let exitCode = 0;
 try {
@@ -189,6 +204,9 @@ try {
   await fill('Name', `E2E Standin ${stamp}`);
   await click('Add');
   await expectScreen('setup 3: name added', new RegExp(`E2E Standin ${stamp}`));
+  await fill('Name', `${second} Standin ${stamp}`);
+  await click('Add');
+  await expectScreen('setup 3: second name added', new RegExp(`${second} Standin ${stamp}`));
   await click('Done');
   // One scrolling group page (simplify ticket 06): Coming up, then Members.
   await expectScreen('the new group: coming up', /Coming up/);
@@ -201,13 +219,13 @@ try {
   current = 'headcount';
   const coffeeRow = page.locator(`[aria-label^="E2E Coffee ${stamp},"][aria-label$="Coming?"]`).filter({ visible: true }).first();
   if (await coffeeRow.isVisible().catch(() => false)) {
-    await expectScreen('headcount row: counts', /0 coming · 0 not · 2 no reply/);
+    await expectScreen('headcount row: counts', /0 coming · 0 not · 3 no reply/);
     await coffeeRow.click();
     await expectScreen('headcount sheet: Coming? and the stand-in', /Coming\?[\s\S]*Not on the app/);
     await click('Yes');
-    await expectScreen('headcount: I said yes', /1 coming · 0 not · 1 no reply/);
+    await expectScreen('headcount: I said yes', /1 coming · 0 not · 2 no reply/);
     await click(`No for E2E Standin ${stamp}`);
-    await expectScreen('headcount: answered for the stand-in', /1 coming · 1 not · 0 no reply/);
+    await expectScreen('headcount: answered for the stand-in', /1 coming · 1 not · 1 no reply/);
     await click('Close');
     await sleep(600);
     await expectScreen("headcount row: you're coming", /You're coming/);
@@ -216,6 +234,34 @@ try {
     results.push(note);
     console.log(note);
   }
+
+  // Turn order in group settings (feedback-2 ticket 02): move the last person to the top, save,
+  // and the job's next date on the group page is theirs. Done before any cover, so nothing is
+  // pinned and the new order starts at the next date.
+  current = 'turn order';
+  await click('Group settings');
+  await expectScreen('settings: Turn order section', /Turn order[\s\S]*Next: [\s\S]*Change the order[\s\S]*Dates off/);
+  if (process.env.E2E_SHOTS) await shoot('settings-turn-order');
+  await page.getByRole('button', { name: new RegExp(`^Turn order for ${jobName}:`) }).filter({ visible: true }).first().click();
+  await expectScreen('Turn order sheet', /Use the arrows to move people up or down/);
+  await expectScreen('Turn order sheet: the last person is the second stand-in', new RegExp(`${second}\\s*Save`));
+  if (await button(`Move ${second} later`).isEnabled()) throw new Error('Turn order: the last row can still move later');
+  if (process.env.E2E_SHOTS) await shoot('turn-order-sheet');
+  await click(`Move ${second} earlier`);
+  await click(`Move ${second} earlier`);
+  if (await button(`Move ${second} earlier`).isEnabled()) throw new Error('Turn order: the top row can still move earlier');
+  await click('Save');
+  await expectScreen('Turn order saved', /Turn order saved/);
+  await expectScreen('settings: next is the moved person', new RegExp(`Next: ${second} · Change the order`));
+  await backToGroup('turn order');
+  const nextTurn = page.locator(`[aria-label^="${jobName},"]`).filter({ visible: true }).first();
+  await nextTurn.waitFor();
+  const nextLabel = (await nextTurn.getAttribute('aria-label')) ?? '';
+  if (![`, ${second}`, `, ${second} (Stand-in)`].some((end) => nextLabel.endsWith(end))) {
+    throw new Error(`Turn order: the next date shows "${nextLabel}", expected ${second}`);
+  }
+  results.push(`ok  turn order: the next date is ${second}'s`);
+  console.log(`ok  turn order: the next date is ${second}'s`);
 
   // A turn → its details sheet → the full details page → back.
   current = 'turn';
