@@ -36,8 +36,9 @@ const pastAssignments = (state: GroupState, throughWeek: number) =>
 
 // ---------------------------------------------------------------------------
 
-describe('Permissions live in the engine', () => {
-  const adminOnly: Command[] = [
+describe('Permissions live in the engine (no Admins for now)', () => {
+  /** Commands only Admins could run before the simplification. */
+  const formerlyAdminOnly: Command[] = [
     { type: 'fillSchedule' },
     { type: 'addEvents', events: [{ id: 'x', seriesId: 'sundays', startsAt: week(9) }] },
     { type: 'requestConfirmation', assignmentIds: [] },
@@ -53,24 +54,34 @@ describe('Permissions live in the engine', () => {
     { type: 'addEventSeries', series: { id: 'sat', name: 'Saturdays', responsibilityIds: ['sound'] } },
     { type: 'editEventSeries', seriesId: 'sundays', changes: { name: 'Sun' } },
     { type: 'removeEventSeries', seriesId: 'sundays' },
-    { type: 'removeEvent', eventId: 'w1' },
+    { type: 'removeEvent', eventId: 'oneoff' },
     { type: 'setAdmin', memberId: 'ben', isAdmin: true },
     { type: 'changeSettings', settings: { allowDoubling: true } },
     { type: 'rebalance', responsibilityId: 'sound' },
   ];
 
-  it.each(adminOnly.map((c) => [c.type, c] as const))('%s is for Admins only', (_, command) => {
-    expect(rejected(twoResponsibilities(), command, { by: 'ben' })).toBe('notPermitted');
+  it.each(formerlyAdminOnly.map((c) => [c.type, c] as const))('a plain Member may run %s', (_, command) => {
+    // A one-off Event, so that removeEvent has something it may remove.
+    const state = act(twoResponsibilities(), {
+      type: 'addEvents',
+      events: [{ id: 'oneoff', seriesId: null, startsAt: week(9), responsibilityIds: ['sound'] }],
+    }).state;
+    const result = act(state, command, { by: 'ben' });
+    expect(result.history.at(-1)?.actorId).toBe('ben');
   });
 
-  it('Members manage only their own Time Off; Admins manage anyone’s', () => {
+  it('Members manage only their own Time Off (or a Stand-in’s), not another app user’s', () => {
     let state = twoResponsibilities();
     expect(rejected(state, { type: 'addTimeOff', timeOff: timeOff('t-ana', 'ana', 2) }, { by: 'ben' })).toBe('notPermitted');
+    // Being flagged Admin grants nothing extra.
+    expect(rejected(state, { type: 'addTimeOff', timeOff: timeOff('t-cal', 'cal', 3) }, { by: 'ana' })).toBe('notPermitted');
     state = act(state, { type: 'addTimeOff', timeOff: timeOff('t-ben', 'ben', 2) }, { by: 'ben' }).state;
-    state = act(state, { type: 'addTimeOff', timeOff: timeOff('t-cal', 'cal', 3) }, { by: 'ana' }).state;
+    state = act(state, { type: 'addTimeOff', timeOff: timeOff('t-cal', 'cal', 3) }, { by: 'cal' }).state;
     expect(rejected(state, { type: 'removeTimeOff', timeOffId: 't-cal' }, { by: 'ben' })).toBe('notPermitted');
     state = act(state, { type: 'removeTimeOff', timeOffId: 't-ben' }, { by: 'ben' }).state;
-    act(state, { type: 'removeTimeOff', timeOffId: 't-cal' }, { by: 'ana' });
+    state = act(state, { type: 'addMember', member: { id: 'gus', name: 'Gus' }, qualifiedFor: ['sound'] }, { by: 'ben' }).state;
+    state = act(state, { type: 'addTimeOff', timeOff: timeOff('t-gus', 'gus', 4) }, { by: 'cal' }).state;
+    act(state, { type: 'removeTimeOff', timeOffId: 't-gus' }, { by: 'ben' });
   });
 
   it('Members may still add Skip Dates, Decline their own Assignments and Cover', () => {
@@ -87,28 +98,32 @@ describe('Permissions live in the engine', () => {
     expect(rejected(state, { type: 'addSkipDate', eventId: 'w3' }, { by: 'stranger' })).toBe('notPermitted');
   });
 
-  it('Joining adds yourself as a plain Member; only Admins add others', () => {
+  it('Joining adds yourself as a plain Member, who may join every Rotation', () => {
     const state = twoResponsibilities();
     act(state, { type: 'addMember', member: { id: 'gus', name: 'Gus', accountId: 'acct-gus' } }, { by: 'gus' });
     expect(
       rejected(state, { type: 'addMember', member: { id: 'gus', name: 'Gus', accountId: 'acct-gus', isAdmin: true } }, { by: 'gus' }),
     ).toBe('notPermitted');
-    expect(
-      rejected(state, { type: 'addMember', member: { id: 'gus', name: 'Gus', accountId: 'acct-gus' }, qualifiedFor: ['sound'] }, { by: 'gus' }),
-    ).toBe('notPermitted');
+    const joined = act(
+      state,
+      { type: 'addMember', member: { id: 'gus', name: 'Gus', accountId: 'acct-gus' }, qualifiedFor: ['sound', 'greeter'] },
+      { by: 'gus' },
+    ).state;
+    expect(joined.rotations.every((r) => r.queue.includes('gus'))).toBe(true);
   });
 });
 
 // ---------------------------------------------------------------------------
 
 describe('Renaming a Member', () => {
-  it('A Member renames themselves; an Admin can rename anyone, including a Placeholder', () => {
+  it('A Member renames themselves or a Stand-in, not another app user', () => {
     let state = twoResponsibilities();
     state = act(state, { type: 'renameMember', memberId: 'ben', name: '  Benny ' }, { by: 'ben' }).state;
     expect(state.members.find((m) => m.id === 'ben')?.name).toBe('Benny');
     expect(rejected(state, { type: 'renameMember', memberId: 'cal', name: 'Cally' }, { by: 'ben' })).toBe('notPermitted');
-    state = act(state, { type: 'addMember', member: { id: 'gus', name: 'Gus' } }, { by: 'ana' }).state;
-    const result = act(state, { type: 'renameMember', memberId: 'gus', name: 'Gus P.' }, { by: 'ana' });
+    expect(rejected(state, { type: 'renameMember', memberId: 'cal', name: 'Cally' }, { by: 'ana' })).toBe('notPermitted');
+    state = act(state, { type: 'addMember', member: { id: 'gus', name: 'Gus' } }, { by: 'ben' }).state;
+    const result = act(state, { type: 'renameMember', memberId: 'gus', name: 'Gus P.' }, { by: 'cal' });
     expect(result.state.members.find((m) => m.id === 'gus')?.name).toBe('Gus P.');
     expect(result.changes).toEqual([]);
     expect(rejected(state, { type: 'renameMember', memberId: 'ben', name: '   ' }, { by: 'ben' })).toBe('invalid');
@@ -117,31 +132,22 @@ describe('Renaming a Member', () => {
 
 // ---------------------------------------------------------------------------
 
-describe('Admins', () => {
-  it('An Admin appoints another Admin, who can then run Admin commands', () => {
-    let state = twoResponsibilities();
-    state = act(state, { type: 'setAdmin', memberId: 'ben', isAdmin: true }, { by: 'ana' }).state;
-    act(state, { type: 'rebalance', responsibilityId: 'sound' }, { by: 'ben' });
-  });
-
-  it('The last active Admin cannot be removed as Admin, removed from the Group, or leave', () => {
+describe('The Admin flag (kept, but hidden)', () => {
+  it('Anyone may leave, including the last Member flagged Admin', () => {
     const state = twoResponsibilities();
-    expect(rejected(state, { type: 'setAdmin', memberId: 'ana', isAdmin: false }, { by: 'ana' })).toBe('lastAdmin');
-    expect(rejected(state, { type: 'removeMember', memberId: 'ana' }, { by: 'ana' })).toBe('lastAdmin');
-    expect(rejected(state, { type: 'removeMember', memberId: 'ana' })).toBe('lastAdmin');
-  });
-
-  it('With a second Admin, either can step down or leave', () => {
-    let state = twoResponsibilities();
-    state = act(state, { type: 'setAdmin', memberId: 'ben', isAdmin: true }, { by: 'ana' }).state;
-    const steppedDown = act(state, { type: 'setAdmin', memberId: 'ana', isAdmin: false }, { by: 'ana' }).state;
-    expect(steppedDown.members.find((m) => m.id === 'ana')?.isAdmin).toBe(false);
-    expect(rejected(steppedDown, { type: 'removeMember', memberId: 'ben' }, { by: 'ben' })).toBe('lastAdmin');
     const left = act(state, { type: 'removeMember', memberId: 'ana' }, { by: 'ana' }).state;
     expect(left.members.find((m) => m.id === 'ana')?.leftAt).not.toBeNull();
   });
 
-  it('A Placeholder Member cannot be made an Admin until claimed', () => {
+  it('Members remove Stand-ins, but not other app users', () => {
+    let state = twoResponsibilities();
+    expect(rejected(state, { type: 'removeMember', memberId: 'cal' }, { by: 'ben' })).toBe('notPermitted');
+    state = act(state, { type: 'addMember', member: { id: 'gus', name: 'Gus' } }, { by: 'ben' }).state;
+    state = act(state, { type: 'removeMember', memberId: 'gus' }, { by: 'cal' }).state;
+    expect(state.members.find((m) => m.id === 'gus')?.leftAt).not.toBeNull();
+  });
+
+  it('A Placeholder Member cannot be flagged Admin until claimed', () => {
     let state = twoResponsibilities();
     state = act(state, { type: 'addMember', member: { id: 'gus', name: 'Gus' } }, { by: 'ana' }).state;
     expect(rejected(state, { type: 'setAdmin', memberId: 'gus', isAdmin: true }, { by: 'ana' })).toBe('invalid');

@@ -135,10 +135,8 @@ describe('Pay It Back', () => {
     ]);
   });
 
-  it('Changing settings is for Admins only', () => {
-    expect(rejected(setup(), { type: 'changeSettings', settings: { allowDoubling: true } }, { by: 'ana' })).toBe(
-      'notPermitted',
-    );
+  it('Any Member may change settings (no Admins for now)', () => {
+    act(setup(), { type: 'changeSettings', settings: { allowDoubling: true } }, { by: 'ana' });
   });
 });
 
@@ -167,7 +165,7 @@ describe('Replacement Duty', () => {
     expect(assignmentOf(result.state, 'w1', 'eve').confirmation).toBe('requested');
   });
 
-  it('Replacement Duty with Admins: only an Admin may mark it covered, and a Qualified coverer is owed', () => {
+  it('Any Member may mark it covered (whatever Replacement Duty says), and a Qualified coverer is owed', () => {
     let state = setup({
       members: WITH_EVE,
       admins: ['eve'],
@@ -177,8 +175,7 @@ describe('Replacement Duty', () => {
     state = declined(state, 'w1', 'ana').state;
     const assignmentId = assignmentOf(state, 'w1', 'ana').id;
     const command = { type: 'markCovered', assignmentId, by: { memberId: 'ben' } } as const;
-    expect(rejected(state, command, { by: 'ana' })).toBe('notPermitted');
-    state = act(state, command, { by: 'eve' }).state;
+    state = act(state, command, { by: 'cal' }).state;
     expect(state.makeUpTurns).toEqual([expect.objectContaining({ debtorId: 'ana', creditorId: 'ben' })]);
   });
 });

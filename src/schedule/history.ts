@@ -182,8 +182,19 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
       if (change?.before?.coverageRequest?.cover) {
         return { text: `${actor} can no longer cover ${assignmentPhrase(ctx, a)}. It needs coverage again.`, tone: 'bad' };
       }
-      const holder = change?.before?.memberId ?? a?.memberId ?? null;
+      const holder = change?.before?.memberId ?? a?.coverageRequest?.requestedBy ?? a?.memberId ?? null;
       const why = quoted(cause.reason);
+      if (cause.coveredBy) {
+        // The cover was found straight away ("I'll find someone to cover", "Pick someone to do it").
+        const by = 'guestName' in cause.coveredBy
+          ? `${cause.coveredBy.guestName.trim()} (guest)`
+          : object(nameOf(ctx, cause.coveredBy.memberId));
+        if (holder && entry.actorId !== null && holder !== entry.actorId) {
+          const whose = nameOf(ctx, holder, 'your');
+          return { text: `${actor} gave ${whose === 'your' ? whose : `${whose}'s`} ${assignmentPhrase(ctx, a)} to ${by}.`, tone: 'info' };
+        }
+        return { text: `${actor} can't make ${assignmentPhrase(ctx, a)}${why}. ${by} is covering.`, tone: 'info' };
+      }
       if (holder && entry.actorId !== null && holder !== entry.actorId) {
         // An Admin declining for someone else (e.g. a Placeholder Member).
         const name = nameOf(ctx, holder);

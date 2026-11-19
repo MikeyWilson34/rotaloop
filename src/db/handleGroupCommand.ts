@@ -94,6 +94,11 @@ function activeMemberFor(state: GroupState, accountId: string): Member | undefin
   return state.members.find((m) => m.accountId === accountId && m.leftAt === null);
 }
 
+/** Everyone does every Job: a new Member (or Stand-in) joins every current Job's Rotation. */
+function everyJob(state: GroupState): string[] {
+  return state.responsibilities.filter((r) => r.removedAt === null).map((r) => r.id);
+}
+
 // ---------------------------------------------------------------------------
 // The load -> engine -> persist cycle
 
@@ -166,11 +171,12 @@ function runCommand(
 function toEngineCommand(command: ClientCommand, context: HandlerContext, state: GroupState, now: Instant): Command {
   switch (command.type) {
     case 'addMember':
-      // An Admin adds a Placeholder Member; the server picks the id.
+      // Any Member adds a Stand-in (a Placeholder Member); the server picks the id. Unless
+      // the client names Jobs, the Stand-in is in every Job's Rotation like anyone.
       return {
         type: 'addMember',
         member: { id: context.newId(), name: command.member.name, accountId: null },
-        qualifiedFor: command.qualifiedFor,
+        qualifiedFor: command.qualifiedFor ?? everyJob(state),
       };
     case 'addEventSeries':
       // A new series with a repeat pattern gets its Events up to the horizon in the same
@@ -325,7 +331,11 @@ async function join(
       const memberId = context.newId();
       return {
         state,
-        command: { type: 'addMember', member: { id: memberId, name: request.memberName, accountId: context.accountId } },
+        command: {
+          type: 'addMember',
+          member: { id: memberId, name: request.memberName, accountId: context.accountId },
+          qualifiedFor: everyJob(state),
+        },
         actorId: memberId,
       };
     },

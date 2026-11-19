@@ -276,6 +276,7 @@ export function parseClientCommand(value: unknown): ClientCommand {
       const reason = optional(o.reason, (v) => nullable(v, (x) => optionalText(x, f('reason'), MAX_REASON)));
       const command: Extract<ClientCommand, { type: 'decline' }> = { type: 'decline', assignmentId: id(o.assignmentId, f('assignmentId')) };
       if (reason) command.reason = reason;
+      if (o.coveredBy !== undefined) command.coveredBy = coverTarget(o.coveredBy, f('coveredBy'));
       return command;
     }
     case 'confirm':
