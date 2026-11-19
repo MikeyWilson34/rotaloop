@@ -292,11 +292,24 @@ try {
 
   // The cover flow (simplify ticket 07), from the group page's turn sheet.
   current = 'cover flow';
-  const myTurn = () => page.locator(`[aria-label^="${jobName}"][aria-label$=", You"]`).filter({ visible: true }).first();
+  // Coming up shows 5 dates at a time. After the turn-order step Zoe has the next E2E Job date
+  // and the twice-weekly-plus job fills the first dates, so my E2E Job turn can sit further down:
+  // tap "Show more dates" until it is listed.
+  const myTurnLocator = () =>
+    page.locator(`[aria-label^="${jobName}"][aria-label$=", You"]`).filter({ visible: true }).first();
+  async function myTurn() {
+    for (let i = 0; i < 6 && (await myTurnLocator().count()) === 0; i++) {
+      const more = page.getByRole('button', { name: 'Show more dates', exact: true }).filter({ visible: true }).first();
+      if (!(await more.isVisible().catch(() => false))) break;
+      await more.click();
+      await sleep(400);
+    }
+    return myTurnLocator();
+  }
   const needsCoverTurn = () =>
     page.locator(`[aria-label^="${jobName}"][aria-label$="Needs cover"]`).filter({ visible: true }).first();
   // "Can't make it" → "Can't make it?" → "Ask the group for cover": the sheet just closes.
-  await myTurn().click();
+  await (await myTurn()).click();
   await click("Can't make it");
   await expectScreen("cover: Can't make it? sheet", /Pick how to get it covered[\s\S]*Ask the group for cover[\s\S]*I'll find someone to cover/);
   await click('Ask the group for cover');
@@ -315,7 +328,7 @@ try {
   await expectScreen("cover: I can make it after all", /You're back on/);
   await sleep(600);
   // "I'll find someone to cover" → "Someone else" (an empty name isn't accepted) → covered.
-  await myTurn().click();
+  await (await myTurn()).click();
   await click("Can't make it");
   await click("I'll find someone to cover");
   await expectScreen('cover: Who is covering? picker', /Who is covering\?[\s\S]*Someone else/);
