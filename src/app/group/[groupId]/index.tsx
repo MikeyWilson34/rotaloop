@@ -86,7 +86,7 @@ export default function GroupScreen() {
     );
   } else {
     const count = activeMemberCount(data.state);
-    // Only real member (the rest are stand-ins): the invite card sits up top, not under Members too.
+    // Only real member (the rest are stand-ins): the invite card sits between Coming up and Members, not under Members too.
     const solo = data.state.members.every((m) => m.leftAt !== null || m.id === me.id || m.accountId === null);
     body = (
       <View style={{ paddingHorizontal: space.lg, gap: space.md }}>
@@ -101,14 +101,13 @@ export default function GroupScreen() {
             </Text>
           </View>
         </View>
-        {solo ? (
-          <InviteCard group={data} title="Invite your group" subtitle="Share the turns. Everyone gets their own reminders." />
-        ) : null}
-
         <View style={{ marginTop: space.md }}>
           <SectionHeading title="Coming up" />
         </View>
         <ComingUp group={data} accountId={accountId} onOpen={setOpen} />
+        {solo ? (
+          <InviteCard group={data} title="Invite" subtitle="Share the turns. Everyone gets their own reminders." />
+        ) : null}
 
         <View style={{ marginTop: space.lg }}>
           <SectionHeading title="Members" />

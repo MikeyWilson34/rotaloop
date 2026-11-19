@@ -231,12 +231,13 @@ try {
   }
   await expectScreen('the new group: typed name is a stand-in', new RegExp(`E2E Standin ${stamp}[\\s\\S]*Stand-in`));
   // Invite from the group page (feedback-2 ticket 03): no trip through settings.
-  // Feedback-2 ticket 04: you're the only real member, so the invite card is at the top of the
-  // page ("Invite your group") and not repeated under Members; "Add a stand-in" is a small link.
-  await expectScreen('group page: invite card up top when you are the only member', /Invite your group[\s\S]*Coming up/);
+  // Feedback-2 ticket 04: you're the only real member, so the invite card sits in the
+  // page between Coming up and Members ("Invite") and not repeated under Members; "Add a stand-in" is a small link.
+  await expectScreen('group page: invite card between Coming up and Members when you are the only member', /Coming up[\s\S]*Share the turns\. Everyone gets their own reminders\.[\s\S]*Members/);
   if (process.env.E2E_SHOTS) {
     await sleep(4500); // let the 'schedule is ready' toast go
-    await shoot('group-solo-top-card');
+    await page.getByRole('button', { name: 'Invite people', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+    await shoot('group-solo-invite-card');
     await page.getByRole('button', { name: 'Add a stand-in', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
     await shoot('group-members-standins');
   }
