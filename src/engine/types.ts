@@ -45,10 +45,20 @@ export interface Member {
   leftAt: Instant | null;
 }
 
+/**
+ * What kind of Job a Responsibility is (simplify ticket 09):
+ * - `turns` (the default): one person per date, rotating fairly.
+ * - `headcount`: no Rotation and no seats. Before each date every active Member is asked
+ *   "Coming?" (Yes / No; see `HeadcountAnswer`). There is no cover flow for it.
+ */
+export type JobKind = 'turns' | 'headcount';
+
 export interface Responsibility {
   id: ResponsibilityId;
   name: string;
-  /** How many seats each Event needs. */
+  /** Take turns or Headcount. Not to be confused with `headcount` below (people per turn). */
+  kind: JobKind;
+  /** How many seats each Event needs (people per turn; always 1 for new Jobs). */
   headcount: number;
   requiresConfirmation: boolean;
   /**
@@ -259,6 +269,25 @@ export interface MakeUpTurn {
 }
 
 // ---------------------------------------------------------------------------
+// Headcount answers
+
+export type HeadcountReply = 'yes' | 'no';
+
+/**
+ * One Member's "Coming?" answer for one date (Event) of a headcount Job. At most one per
+ * Event, Job and Member; answering again replaces it. Kept for past dates as history.
+ */
+export interface HeadcountAnswer {
+  eventId: EventId;
+  responsibilityId: ResponsibilityId;
+  memberId: MemberId;
+  answer: HeadcountReply;
+  /** Who gave the answer: the Member, or anyone in the Group for a Stand-in. `null`: the system. */
+  answeredBy: MemberId | null;
+  answeredAt: Instant;
+}
+
+// ---------------------------------------------------------------------------
 // The whole state
 
 export interface GroupState {
@@ -275,6 +304,8 @@ export interface GroupState {
   /** Past and future Assignments. Past ones are history and never change. */
   assignments: Assignment[];
   makeUpTurns: MakeUpTurn[];
+  /** "Coming?" answers for headcount Jobs, in the order they were first given. */
+  headcountAnswers: HeadcountAnswer[];
   /** Events starting at or before this instant are history. `null` = none yet. */
   rotatedThrough: Instant | null;
   /** Counter for engine-generated ids (Assignments and Make-up Turns). */
@@ -300,11 +331,12 @@ export type NewTimeOff = Omit<TimeOff, 'removedAt' | 'retainedEventIds' | Option
 export type NewEvent = Omit<Event, 'skipDate' | 'responsibilityIds'> &
   Partial<Pick<Event, 'responsibilityIds'>>;
 
-export type NewResponsibility = Omit<Responsibility, 'removedAt'>;
+/** `kind` defaults to `turns`. */
+export type NewResponsibility = Omit<Responsibility, 'removedAt' | 'kind'> & Partial<Pick<Responsibility, 'kind'>>;
 
 export type NewEventSeries = Omit<EventSeries, 'removedAt' | 'repeat'> & Partial<Pick<EventSeries, 'repeat'>>;
 
-export type ResponsibilityChanges = Partial<Pick<Responsibility, 'name' | 'headcount' | 'requiresConfirmation'>>;
+export type ResponsibilityChanges = Partial<Pick<Responsibility, 'name' | 'kind' | 'headcount' | 'requiresConfirmation'>>;
 
 export type EventSeriesChanges = Partial<Pick<EventSeries, 'name' | 'responsibilityIds' | 'repeat'>>;
 
@@ -331,6 +363,17 @@ export type Command =
    */
   | { type: 'withdrawDecline'; assignmentId: AssignmentId }
   | { type: 'cover'; assignmentId: AssignmentId }
+  /**
+   * "Coming?" Yes / No for one date of a headcount Job: the Member's own answer, or anyone's
+   * for a Stand-in. Answering again changes it. Not recorded in the schedule history.
+   */
+  | {
+      type: 'answerHeadcount';
+      eventId: EventId;
+      responsibilityId: ResponsibilityId;
+      memberId: MemberId;
+      answer: HeadcountReply;
+    }
   | { type: 'markCovered'; assignmentId: AssignmentId; by: CoverTarget }
   | { type: 'changeSettings'; settings: Partial<GroupSettings> }
   | { type: 'rebalance'; responsibilityId: ResponsibilityId }

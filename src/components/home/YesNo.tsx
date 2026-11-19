@@ -2,7 +2,7 @@ import { Check, X } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui';
-import type { HeadcountAnswer } from '@/home/home';
+import type { HeadcountReply } from '@/engine/types';
 import { useTheme } from '@/theme';
 
 /**
@@ -16,30 +16,38 @@ export function YesNoButtons({
   onChange,
   appearance = 'choice',
   busy = null,
+  disabled = false,
+  who,
 }: {
-  value: HeadcountAnswer | null;
-  onChange: (answer: HeadcountAnswer) => void;
+  value: HeadcountReply | null;
+  onChange: (answer: HeadcountReply) => void;
   appearance?: 'filled' | 'choice';
-  /** The answer being sent, if any. */
-  busy?: HeadcountAnswer | null;
+  /** The answer being sent, if any (both buttons are disabled meanwhile). */
+  busy?: HeadcountReply | null;
+  disabled?: boolean;
+  /** Answering for someone else: the buttons read "Yes for Pat" / "No for Pat". */
+  who?: string;
 }) {
+  const off = disabled || busy !== null;
   return (
     <View style={{ flexDirection: 'row', gap: 10 }}>
-      <AnswerButton answer="yes" selected={value === 'yes'} appearance={appearance} busy={busy === 'yes'} disabled={busy !== null} onPress={() => onChange('yes')} />
-      <AnswerButton answer="no" selected={value === 'no'} appearance={appearance} busy={busy === 'no'} disabled={busy !== null} onPress={() => onChange('no')} />
+      <AnswerButton answer="yes" who={who} selected={value === 'yes'} appearance={appearance} busy={busy === 'yes'} disabled={off} onPress={() => onChange('yes')} />
+      <AnswerButton answer="no" who={who} selected={value === 'no'} appearance={appearance} busy={busy === 'no'} disabled={off} onPress={() => onChange('no')} />
     </View>
   );
 }
 
 function AnswerButton({
   answer,
+  who,
   selected,
   appearance,
   busy,
   disabled,
   onPress,
 }: {
-  answer: HeadcountAnswer;
+  answer: HeadcountReply;
+  who?: string;
   selected: boolean;
   appearance: 'filled' | 'choice';
   busy: boolean;
@@ -56,7 +64,7 @@ function AnswerButton({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={who ? `${label} for ${who}` : label}
       accessibilityState={{ selected, disabled, busy }}
       aria-pressed={appearance === 'choice' ? selected : undefined}
       disabled={disabled}

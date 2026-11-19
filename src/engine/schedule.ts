@@ -3,7 +3,7 @@ import {
   findEvent,
   isActiveMember,
   isPinned,
-  responsibilitiesNeeded,
+  seatsNeeded,
   rotationOf,
 } from './state';
 import { compareEvents, isKnownTimeZone, ms, timeOffCovers, wallClockMs } from './time';
@@ -157,7 +157,7 @@ export function planSchedule(state: GroupState): PlannedSeat[] {
   const keptPins = new Map(
     future.map((event) => [
       event.id,
-      responsibilitiesNeeded(state, event).flatMap((r) =>
+      seatsNeeded(state, event).flatMap((r) =>
         keepWithinHeadcount((pinnedByEvent.get(event.id) ?? []).filter((p) => p.responsibilityId === r.id), r.headcount),
       ),
     ]),
@@ -171,7 +171,7 @@ export function planSchedule(state: GroupState): PlannedSeat[] {
   }
 
   future.forEach((event, index) => {
-    const needed = responsibilitiesNeeded(state, event);
+    const needed = seatsNeeded(state, event);
     const pins = keptPins.get(event.id) ?? [];
     const atEvent = new EventSeats(event.id, days.get(localDay(event, zone)) as DaySeats, pins);
     for (const responsibility of needed) {
@@ -441,7 +441,7 @@ class SeatFiller {
   private eventOfSeat(n: number): Event | null {
     let remaining = n;
     for (const later of this.input.laterEvents) {
-      if (!responsibilitiesNeeded(this.input.state, later).some((r) => r.id === this.input.responsibility.id)) {
+      if (!seatsNeeded(this.input.state, later).some((r) => r.id === this.input.responsibility.id)) {
         continue;
       }
       if (remaining < this.input.responsibility.headcount) return later;

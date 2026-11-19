@@ -12,7 +12,7 @@
 import { assignmentActions, isOpenRequest } from '../coverage/actions';
 import { firstName, qualifiedToAsk } from '../coverage/sheets';
 import { replacementDutyHolder } from '../engine/status';
-import type { Assignment, GroupState, Instant, MemberId } from '../engine/types';
+import type { Assignment, GroupState, HeadcountReply, Instant, MemberId } from '../engine/types';
 import { localTime } from '../schedule/expandSeries';
 import {
   dateIn,
@@ -24,6 +24,14 @@ import {
   groupZoneNote,
   relativeDay,
 } from '../schedule/format';
+import {
+  answerOf,
+  headcountCounts,
+  headcountText,
+  upcomingHeadcounts,
+  type HeadcountCounts,
+  type HeadcountDate,
+} from '../schedule/headcount';
 import { movedNotice, type HistoryContext, type HistoryRecord } from '../schedule/history';
 import { eventView, type EventView, type ScheduleGroup, type SlotView } from '../schedule/views';
 
@@ -156,6 +164,20 @@ export type TurnView = {
   needsCover: boolean;
   /** The viewer is covering someone else's turn. */
   covering: boolean;
+  /**
+   * Set for a date of a headcount job (ticket 09): not a turn (`assignmentId` is empty), but
+   * a "Coming?" question with the viewer's answer and the group's counts.
+   */
+  headcount?: HeadcountView;
+};
+
+export type HeadcountView = {
+  eventId: string;
+  responsibilityId: string;
+  answer: HeadcountReply | null;
+  counts: HeadcountCounts;
+  /** "2 coming · 0 not · 3 no reply". */
+  summary: string;
 };
 
 export type HeroMode =
@@ -165,10 +187,8 @@ export type HeroMode =
   | 'confirm'
   /** The viewer asked for cover: "Needs cover. We'll tell you when someone takes it." */
   | 'needsCover'
-  /** A headcount date (ticket 09): green Yes / red No. Not produced until headcount Jobs exist. */
+  /** A headcount date (ticket 09) not answered yet: green Yes / red No. */
   | 'headcount';
-
-export type HeadcountAnswer = 'yes' | 'no';
 
 export type HeroNote = { tone: 'ok' | 'warn'; strong?: string; text: string };
 
@@ -177,8 +197,6 @@ export type HeroView = TurnView & {
   mode: HeroMode;
   /** One short line under the date ("You're covering for Ben. Thank you!"), or null. */
   note: HeroNote | null;
-  /** Headcount dates only: the viewer's answer and how many are coming so far. */
-  headcount?: { answer: HeadcountAnswer | null; coming: number };
 };
 
 type Mine = Slot & { group: HomeGroup };
@@ -216,6 +234,45 @@ function turnView(m: Mine, ctx: HomeContext): TurnView {
     relative: relativeDay(event.date, todayOf(ctx)),
     needsCover: isOpenRequest(assignment),
     covering: slot.covering,
+  };
+}
+
+type MyHeadcount = { group: HomeGroup; date: HeadcountDate };
+
+/** Every upcoming headcount date in the viewer's Groups: each one asks them "Coming?". */
+function myHeadcounts(groups: HomeGroup[], ctx: HomeContext): MyHeadcount[] {
+  const out: MyHeadcount[] = [];
+  for (const group of groups) {
+    if (!group.myMemberId || !me(group)) continue;
+    for (const date of upcomingHeadcounts(group.state, ctx.now)) out.push({ group, date });
+  }
+  return out;
+}
+
+function headcountTurnView(h: MyHeadcount, ctx: HomeContext): TurnView {
+  const { group, date: d } = h;
+  const date = dateIn(d.startsAt, ctx.viewerTimeZone);
+  const counts = headcountCounts(group.state, d.eventId, d.responsibilityId);
+  return {
+    key: `${group.id}/hc:${d.eventId}:${d.responsibilityId}`,
+    groupId: group.id,
+    groupName: group.name,
+    assignmentId: '',
+    responsibilityName: d.jobName,
+    date,
+    startsAt: d.startsAt,
+    dayLabel: formatDayShort(date),
+    timeLabel: timeText(d.startsAt, group.timeZone, ctx.viewerTimeZone),
+    relative: relativeDay(date, todayOf(ctx)),
+    needsCover: false,
+    covering: false,
+    headcount: {
+      eventId: d.eventId,
+      responsibilityId: d.responsibilityId,
+      answer: answerOf(group.state, d.eventId, d.responsibilityId, group.myMemberId),
+      counts,
+      summary: headcountText(counts),
+    },
   };
 }
 
@@ -454,30 +511,47 @@ export type HomeWeek = {
   thisWeek: TurnView[];
   /** "Greeter · Welcome team · Sun, Nov 29": the viewer's next turn anywhere, or null. */
   nextTurn: string | null;
+  /** No big card, but the week has dates already answered: "You're all set". */
+  allSet: boolean;
 };
 
 export type HomeWeekOptions = Pick<AttentionOptions, 'canWithdraw'>;
+
+type WeekEntry = { startsAt: Instant; date: string; groupName: string; turn?: Mine; headcount?: TurnView };
 
 /** Everything above "Your groups" on Home. */
 export function homeWeek(groups: HomeGroup[], ctx: HomeContext, options: HomeWeekOptions = {}): HomeWeek {
   const today = todayOf(ctx);
   const mine = myTurns(groups, ctx);
-  const week = mine.filter((m) => inHomeWindow(m.event.date, today));
-  const hero = week.length ? heroView(week[0], ctx) : null;
+  const entries: WeekEntry[] = [
+    ...mine.map((m) => ({ startsAt: m.event.startsAt, date: m.event.date, groupName: m.group.name, turn: m })),
+    ...myHeadcounts(groups, ctx).map((h) => {
+      const view = headcountTurnView(h, ctx);
+      return { startsAt: view.startsAt, date: view.date, groupName: view.groupName, headcount: view };
+    }),
+  ].sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt) || a.groupName.localeCompare(b.groupName));
+  const week = entries.filter((e) => inHomeWindow(e.date, today));
+  // The big card: the first turn, or the first headcount the viewer hasn't answered yet.
+  const first = week.find((e) => e.turn || e.headcount?.headcount?.answer === null) ?? null;
+  const hero: HeroView | null = first?.turn
+    ? heroView(first.turn, ctx)
+    : first?.headcount
+      ? { ...first.headcount, mode: 'headcount', note: null }
+      : null;
   const needsYou = attentionItems(groups, ctx, { heroKey: hero?.key ?? null, canWithdraw: options.canWithdraw }).filter(
     // My own open requests show as "Needs cover" on the card or in "This week" instead.
     (item) => item.kind !== 'myRequest' && item.key !== hero?.key && inHomeWindow(item.date, today),
   );
   const listed = new Set(needsYou.map((i) => i.key));
   const thisWeek = week
-    .slice(1)
-    .filter((m) => !listed.has(m.slot.key))
-    .map((m) => turnView(m, ctx));
+    .filter((e) => e !== first && !(e.turn && listed.has(e.turn.slot.key)))
+    .map((e) => (e.turn ? turnView(e.turn, ctx) : (e.headcount as TurnView)));
   const next = mine.find((m) => !isOpenRequest(m.assignment));
   return {
     hero,
     needsYou,
     thisWeek,
+    allSet: hero === null && thisWeek.length > 0,
     nextTurn: next ? `${next.slot.responsibilityName} · ${next.group.name} · ${formatDayShort(next.event.date)}` : null,
   };
 }

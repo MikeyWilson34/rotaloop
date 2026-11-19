@@ -9,6 +9,7 @@ import { GroupTile } from '@/components/group/GroupTile';
 import { MembersSection } from '@/components/group/MembersSection';
 import type { RunCommand } from '@/components/group/runCommand';
 import { TurnSheet } from '@/components/group/TurnSheet';
+import { HeadcountSheet } from '@/components/home/HeadcountSheet';
 import { SectionHeading } from '@/components/schedule/parts';
 import { Button, InfoNote, Notice, Text } from '@/components/ui';
 import type { TurnRow } from '@/lib/groupPage';
@@ -113,7 +114,24 @@ export default function GroupScreen() {
         </View>
         <MembersSection group={data} myMemberId={me.id} run={run} />
 
-        {open ? (
+        {open?.headcount ? (
+          <HeadcountSheet
+            groupName={data.name}
+            state={data.state}
+            eventId={open.eventId}
+            responsibilityId={open.headcount.responsibilityId}
+            jobName={open.jobName}
+            startsAt={open.startsAt}
+            myMemberId={me.id}
+            send={(memberId, answer) =>
+              run(
+                { type: 'answerHeadcount', eventId: open.eventId, responsibilityId: open.headcount!.responsibilityId, memberId, answer },
+                'answerHeadcount',
+              )
+            }
+            onClose={() => setOpen(null)}
+          />
+        ) : open ? (
           <TurnSheet group={data} row={open} myMemberId={me.id} run={run} onClose={() => setOpen(null)} />
         ) : null}
       </View>

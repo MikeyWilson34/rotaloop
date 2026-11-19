@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ChevronRight, CircleAlert, CircleCheck, Repeat } from 'lucide-react-native';
+import { Check, ChevronRight, CircleAlert, CircleCheck, Repeat } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
 import { GroupTile } from '@/components/group/GroupTile';
@@ -30,8 +30,29 @@ function DateBox({ date }: { date: string }) {
   );
 }
 
+/** A headcount date's pill (prototype `pillFor`): "You're coming", "Not coming" or "Coming?". */
+function headcountPill(turn: TurnView): string | null {
+  if (!turn.headcount) return null;
+  const a = turn.headcount.answer;
+  return a === 'yes' ? "You're coming" : a === 'no' ? 'Not coming' : 'Coming?';
+}
+
+function HeadcountPill({ turn }: { turn: TurnView }) {
+  const { colors, fonts, radii } = useTheme();
+  const a = turn.headcount?.answer ?? null;
+  const bg = a === 'yes' ? colors.successTint : a === 'no' ? colors.surfaceAlt : colors.warningTint;
+  const fg = a === 'yes' ? colors.successText : a === 'no' ? colors.textSecondary : colors.warningText;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 24, paddingHorizontal: 8, borderRadius: radii.pill, backgroundColor: bg }}>
+      {a === 'yes' ? <Check size={14} color={fg} strokeWidth={2.5} /> : null}
+      <Text style={{ fontFamily: fonts.bold, fontSize: 12, lineHeight: 16, color: fg }}>{headcountPill(turn)}</Text>
+    </View>
+  );
+}
+
 function TurnPill({ turn }: { turn: TurnView }) {
   const { colors, fonts, radii } = useTheme();
+  if (turn.headcount) return <HeadcountPill turn={turn} />;
   if (!turn.needsCover && !turn.covering) return null;
   const bad = turn.needsCover;
   const fg = bad ? colors.dangerText : colors.primary;
@@ -63,7 +84,7 @@ export function ThisWeekList({ turns, onOpen }: { turns: TurnView[]; onOpen: (tu
         <Pressable
           key={t.key}
           accessibilityRole="button"
-          accessibilityLabel={`${t.responsibilityName}, ${t.groupName}. ${t.dayLabel}, ${t.timeLabel}.${t.needsCover ? ' Needs cover.' : t.covering ? ' Covering.' : ''}`}
+          accessibilityLabel={`${t.responsibilityName}, ${t.groupName}. ${t.dayLabel}, ${t.timeLabel}.${t.headcount ? ` ${headcountPill(t)}` : t.needsCover ? ' Needs cover.' : t.covering ? ' Covering.' : ''}`}
           onPress={() => onOpen(t)}
           style={({ pressed }) => ({
             flexDirection: 'row',
@@ -82,7 +103,7 @@ export function ThisWeekList({ turns, onOpen }: { turns: TurnView[]; onOpen: (tu
               {t.responsibilityName}
             </Text>
             <Text numberOfLines={1} variant="caption" color="textSecondary" style={{ fontSize: 13, lineHeight: 18 }}>
-              {`${t.groupName} · ${t.timeLabel}`}
+              {t.headcount ? `${t.groupName} · ${t.timeLabel} · ${t.headcount.summary}` : `${t.groupName} · ${t.timeLabel}`}
             </Text>
           </View>
           <TurnPill turn={t} />
@@ -92,13 +113,17 @@ export function ThisWeekList({ turns, onOpen }: { turns: TurnView[]; onOpen: (tu
   );
 }
 
-/** Nothing due in the next 7 days (prototype `.calm`): names the next turn. */
-export function NothingThisWeek({ nextTurn }: { nextTurn: string | null }) {
+/**
+ * Nothing due in the next 7 days (prototype `.calm`): names the next turn. "You're all set"
+ * instead when the week only has dates already answered (headcounts).
+ */
+export function NothingThisWeek({ nextTurn, allSet = false }: { nextTurn: string | null; allSet?: boolean }) {
   const { colors, fonts, radii, shadows } = useTheme();
+  const title = allSet ? "You're all set" : 'Nothing this week';
   return (
     <View
       accessible
-      accessibilityLabel={`Nothing this week. ${nextTurn ? `Your next turn: ${nextTurn}.` : 'No turns coming up.'}`}
+      accessibilityLabel={`${title}. ${nextTurn ? `Your next turn: ${nextTurn}.` : 'No turns coming up.'}`}
       style={{
         paddingVertical: 28,
         paddingHorizontal: 20,
@@ -112,7 +137,7 @@ export function NothingThisWeek({ nextTurn }: { nextTurn: string | null }) {
       <View style={{ width: 48, height: 48, borderRadius: 16, marginBottom: 12, backgroundColor: colors.successTint, alignItems: 'center', justifyContent: 'center' }}>
         <CircleCheck size={24} color={colors.successText} strokeWidth={1.75} />
       </View>
-      <Text style={{ fontFamily: fonts.bold, fontSize: 16, lineHeight: 22, textAlign: 'center' }}>Nothing this week</Text>
+      <Text style={{ fontFamily: fonts.bold, fontSize: 16, lineHeight: 22, textAlign: 'center' }}>{title}</Text>
       <Text variant="subhead" color="textSecondary" style={{ textAlign: 'center', marginTop: 2 }}>
         {nextTurn ? `Your next turn: ${nextTurn}` : 'No turns coming up.'}
       </Text>

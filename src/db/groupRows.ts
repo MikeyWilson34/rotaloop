@@ -15,7 +15,9 @@ import type {
   CoveragePolicy,
   CoverageRequest,
   GroupState,
+  HeadcountReply,
   Instant,
+  JobKind,
   MakeUpTurnClosedReason,
   MakeUpTurnStatus,
   RepeatPattern,
@@ -51,6 +53,8 @@ export interface ResponsibilityRow {
   id: string;
   position: number;
   name: string;
+  /** Added by 20261124000000_headcount_jobs.sql; absent (take turns) in older selects. */
+  kind?: JobKind;
   headcount: number;
   requires_confirmation: boolean;
   removed_at: string | null;
@@ -135,6 +139,17 @@ export interface AssignmentRow {
   covered_at: string | null;
 }
 
+/** A "Coming?" answer (20261124000000_headcount_jobs.sql). */
+export interface HeadcountAnswerRow {
+  event_id: string;
+  responsibility_id: string;
+  member_id: string;
+  position: number;
+  answer: HeadcountReply;
+  answered_by: string | null;
+  answered_at: string;
+}
+
 /** Everything `group_state_rows` returns and `apply_group_command_result` takes. */
 export interface GroupRows {
   group: GroupRow;
@@ -146,6 +161,8 @@ export interface GroupRows {
   time_off: TimeOffRow[];
   make_up_turns: MakeUpTurnRow[];
   assignments: AssignmentRow[];
+  /** Optional so payloads from before 20261124000000_headcount_jobs.sql still read (as none). */
+  headcount_answers?: HeadcountAnswerRow[];
 }
 
 /** Postgres returns timestamptz as e.g. "2027-01-03T09:00:00+00:00"; the engine uses toISOString form. */
@@ -200,6 +217,7 @@ export function rowsFromState(state: GroupState): GroupRows {
       id: r.id,
       position,
       name: r.name,
+      kind: r.kind,
       headcount: r.headcount,
       requires_confirmation: r.requiresConfirmation,
       removed_at: r.removedAt,
@@ -255,6 +273,15 @@ export function rowsFromState(state: GroupState): GroupRows {
       closed_reason: t.closedReason,
     })),
     assignments: state.assignments.map(assignmentRow),
+    headcount_answers: state.headcountAnswers.map((a, position) => ({
+      event_id: a.eventId,
+      responsibility_id: a.responsibilityId,
+      member_id: a.memberId,
+      position,
+      answer: a.answer,
+      answered_by: a.answeredBy,
+      answered_at: a.answeredAt,
+    })),
   };
 }
 
@@ -310,6 +337,7 @@ export function stateFromRows(rows: GroupRows): GroupState {
     responsibilities: byPosition(rows.responsibilities).map((r) => ({
       id: r.id,
       name: r.name,
+      kind: r.kind ?? 'turns',
       headcount: r.headcount,
       requiresConfirmation: r.requires_confirmation,
       removedAt: instantOrNull(r.removed_at ?? null),
@@ -364,6 +392,14 @@ export function stateFromRows(rows: GroupRows): GroupState {
       status: t.status,
       closedAt: instantOrNull(t.closed_at),
       closedReason: t.closed_reason,
+    })),
+    headcountAnswers: byPosition(rows.headcount_answers ?? []).map((a) => ({
+      eventId: a.event_id,
+      responsibilityId: a.responsibility_id,
+      memberId: a.member_id,
+      answer: a.answer,
+      answeredBy: a.answered_by,
+      answeredAt: toInstant(a.answered_at),
     })),
     rotatedThrough: instantOrNull(g.rotated_through),
     idSequence: g.id_sequence,

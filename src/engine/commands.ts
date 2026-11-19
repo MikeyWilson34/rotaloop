@@ -8,6 +8,7 @@ import {
   findEvent,
   findMember,
   findResponsibility,
+  headcountsNeeded,
   initialConfirmation,
   isActiveMember,
   isPinned,
@@ -31,6 +32,7 @@ import type {
   Event,
   EventSeriesChanges,
   GroupState,
+  HeadcountAnswer,
   HistoryEntry,
   Instant,
   MakeUpTurn,
@@ -83,6 +85,11 @@ export function applyCommand(state: GroupState, command: Command, context: Comma
   if (denied) return denied;
   const outcome = handle(before, command, ctx);
   if (!outcome.ok) return outcome;
+  if (command.type === 'answerHeadcount') {
+    // A "Coming?" answer touches no seat: nothing to reschedule and no history entry (the
+    // answer itself records who gave it and when).
+    return { ok: true, state: outcome.state, changes: [], history };
+  }
   const after = schedule(outcome.state, before.events, now);
   if (command.type === 'withdrawDecline') {
     const lost = seatLost(before, after, command.assignmentId);
@@ -165,6 +172,8 @@ function permissionError(state: GroupState, command: Command, ctx: Context): Rej
       return forMember(command.memberId, 'leave the Group themselves');
     case 'claimPlaceholder':
       return command.memberId === actor ? null : reject('notPermitted', 'Members can only claim their own Stand-in');
+    case 'answerHeadcount':
+      return forMember(command.memberId, 'answer for themselves');
     default:
       return null;
   }
@@ -194,6 +203,8 @@ function handle(state: GroupState, command: Command, ctx: Context): Outcome {
       return withdrawDecline(state, command.assignmentId, ctx);
     case 'cover':
       return cover(state, command.assignmentId, ctx);
+    case 'answerHeadcount':
+      return answerHeadcount(state, command, ctx);
     case 'markCovered':
       return markCovered(state, command, ctx);
     case 'changeSettings':
@@ -257,7 +268,11 @@ function addEvents(state: GroupState, events: NewEvent[]): Outcome {
 
 /** Removes future Events. Their Assignments are reconciled away by the schedule step. */
 function withoutEvents(state: GroupState, eventIds: Set<string>): GroupState {
-  return { ...state, events: state.events.filter((e) => !eventIds.has(e.id)) };
+  return {
+    ...state,
+    events: state.events.filter((e) => !eventIds.has(e.id)),
+    headcountAnswers: state.headcountAnswers.filter((a) => !eventIds.has(a.eventId)),
+  };
 }
 
 function removeEvent(state: GroupState, eventId: string, ctx: Context): Outcome {
@@ -435,6 +450,37 @@ function removeTimeOff(state: GroupState, timeOffId: string, ctx: Context): Outc
   return done({
     ...state,
     timeOff: state.timeOff.map((t) => (t.id === timeOffId ? { ...t, removedAt: ctx.now, retainedEventIds } : t)),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Headcount answers
+
+/**
+ * "Coming?" Yes / No for one future date of a headcount Job. The date must still need the Job
+ * (not a group date off), and the Member must be active. One answer per Member and date:
+ * a new answer replaces the old one in place.
+ */
+function answerHeadcount(state: GroupState, command: Extract<Command, { type: 'answerHeadcount' }>, ctx: Context): Outcome {
+  const { eventId, responsibilityId, memberId, answer } = command;
+  if (answer !== 'yes' && answer !== 'no') return reject('invalid', 'Answer Yes or No');
+  const event = findEvent(state, eventId);
+  if (!event) return reject('notFound', `No Event ${eventId}`);
+  if (isPast(event, ctx.now)) return reject('eventHasPassed', 'The Event has already started');
+  const job = findActiveResponsibility(state, responsibilityId);
+  if (!job || job.kind !== 'headcount') return reject('notFound', 'No such headcount Job');
+  if (!headcountsNeeded(state, event).some((r) => r.id === responsibilityId)) {
+    return reject('invalid', 'That date does not need this Job');
+  }
+  if (!isActiveMember(state, memberId)) return reject('notFound', 'No such Member');
+  const given: HeadcountAnswer = { eventId, responsibilityId, memberId, answer, answeredBy: ctx.actorId, answeredAt: ctx.now };
+  const same = (a: HeadcountAnswer) => a.eventId === eventId && a.responsibilityId === responsibilityId && a.memberId === memberId;
+  const existing = state.headcountAnswers.some(same);
+  return done({
+    ...state,
+    headcountAnswers: existing
+      ? state.headcountAnswers.map((a) => (same(a) ? given : a))
+      : [...state.headcountAnswers, given],
   });
 }
 
@@ -799,7 +845,10 @@ function addMember(state: GroupState, command: Extract<Command, { type: 'addMemb
 
 function qualifyMember(state: GroupState, memberId: string, responsibilityId: string): Outcome {
   if (!isActiveMember(state, memberId)) return reject('notFound', 'No such Member');
-  if (!findActiveResponsibility(state, responsibilityId)) return reject('notFound', 'No such Responsibility');
+  const job = findActiveResponsibility(state, responsibilityId);
+  if (!job) return reject('notFound', 'No such Responsibility');
+  // A headcount Job has no Rotation: everyone in the Group is asked "Coming?".
+  if (job.kind === 'headcount') return done(state);
   return done(withRotation(state, appendToQueue(rotationOf(state, responsibilityId), memberId)));
 }
 
@@ -895,6 +944,9 @@ function setAdmin(state: GroupState, memberId: string, value: boolean): Outcome 
 
 function responsibilityChangesError(changes: ResponsibilityChanges): Outcome | null {
   if (changes.name !== undefined && changes.name.trim() === '') return reject('invalid', 'A name is needed');
+  if (changes.kind !== undefined && changes.kind !== 'turns' && changes.kind !== 'headcount') {
+    return reject('invalid', 'A Job takes turns or is a headcount');
+  }
   if (changes.headcount !== undefined && (!Number.isInteger(changes.headcount) || changes.headcount < 1)) {
     return reject('invalid', 'Headcount must be a whole number of at least 1');
   }
@@ -934,10 +986,23 @@ function editResponsibility(state: GroupState, id: string, changes: Responsibili
   const updated = {
     ...current,
     name: changes.name?.trim() ?? current.name,
+    kind: changes.kind ?? current.kind,
     headcount: changes.headcount ?? current.headcount,
     requiresConfirmation: changes.requiresConfirmation ?? current.requiresConfirmation,
   };
   let next: GroupState = { ...state, responsibilities: state.responsibilities.map((r) => (r.id === id ? updated : r)) };
+  if (updated.kind !== current.kind) {
+    if (updated.kind === 'headcount') {
+      // No more turns: the Rotation empties, its future seats go (the schedule step) and so
+      // do the swaps owed in it.
+      next = withRotation(next, withQueueOrder(rotationOf(next, id), []));
+      next = closeMakeUpTurns(next, (t) => t.responsibilityId === id, 'cancelled', 'responsibilityRemoved', ctx.now);
+    } else {
+      // Everyone does every Job: the whole Group takes turns, in join order.
+      const everyone = next.members.filter((m) => m.leftAt === null).map((m) => m.id);
+      next = withRotation(next, withQueueOrder(rotationOf(next, id), everyone));
+    }
+  }
   if (updated.requiresConfirmation !== current.requiresConfirmation) {
     next = {
       ...next,

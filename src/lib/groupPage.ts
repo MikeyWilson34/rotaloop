@@ -9,9 +9,11 @@
  */
 import type { ClientCommand } from '../db/protocol';
 import { planSchedule } from '../engine/schedule';
-import type { EventSeries, GroupState, MemberId, RepeatPattern, Responsibility } from '../engine/types';
+import { headcountsNeeded } from '../engine/state';
+import type { EventSeries, GroupState, HeadcountReply, MemberId, RepeatPattern, Responsibility } from '../engine/types';
 import { dateOf, dayNumber, localDate, localTime, seriesEventId, weekdayOf, zonedTimeToInstant } from '../schedule/expandSeries';
 import { dateIn } from '../schedule/format';
+import { answerOf, headcountCounts, headcountText, type HeadcountCounts } from '../schedule/headcount';
 import { eventViews, type ScheduleGroup } from '../schedule/views';
 import { jobPattern, jobTimeText, repeatText, type JobDraft, type JobRepeat } from './groupCreate';
 import { newId, todayIn } from './groupSetup';
@@ -64,6 +66,17 @@ export type TurnRow = {
   breakFor: string | null;
   /** The person who holds the turn is a stand-in (not on the app): anyone can act for them. */
   standInId: MemberId | null;
+  /**
+   * Set for a date of a headcount job (ticket 09): there is no turn (`assignmentId` is empty);
+   * the row shows "2 coming · 0 not · 3 no reply" and the viewer's own answer.
+   */
+  headcount?: {
+    responsibilityId: string;
+    counts: HeadcountCounts;
+    /** "2 coming · 0 not · 3 no reply". */
+    summary: string;
+    answer: HeadcountReply | null;
+  };
 };
 
 export type ComingUpDay =
@@ -131,6 +144,33 @@ export function comingUp(group: ScheduleGroup, now: string, viewerTimeZone: stri
         });
       }
     }
+    for (const event of live) {
+      const source = state.events.find((e) => e.id === event.eventId);
+      if (!source) continue;
+      for (const job of headcountsNeeded(state, source)) {
+        const counts = headcountCounts(state, event.eventId, job.id);
+        rows.push({
+          key: `${group.id}/hc:${event.eventId}:${job.id}`,
+          assignmentId: '',
+          eventId: event.eventId,
+          jobName: job.name,
+          startsAt: event.startsAt,
+          person: { kind: 'open' },
+          mine: false,
+          needsCover: false,
+          coveringFor: null,
+          swappedWith: null,
+          breakFor: null,
+          standInId: null,
+          headcount: {
+            responsibilityId: job.id,
+            counts,
+            summary: headcountText(counts),
+            answer: answerOf(state, event.eventId, job.id, me),
+          },
+        });
+      }
+    }
     days.push({ kind: 'turns', date, key: `turns:${date}`, rows });
   }
   return days;
@@ -157,6 +197,7 @@ function restsByTurn(state: GroupState): Map<string, MemberId> {
 /** The small grey line under a job's name: "9:00 AM · covering for Sam · swapped with you · break for Tom". */
 export function turnDetails(row: TurnRow, time: string): string[] {
   const parts = [time];
+  if (row.headcount) parts.push(row.headcount.summary);
   if (row.coveringFor) parts.push(`covering for ${row.coveringFor}`);
   if (row.breakFor) parts.push(`break for ${row.breakFor}`);
   return parts;
@@ -243,7 +284,7 @@ function draftOf(
       name: r.name,
       repeat: { ...repeatFromPattern(series.repeat), date: weekAhead },
       time: series.repeat.startTime,
-      type: 'turns',
+      type: r.kind,
     };
   }
   // A one-off: its next date (or its last one, when it has passed).
@@ -256,7 +297,7 @@ function draftOf(
     name: r.name,
     repeat: { kind: 'once', weekday: weekdayOf(dayNumber(date)), nth: 1, date },
     time: event ? localTime(event.startsAt, zone) : '10:00',
-    type: 'turns',
+    type: r.kind,
   };
 }
 
@@ -297,8 +338,12 @@ export function jobEditCommands(
 ): ClientCommand[] {
   const commands: ClientCommand[] = [];
   const name = draft.name.trim().replace(/\s+/g, ' ');
-  if (name !== job.name) {
-    commands.push({ type: 'editResponsibility', responsibilityId: job.responsibilityId, changes: { name } });
+  const changes = {
+    ...(name !== job.name ? { name } : {}),
+    ...(draft.type !== job.draft.type ? { kind: draft.type } : {}),
+  };
+  if (Object.keys(changes).length) {
+    commands.push({ type: 'editResponsibility', responsibilityId: job.responsibilityId, changes });
   }
   const today = todayIn(timeZone, now);
   const renameSeries = job.ownSeries && name !== job.name ? { name } : {};
@@ -357,8 +402,9 @@ export function newJobCommands(
   return [
     {
       type: 'addResponsibility',
-      responsibility: { id: rId, name, headcount: 1, requiresConfirmation: false },
-      qualifiedMemberIds: everyone,
+      responsibility: { id: rId, name, kind: draft.type, headcount: 1, requiresConfirmation: false },
+      // A headcount job has no turns: everyone is asked "Coming?" instead.
+      ...(draft.type === 'headcount' ? {} : { qualifiedMemberIds: everyone }),
     },
     ...seriesCommands(sId, rId, name, draft, timeZone, todayIn(timeZone, now)),
   ];

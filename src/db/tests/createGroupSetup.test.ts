@@ -86,17 +86,18 @@ describe('3-screen group setup', () => {
 
     // Defaults: one Job = one Responsibility + one series; one person per turn, no
     // confirmation, everyone does every Job, join-order rotation.
-    expect(state.responsibilities.map((r) => [r.name, r.headcount, r.requiresConfirmation])).toEqual([
-      ['Greeter', 1, false],
-      ['Coffee', 1, false],
-      ['Potluck', 1, false],
+    expect(state.responsibilities.map((r) => [r.name, r.kind, r.headcount, r.requiresConfirmation])).toEqual([
+      ['Greeter', 'turns', 1, false],
+      ['Coffee', 'turns', 1, false],
+      ['Potluck', 'headcount', 1, false],
     ]);
     expect(state.eventSeries.map((s) => [s.name, s.repeat?.frequency ?? null])).toEqual([
       ['Greeter', 'weekly'],
       ['Coffee', 'monthly'],
       ['Potluck', null],
     ]);
-    for (const rotation of state.rotations) expect(rotation.queue).toEqual([ana, ben, cal]);
+    // Take-turns Jobs rotate everyone; the headcount Job (Potluck) has no turns.
+    expect(state.rotations.map((r) => r.queue)).toEqual([[ana, ben, cal], [ana, ben, cal], []]);
     expect(state.primaryResponsibilityId).toBeNull();
     expect(state.settings).toMatchObject({ coveragePolicy: 'payItBack', timeOffHandling: 'routeAround', allowDoubling: false });
 
@@ -130,9 +131,28 @@ describe('3-screen group setup', () => {
     expect(coffeeEvents[0]).toBe('2026-12-06T15:30:00.000Z');
     expect(coffeeEvents[1]).toBe('2027-01-03T15:30:00.000Z');
 
-    // The one-off date, with its person.
+    // The one-off headcount date: nobody has a turn; everyone is asked "Coming?".
     const potluckEvents = state.events.filter((e) => e.seriesId === state.eventSeries[2].id);
     expect(potluckEvents.map((e) => e.startsAt)).toEqual(['2026-12-13T00:00:00.000Z']);
-    expect(state.assignments.filter((a) => a.eventId === potluckEvents[0].id).map((a) => a.memberId)).toHaveLength(1);
+    expect(state.assignments.filter((a) => a.eventId === potluckEvents[0].id)).toHaveLength(0);
+
+    // Ana says Yes, then answers No for Ben (a Stand-in); the answers are stored and read back.
+    const potluckDate = { eventId: potluckEvents[0].id, responsibilityId: state.responsibilities[2].id };
+    for (const [memberId, answer] of [[ana, 'yes'], [ben, 'no']] as const) {
+      expectOk(await send({ action: 'command', groupId, command: { type: 'answerHeadcount', ...potluckDate, memberId, answer } }));
+    }
+    const after = stateFromRows((await t.store.load(groupId))!.rows);
+    expect(after.headcountAnswers.map((a) => [a.memberId, a.answer, a.answeredBy])).toEqual([
+      [ana, 'yes', ana],
+      [ben, 'no', ana],
+    ]);
+    // Answering again changes it in place; the schedule is untouched.
+    expectOk(await send({ action: 'command', groupId, command: { type: 'answerHeadcount', ...potluckDate, memberId: ben, answer: 'yes' } }));
+    const again = stateFromRows((await t.store.load(groupId))!.rows);
+    expect(again.headcountAnswers.map((a) => [a.memberId, a.answer])).toEqual([
+      [ana, 'yes'],
+      [ben, 'yes'],
+    ]);
+    expect(again.assignments).toEqual(after.assignments);
   });
 });

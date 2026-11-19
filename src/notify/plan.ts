@@ -30,6 +30,7 @@
 import type { Assignment, AssignmentChange, Event, GroupState, HistoryEntry, Instant, MemberId } from '../engine/types';
 import { localDate, zonedTimeToInstant } from '../schedule/expandSeries';
 import { addDays, dateIn, formatDayShort, formatTimeIn, relativeDay, safeZone } from '../schedule/format';
+import { answerOf, nextHeadcounts } from '../schedule/headcount';
 import { coverSentence, describeAssignmentChange, describeHistoryEntry, type HistoryContext } from '../schedule/history';
 
 const MINUTE = 60_000;
@@ -456,6 +457,9 @@ export function confirmationRequestsDue(state: GroupState, now: Instant, windowM
  *   deadline), once, to every Member free that day (as for a new request), unless the request
  *   only opened after it. There is no Replacement Duty and there are no Admin alerts any more
  *   (simplify ticket 07): the group page shows "Needs cover" to everyone.
+ * - **"Coming?"** (headcount Jobs, ticket 09): for the next date of each headcount Job, at the
+ *   same reminder times, every Member who hasn't answered is asked "Coming?" and every Member
+ *   who said Yes is reminded. Those who said No hear nothing. It opens Home (Yes / No there).
  */
 export function planScheduledNotifications(input: ScheduledInput): NotificationItem[] {
   const { profiles, now } = input;
@@ -522,6 +526,43 @@ export function planScheduledNotifications(input: ScheduledInput): NotificationI
             }
           }
 
+        }
+      }
+    }
+
+    // "Coming?" for the next date of each headcount Job.
+    for (const date of nextHeadcounts(state, now)) {
+      for (const m of state.members) {
+        const r = recipientOf(state, profiles, m.id);
+        if (!r) continue;
+        const answer = answerOf(state, date.eventId, date.responsibilityId, m.id);
+        if (answer === 'no') continue;
+        const zone = zoneOf(r.profile);
+        const day = formatDayShort(dateIn(date.startsAt, zone));
+        const time = formatTimeIn(date.startsAt, zone);
+        for (const days of [...new Set(r.profile.reminderDaysBefore)].sort((x, y) => y - x)) {
+          const at = reminderDueAt(date.startsAt, days, r.profile);
+          if (!at || !due(Date.parse(at))) continue;
+          const when = relativeDay(dateIn(date.startsAt, zone), dateIn(now, zone));
+          const offsetKey = `${days}d`;
+          items.push({
+            dedupeKey: `reminder:${group.id}:hc:${date.responsibilityId}:${date.eventId}:${offsetKey}:${m.accountId}`,
+            accountId: m.accountId!,
+            kind: 'reminder',
+            groupId: group.id,
+            groupName: group.name,
+            assignmentId: null,
+            eventId: date.eventId,
+            offsetKey,
+            title: answer === 'yes' ? `${when}: ${date.jobName}` : `Coming? ${date.jobName}, ${day}`,
+            body: withGroup(
+              answer === 'yes'
+                ? `You said you're coming to ${date.jobName} on ${day} at ${time}.`
+                : `${date.jobName} on ${day} at ${time}. Tap to answer Yes or No.`,
+              group,
+            ),
+            url: '/',
+          });
         }
       }
     }

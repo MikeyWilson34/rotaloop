@@ -195,6 +195,28 @@ try {
   await expectScreen('the new group: schedule filled', new RegExp(jobName));
   await expectScreen('the new group: typed name is a stand-in', new RegExp(`E2E Standin ${stamp}[\\s\\S]*Stand-in`));
 
+  // Headcount jobs (simplify ticket 09): Coffee asks "Coming?" instead of taking turns. This
+  // needs the 20261124000000_headcount_jobs migration and the new group-command function; until
+  // both are deployed the server makes Coffee a take-turns job, and these steps are skipped.
+  current = 'headcount';
+  const coffeeRow = page.locator(`[aria-label^="E2E Coffee ${stamp},"][aria-label$="Coming?"]`).filter({ visible: true }).first();
+  if (await coffeeRow.isVisible().catch(() => false)) {
+    await expectScreen('headcount row: counts', /0 coming · 0 not · 2 no reply/);
+    await coffeeRow.click();
+    await expectScreen('headcount sheet: Coming? and the stand-in', /Coming\?[\s\S]*Not on the app/);
+    await click('Yes');
+    await expectScreen('headcount: I said yes', /1 coming · 0 not · 1 no reply/);
+    await click(`No for E2E Standin ${stamp}`);
+    await expectScreen('headcount: answered for the stand-in', /1 coming · 1 not · 0 no reply/);
+    await click('Close');
+    await sleep(600);
+    await expectScreen("headcount row: you're coming", /You're coming/);
+  } else {
+    const note = 'skip  headcount steps: the server has no headcount jobs yet (apply the migration, deploy group-command)';
+    results.push(note);
+    console.log(note);
+  }
+
   // A turn → its details sheet → the full details page → back.
   current = 'turn';
   await page.locator(`[aria-label^="${jobName}"]`).filter({ visible: true }).first().click();
@@ -265,7 +287,7 @@ try {
   await page.goto(`${BASE}/`);
   await expectScreen('Home', /Home/);
   // Home is the next 7 days (big card, or "Nothing this week"), then Your groups.
-  await expectScreen('Home: this week', /Your next turn|Nothing this week/);
+  await expectScreen('Home: this week', /Your next turn|Coming\?|Nothing this week|You're all set/);
   await expectScreen('Home: your groups', /Your groups/);
   // Home's "Can't make it" opens the same "Can't make it?" sheet (when a turn of mine is this week).
   const homeCant = page.getByRole('button', { name: "Can't make it", exact: true }).filter({ visible: true }).first();

@@ -41,6 +41,8 @@ export type GroupAction =
   | 'removeTimeOff'
   | 'addSkipDate'
   | 'removeSkipDate'
+  /** "Coming?" Yes / No for a headcount job (simplify ticket 09). */
+  | 'answerHeadcount'
   | 'other';
 
 const LAST_ADMIN: Record<GroupAction, string> = {
@@ -72,6 +74,7 @@ const LAST_ADMIN: Record<GroupAction, string> = {
   removeTimeOff: 'The group needs at least one Admin. Make someone else an Admin first.',
   addSkipDate: 'The group needs at least one Admin. Make someone else an Admin first.',
   removeSkipDate: 'The group needs at least one Admin. Make someone else an Admin first.',
+  answerHeadcount: 'The group needs at least one Admin. Make someone else an Admin first.',
   other:'The group needs at least one Admin. Make someone else an Admin first.',
 };
 
@@ -130,6 +133,12 @@ const ASSIGNMENT: Partial<Record<GroupAction, Partial<Record<string, string>>>> 
     noCoverageRequest: "You're already back on this one. Pull down to refresh.",
     notPermitted: 'Only the person who said they can’t make it can take it back.',
     invalid: 'The turns changed since you said you can’t make it, so this one has moved on. Cover someone else’s turn instead.',
+  },
+  answerHeadcount: {
+    notPermitted: "You can only answer for yourself, or for someone who isn't on the app.",
+    eventHasPassed: 'That date has already started, so the answers are closed.',
+    notFound: "That date or job isn't in the group anymore. Pull down to refresh.",
+    invalid: "That date doesn't need this job anymore. Pull down to refresh.",
   },
   markCovered: {
     notPermitted: 'Only people in this group can say who is covering.',

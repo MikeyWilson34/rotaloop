@@ -167,20 +167,25 @@ function coverTarget(value: unknown, field: string): CoverTarget {
 
 const MAX_HEADCOUNT = 50;
 
+const JOB_KINDS = ['turns', 'headcount'] as const;
+
 function responsibility(value: unknown, field: string): NewResponsibility {
   const o = obj(value, field);
-  return {
+  const r: NewResponsibility = {
     id: id(o.id, `${field}.id`),
     name: name(o.name, `${field}.name`),
     headcount: int(o.headcount, `${field}.headcount`, 1, MAX_HEADCOUNT),
     requiresConfirmation: bool(o.requiresConfirmation, `${field}.requiresConfirmation`),
   };
+  if (o.kind !== undefined) r.kind = oneOf(o.kind, `${field}.kind`, JOB_KINDS);
+  return r;
 }
 
 function responsibilityChanges(value: unknown, field: string): ResponsibilityChanges {
   const o = obj(value, field);
   const changes: ResponsibilityChanges = {};
   if (o.name !== undefined) changes.name = name(o.name, `${field}.name`);
+  if (o.kind !== undefined) changes.kind = oneOf(o.kind, `${field}.kind`, JOB_KINDS);
   if (o.headcount !== undefined) changes.headcount = int(o.headcount, `${field}.headcount`, 1, MAX_HEADCOUNT);
   if (o.requiresConfirmation !== undefined) {
     changes.requiresConfirmation = bool(o.requiresConfirmation, `${field}.requiresConfirmation`);
@@ -283,6 +288,14 @@ export function parseClientCommand(value: unknown): ClientCommand {
     case 'withdrawDecline':
     case 'cover':
       return { type: o.type, assignmentId: id(o.assignmentId, f('assignmentId')) };
+    case 'answerHeadcount':
+      return {
+        type: 'answerHeadcount',
+        eventId: id(o.eventId, f('eventId')),
+        responsibilityId: id(o.responsibilityId, f('responsibilityId')),
+        memberId: id(o.memberId, f('memberId')),
+        answer: oneOf(o.answer, f('answer'), ['yes', 'no']),
+      };
     case 'markCovered':
       return {
         type: 'markCovered',

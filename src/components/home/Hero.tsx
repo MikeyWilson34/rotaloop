@@ -3,7 +3,8 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { GroupTile } from '@/components/group/GroupTile';
 import { Text } from '@/components/ui';
-import type { HeadcountAnswer, HeroView } from '@/home/home';
+import type { HeadcountReply } from '@/engine/types';
+import type { HeroView } from '@/home/home';
 import { useTheme } from '@/theme';
 
 import { YesNoButtons } from './YesNo';
@@ -22,11 +23,13 @@ export type HeroProps = {
   onOpen: () => void;
   onCantMakeIt: () => void;
   onConfirm: () => void;
-  onAnswer?: (answer: HeadcountAnswer) => void;
+  onAnswer?: (answer: HeadcountReply) => void;
+  /** Headcount: the answer being sent, if any. */
+  answering?: HeadcountReply | null;
 };
 
 /** The big navy card at the top of Home (prototype `heroCard`): one main button. */
-export function Hero({ hero, busy, onOpen, onCantMakeIt, onConfirm, onAnswer }: HeroProps) {
+export function Hero({ hero, busy, onOpen, onCantMakeIt, onConfirm, onAnswer, answering = null }: HeroProps) {
   const { colors, fonts, radii, shadows, scheme } = useTheme();
   const headcount = hero.mode === 'headcount';
   const label = headcount ? 'Coming?' : 'Your next turn';
@@ -70,7 +73,7 @@ export function Hero({ hero, busy, onOpen, onCantMakeIt, onConfirm, onAnswer }: 
         <Text style={{ fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: ON_NAVY_2, marginTop: 2 }}>{hero.relative}</Text>
         {headcount && hero.headcount ? (
           <Text style={{ fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: ON_NAVY_2, marginTop: 10 }}>
-            {`${hero.headcount.coming} coming so far`}
+            {`${hero.headcount.counts.coming} coming so far`}
           </Text>
         ) : null}
       </Pressable>
@@ -101,7 +104,13 @@ export function Hero({ hero, busy, onOpen, onCantMakeIt, onConfirm, onAnswer }: 
 
       {hero.mode === 'headcount' ? (
         <View style={{ marginTop: 22 }}>
-          <YesNoButtons appearance="filled" value={hero.headcount?.answer ?? null} onChange={(a) => onAnswer?.(a)} />
+          <YesNoButtons
+            appearance="filled"
+            value={hero.headcount?.answer ?? null}
+            busy={answering}
+            disabled={busy}
+            onChange={(a) => onAnswer?.(a)}
+          />
         </View>
       ) : hero.mode === 'confirm' ? (
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 22 }}>

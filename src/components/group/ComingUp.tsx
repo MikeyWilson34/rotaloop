@@ -1,4 +1,4 @@
-import { CalendarOff, CircleAlert, ChevronRight, Repeat } from 'lucide-react-native';
+import { CalendarOff, Check, CircleAlert, ChevronRight, Repeat } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
@@ -135,6 +135,7 @@ function TurnRowView({
 }) {
   const { colors, fonts, radii, space } = useTheme();
   const details = turnDetails(row, time).join(' · ');
+  if (row.headcount) return <HeadcountRowView row={row} first={first} details={details} date={date} onPress={onPress} />;
   const person = row.person;
   const whoText = row.needsCover ? 'Needs cover' : person.kind === 'open' ? 'Nobody yet' : person.label;
   const tag = person.kind === 'guest' ? 'Not in group' : person.kind === 'member' && person.isStandIn ? 'Stand-in' : null;
@@ -214,6 +215,57 @@ function TurnRowView({
           </View>
         </View>
       )}
+      <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.75} />
+    </Pressable>
+  );
+}
+
+/** A date of a headcount job: "10:00 AM · 2 coming · 0 not · 3 no reply" and the viewer's answer. */
+function HeadcountRowView({
+  row,
+  first,
+  details,
+  date,
+  onPress,
+}: {
+  row: TurnRow;
+  first: boolean;
+  details: string;
+  date: string;
+  onPress: () => void;
+}) {
+  const { colors, fonts, radii, space } = useTheme();
+  const answer = row.headcount?.answer ?? null;
+  const pill = answer === 'yes' ? "You're coming" : answer === 'no' ? 'Not coming' : 'Coming?';
+  const bg = answer === 'yes' ? colors.successTint : answer === 'no' ? colors.surfaceAlt : colors.warningTint;
+  const fg = answer === 'yes' ? colors.successText : answer === 'no' ? colors.textSecondary : colors.warningText;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${row.jobName}, ${date}, ${details}, ${pill}`}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        minHeight: 52,
+        paddingVertical: 6,
+        borderTopWidth: first ? 0 : 1,
+        borderTopColor: colors.border,
+        opacity: pressed ? 0.7 : 1,
+      })}>
+      <View style={{ flex: 1, gap: 1 }}>
+        <Text style={{ fontFamily: fonts.bold, fontSize: 15, lineHeight: 21 }}>{row.jobName}</Text>
+        <Text variant="caption" color="textSecondary">
+          {details}
+        </Text>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: space.sm, paddingVertical: 4, borderRadius: radii.pill, backgroundColor: bg }}>
+        {answer === 'yes' ? <Check size={14} color={fg} strokeWidth={2.5} /> : null}
+        <Text variant="caption" style={{ fontFamily: fonts.bold, color: fg, fontSize: 12 }}>
+          {pill}
+        </Text>
+      </View>
       <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.75} />
     </Pressable>
   );

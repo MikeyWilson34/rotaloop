@@ -194,9 +194,7 @@ export function createGroupRequest(input: CreateGroupInput): Extract<GroupComman
     taken.push(rId);
     const sId = newId('s', taken, input.random);
     taken.push(sId);
-    // Headcount Jobs are created as take-turns Jobs for now: the data model has no Job type
-    // yet. See .scratch/simplify/issues/09-headcount-jobs.md.
-    responsibilities.push({ id: rId, name, headcount: 1, requiresConfirmation: false });
+    responsibilities.push({ id: rId, name, kind: job.type, headcount: 1, requiresConfirmation: false });
     const repeat = jobPattern(job, timeZone, today);
     eventSeries.push({ id: sId, name, responsibilityIds: [rId], repeat });
     if (!repeat) {

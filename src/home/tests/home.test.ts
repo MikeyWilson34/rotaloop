@@ -113,7 +113,7 @@ describe('nothing this week', () => {
 
   it('no turns coming up at all', () => {
     const b = buildGroup();
-    expect(homeWeek([], ctx)).toEqual({ hero: null, needsYou: [], thisWeek: [], nextTurn: null });
+    expect(homeWeek([], ctx)).toEqual({ hero: null, needsYou: [], allSet: false, thisWeek: [], nextTurn: null });
     expect(homeWeek([home(b, null)], ctx).nextTurn).toBeNull();
     expect(homeWeek([home(b)], { ...ctx, now: '2027-01-11T00:00:00.000Z' }).nextTurn).toBeNull();
   });
