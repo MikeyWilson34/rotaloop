@@ -272,6 +272,16 @@ input[type=text],input[type=date],select{width:100%;border:1.5px solid var(--bor
 .chips{display:flex;gap:8px;flex-wrap:wrap}
 .chip{min-height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--border-strong);background:var(--surface);font-size:14px;font-weight:700;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .chip[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.daychips{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.daychips .chip{padding:0;justify-content:center;min-height:44px;min-width:0}
+.turnrow{display:flex;align-items:center;gap:12px;padding:4px 4px 4px 16px;min-height:52px}
+.turnwho{display:flex;align-items:center;gap:10px;min-width:0}
+.tdate{flex:none;min-width:92px}
+.turnwho .nm{min-width:0;overflow-wrap:anywhere}
+.turnrow+.turnrow{border-top:1px solid var(--border)}
+.turnrow .t{font-weight:700;font-size:15px;line-height:21px}
+.turnrow+.li{border-top:1px solid var(--border)}
+.turnblock+.turnblock{margin-top:28px}
 .chip .x{color:var(--text-3);margin-right:-6px;width:28px;height:28px;display:grid;place-items:center}
 .opt{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1.5px solid var(--border);border-radius:14px;min-height:56px;width:100%;font-weight:700}
 .opt+.opt{margin-top:8px}
@@ -402,6 +412,7 @@ const ICONS = {
   x:'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   chevR:'<path d="m9 18 6-6-6-6"/>',
   chevL:'<path d="m15 18-6-6 6-6"/>',
+  chevU:'<path d="m18 15-6-6-6 6"/>',
   chevD:'<path d="m6 9 6 6 6-6"/>',
   clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   alert:'<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
@@ -443,9 +454,11 @@ const NTH = {1:'1st',2:'2nd',3:'3rd',4:'4th','-1':'last'};
 function rel(s){ const n = daysUntil(s); if (n===0) return 'Today'; if (n===1) return 'Tomorrow'; if (n<7) return `In ${n} days`; if (n<14) return 'Next week'; return `In ${Math.round(n/7)} weeks`; }
 function t12(t){ let [h,m] = t.split(':').map(Number); const ap = h>=12?'pm':'am'; h = h%12 || 12; return `${h}:${String(m).padStart(2,'0')}${ap}`; }
 function rangeText(r){ return r.from === r.to ? fShort(r.from) : `${fShort(r.from)} – ${fShort(r.to)}`; }
+const repDays = r => (r.wds && r.wds.length ? r.wds.slice().sort((a,b) => a-b) : [r.wd]);
+const daysLabel = r => { const d = repDays(r); return d.length === 1 ? WD[d[0]] : d.map(k => WD[k].slice(0,3)).join(', '); };
 function repText(r){
-  if (r.kind === 'week') return `every ${WD[r.wd]}`;
-  if (r.kind === '2week') return `every other ${WD[r.wd]}`;
+  if (r.kind === 'week') return `every ${daysLabel(r)}`;
+  if (r.kind === '2week') return `every other ${daysLabel(r)}`;
   if (r.kind === 'month') return `${NTH[r.nth]} ${WD[r.wd]} monthly`;
   return `once, ${fMD(r.date)}`;
 }
@@ -462,8 +475,15 @@ function occurrences(job, from, to){
     for (let i=0;i<30;i++){ const s = iso(nthWeekday(d.getFullYear(), d.getMonth()+i, r.nth, r.wd)); if (s > to) break; if (s >= from) out.push(s); }
     return out;
   }
-  const step = r.kind === '2week' ? 14 : 7;
-  for (let s = firstOnOrAfter(job.anchor, r.wd); s <= to; s = addDays(s, step)) if (s >= from) out.push(s);
+  const step = r.kind === '2week' ? 14 : 7, days = repDays(r);
+  if (days.length === 1){
+    for (let s = firstOnOrAfter(job.anchor, days[0]); s <= to; s = addDays(s, step)) if (s >= from) out.push(s);
+    return out;
+  }
+  // several days: the chosen days of one week, then every 1 or 2 weeks (dates before the anchor are dropped)
+  const firstDay = days.map(w => firstOnOrAfter(job.anchor, w)).sort()[0];
+  const wk0 = addDays(firstDay, -D(firstDay).getDay());
+  for (let w = wk0; w <= to; w = addDays(w, step)) days.forEach(k => { const s = addDays(w, k); if (s >= job.anchor && s >= from && s <= to) out.push(s); });
   return out;
 }
 
@@ -492,6 +512,7 @@ function seed(){
         jobs:[
           {id:'greeter', name:'Greeter', rep:{kind:'week', wd:0}, time:'09:30', type:'turns', anchor:'2026-11-22', offset:0},
           {id:'welcome', name:'Welcome table', rep:{kind:'2week', wd:0}, time:'09:30', type:'turns', anchor:'2026-11-22', offset:2},
+          {id:'gym', name:'Open the gym', rep:{kind:'week', wd:2, wds:[2,4,6]}, time:'06:00', type:'turns', anchor:'2026-11-18', offset:0},
         ]},
       { id:'coffee', name:'Coffee team', icon:'coffee', acc:'acc-clay', tz:'America/Chicago', slug:'coffee-team',
         members:coffeeMembers, pending:[], off:[{from:'2026-12-27', to:'2026-12-27'}],
@@ -533,7 +554,7 @@ const W = id => id === ME() ? 'You' : first(id);
 const Wl = id => id === ME() ? 'you' : first(id);
 function hue(id){ let h = 0; for (const c of String(id)) h = (h*31 + c.charCodeAt(0)) % 360; return h; }
 function initials(n){ const p = String(n).trim().split(/\s+/); return ((p[0]||'')[0]||'') + ((p[1]||'')[0]||''); }
-function avatar(id, cls=''){ if (isStandIn(id)) cls += ' ghost'; return `<span class="av ${cls}" style="--h:${hue(id)}" aria-hidden="true">${esc(initials(pname(id)))}</span>`; }
+function avatar(id, cls='', nm){ if (isStandIn(id)) cls += ' ghost'; return `<span class="av ${cls}" style="--h:${hue(id)}" aria-hidden="true">${esc(initials(nm || pname(id)))}</span>`; }
 const G = id => S.groups.find(g => g.id === id);
 const J = (g, jid) => g.jobs.find(j => j.id === jid);
 const myGroups = () => S.groups.filter(g => g.members.includes(ME()));
@@ -561,7 +582,9 @@ function fillJob(g, job, busy){
   const dates = occurrences(job, job.anchor, to);
   const M = g.members, n = M.length;
   const k0 = n ? (job.offset||0) % n : 0;
-  const queue = M.slice(k0).concat(M.slice(0, k0));
+  // if someone said whose turn is next, the picked people go first, then everyone else in join order
+  const picked = (job.order || []).filter(p => M.includes(p));
+  const queue = picked.length ? picked.concat(M.filter(p => !picked.includes(p))) : M.slice(k0).concat(M.slice(0, k0));
   const owed = {}; // coverer -> originals who take the coverer's next turn
   let prev = null; // who had the previous date of this job (after covers/swaps)
   return dates.map(date => {
@@ -775,6 +798,10 @@ const PAGES = {
       h += `<div class="sec-head" style="padding:0"><h2>Jobs</h2></div><div class="list">` +
         g.jobs.map(j => `<button class="li tap" data-act="edit-job" data-g="${g.id}" data-j="${j.id}"><div class="grow"><div class="t">${esc(j.name)}${j.type==='headcount'?'<span class="tag">Headcount</span>':''}</div><div class="s">${esc(repText(j.rep))} · ${t12(j.time)}</div></div><span class="chev">${ic('chevR',18)}</span></button>`).join('') +
         `<button class="li add" data-act="add-job" data-g="${g.id}">${ic('plus')}Add a job</button></div>`;
+      const tj = g.jobs.filter(j => j.type === 'turns');
+      if (g.members.length > 1 && tj.length) h += `<div class="sec-head" style="padding:0;margin-top:32px"><h2>Turn order</h2></div><div class="list">` +
+        tj.map(j => { const nx = jobInstances(g, j).find(i => i.date >= TODAY && !i.off && i.assignee);
+          return `<button class="li tap" data-act="turns-open" data-g="${g.id}" data-j="${j.id}"><div class="grow"><div class="t">${esc(j.name)}</div><div class="s">${nx ? 'Next: ' + esc(W(nx.assignee)) + ' · ' : ''}Change the order</div></div><span class="chev">${ic('chevR',18)}</span></button>`; }).join('') + `</div>`;
       h += `<div class="sec-head" style="padding:0;margin-top:32px"><h2>Dates off</h2></div><div class="list">` +
         g.off.map((o,k) => `<div class="li"><span class="li-ic">${ic('calOff')}</span><div class="grow"><div class="t">${rangeText(o)}</div><div class="s">Whole group</div></div><button class="icon-btn" data-act="rm-off" data-scope="group" data-g="${g.id}" data-k="${k}" aria-label="Remove">${ic('x')}</button></div>`).join('') +
         `<button class="li add" data-act="add-off" data-scope="group" data-g="${g.id}">${ic('plus')}Add a group date off</button></div>`;
@@ -856,7 +883,7 @@ function eventText(e){
 }
 
 /* ---------- Flows: onboarding and create group ---------- */
-function newJobDraft(){ return {name:'', rep:{kind:'week', wd:0, nth:1, date:addDays(TODAY,7)}, time:'10:00', type:'turns'}; }
+function newJobDraft(){ return {name:'', rep:{kind:'week', wd:0, wds:[0], nth:1, date:addDays(TODAY,7)}, time:'10:00', type:'turns'}; }
 function detectTz(){ try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago'; } catch(e){ return 'America/Chicago'; } }
 
 function jobRow(job, ref, removable){
@@ -892,13 +919,14 @@ function renderFlow(){
     return `<div class="flow">${top('')}<div class="flow-body"><h1>Join a group</h1><p class="lead">Paste the link you were sent, or scan the group's QR code with your camera.</p><input type="text" data-bind="join-link" value="${esc(f.link)}" aria-label="Invite link"></div>${foot('Join', true, 'join-go')}</div>`;
   }
   if (f.kind === 'create'){
-    if (f.step === 0) return `<div class="flow">${top(dots(3,0))}<div class="flow-body"><h1>Name your group</h1><p class="lead">Something everyone will recognise.</p>
+    const nd = 3;
+    if (f.step === 0) return `<div class="flow">${top(dots(nd,0))}<div class="flow-body"><h1>Name your group</h1><p class="lead">Something everyone will recognise.</p>
       <input class="big-input" type="text" data-bind="g-name" placeholder="e.g. Coffee team" value="${esc(f.name)}" aria-label="Group name">
       <div class="tz">${ic('globe',14)}Time zone: ${esc(f.tz.replace(/_/g,' '))}</div></div>${foot('Next', !!f.name.trim())}</div>`;
-    if (f.step === 1) return `<div class="flow">${top(dots(3,1))}<div class="flow-body"><h1>What needs doing, and when?</h1><p class="lead">One line per job. You can change these any time.</p>
+    if (f.step === 1) return `<div class="flow">${top(dots(nd,1))}<div class="flow-body"><h1>What needs doing, and when?</h1><p class="lead">One line per job. You can change these any time.</p>
       <div class="stack">${f.jobs.map((j,k) => jobRow(j, 'flow:'+k, f.jobs.length > 1)).join('')}</div>
       <button class="link-btn" data-act="add-job-row" style="margin-top:8px">${ic('plus')}Add another job</button></div>${foot('Next', f.jobs.some(j => j.name.trim()))}</div>`;
-    if (f.step === 2) return `<div class="flow">${top(dots(3,2))}<div class="flow-body"><h1>Who's in?</h1><p class="lead">Send this link to your group. Anyone who opens it can join.</p>
+    if (f.step === 2) return `<div class="flow">${top(dots(nd,2))}<div class="flow-body"><h1>Who's in?</h1><p class="lead">Send this link to your group. Anyone who opens it can join.</p>
       <div class="card linkbox"><span class="url">${esc(LINK_HOST + f.slug)}</span><button class="icon-btn" data-act="copy" aria-label="Copy link">${ic('copy')}</button></div>
       <button class="link-btn" data-act="qr">${ic('qr')}Show QR code</button>
       <div class="or">or type names</div>
@@ -907,6 +935,14 @@ function renderFlow(){
       ${f.people.length ? `<p class="xs muted" style="margin-top:12px">They'll get turns now and can claim their spot from the link later.</p>` : ''}</div>${foot('Done')}</div>`;
   }
   return '';
+}
+/* ---------- Turn order (group settings) ---------- */
+// who has the upcoming turns of a job, in order, then anyone not yet in the sequence
+function currentOrder(g, j){
+  const out = [];
+  jobInstances(g, j).filter(i => i.date >= TODAY && !i.off && i.assignee).forEach(i => { if (!out.includes(i.assignee)) out.push(i.assignee); });
+  g.members.forEach(p => { if (!out.includes(p)) out.push(p); });
+  return out;
 }
 function startCreate(){ S.flow = {kind:'create', step:0, name:'', tz:detectTz(), jobs:[newJobDraft()], people:[], slug:Math.random().toString(36).slice(2,7)}; S.sheets = []; renderSheets(); render(); }
 function finishCreate(){
@@ -972,7 +1008,9 @@ const SHEETS = {
     const kinds = [['week','Every week'],['2week','Every 2 weeks'],['month','Once a month'],['once','Just once']];
     let body = kinds.map(([k,l]) => `<button class="opt" data-act="rep-kind" data-v="${k}" aria-pressed="${r.kind===k}"><span class="radio"></span>${l}</button>`).join('');
     if (r.kind === 'month') body += `<div class="field-label">Which week</div><div class="chips">${[1,2,3,4,-1].map(n => `<button class="chip" data-act="rep-nth" data-v="${n}" aria-pressed="${r.nth===n}">${NTH[n]}</button>`).join('')}</div>`;
-    if (r.kind !== 'once') body += `<div class="field-label">Day</div><div class="chips">${WD.map((w,k) => `<button class="chip" data-act="rep-wd" data-v="${k}" aria-pressed="${r.wd===k}">${w.slice(0,3)}</button>`).join('')}</div>`;
+    if (r.kind === 'week' || r.kind === '2week'){ const on = repDays(r);
+      body += `<div class="field-label">Which days?</div><div class="daychips" role="group" aria-label="Days">${WD.map((w,k) => `<button class="chip" data-act="rep-day" data-v="${k}" aria-label="${w}" title="${w}" aria-pressed="${on.includes(k)}">${w[0]}</button>`).join('')}</div><p class="xs muted" style="margin:8px 0 0">Same time on each day.</p>`; }
+    else if (r.kind !== 'once') body += `<div class="field-label">Day</div><div class="chips">${WD.map((w,k) => `<button class="chip" data-act="rep-wd" data-v="${k}" aria-pressed="${r.wd===k}">${w.slice(0,3)}</button>`).join('')}</div>`;
     else body += `<div class="field-label">Date</div><input type="date" data-bind="rep-date" min="${TODAY}" value="${r.date}">`;
     return sheetShell('How often?', body, `<button class="btn main lg block" data-act="rep-done">Done · ${esc(repText(r))}</button>`);
   },
@@ -1008,7 +1046,15 @@ const SHEETS = {
       `<button class="btn main lg block" data-act="off-save" ${s.from && to && to >= s.from ? '' : 'disabled'}>Save</button>`);
   },
   pick(s){
-    return sheetShell(esc(s.title), `<div class="list">${s.people.map(p => `<button class="li tap" data-act="pick" data-p="${p}">${avatar(p)}<div class="grow t">${esc(pname(p))}${p===ME()?' (you)':''}</div></button>`).join('') || '<div class="li muted">No one to pick.</div>'}${s.other ? `<button class="li add" data-act="pick-other">${ic('userPlus')}Someone else</button>` : ''}</div>`);
+    return sheetShell(esc(s.title), `<div class="list">${s.people.map(p => `<button class="li tap" data-act="pick" data-p="${p}">${s.nameOf ? avatar(p, s.ghost && s.ghost(p) ? 'ghost' : '', s.nameOf(p)) : avatar(p)}<div class="grow t">${s.nameOf ? esc(s.nameOf(p)) : esc(pname(p)) + (p===ME()?' (you)':'')}</div></button>`).join('') || '<div class="li muted">No one to pick.</div>'}${s.other ? `<button class="li add" data-act="pick-other">${ic('userPlus')}Someone else</button>` : ''}</div>`);
+  },
+  turns(s){
+    const g = G(s.g), j = J(g, s.j), dates = occurrences(j, TODAY, addDays(TODAY, HORIZON)), last = s.order.length - 1;
+    const rows = s.order.map((p,k) => `<div class="turnrow"><div class="grow t turnwho"><span class="tdate">${dates[k] ? fShort(dates[k]) : ''}</span>${avatar(p)}<span class="nm">${esc(W(p))}</span></div>
+      <button class="icon-btn" data-act="turn-move" data-d="-1" data-k="${k}" aria-label="Move ${esc(W(p))} earlier" ${k === 0 ? 'disabled style="opacity:.3"' : ''}>${ic('chevU',22)}</button>
+      <button class="icon-btn" data-act="turn-move" data-d="1" data-k="${k}" aria-label="Move ${esc(W(p))} later" ${k === last ? 'disabled style="opacity:.3"' : ''}>${ic('chevD',22)}</button></div>`).join('');
+    return sheetShell('Turn order', `<p class="b" style="margin:0 0 4px">${esc(j.name)}</p><p class="muted small" style="margin:0 0 16px">Use the arrows to move people up or down. After the last person it starts again from the top.</p><div class="list">${rows}</div>`,
+      `<button class="btn main lg block" data-act="turns-save">Save</button>`);
   },
   qr(s){
     let h = 0; for (const c of s.url) h = (h*31 + c.charCodeAt(0)) >>> 0;
@@ -1110,7 +1156,7 @@ const ACT = {
     render(); toast(v === 'yes' ? 'Got it. See you there!' : "Got it. Thanks for letting us know.");
   },
   'menu-item'(el){ const it = topSheet().items[+el.dataset.k]; it.fn(); },
-  'sheet-close'(){ if (S.sheets.length > 1 && ['repeat','time','pick','text'].includes(topSheet().kind)) popSheet(); else closeSheets(); },
+  'sheet-close'(){ if (S.sheets.length > 1 && ['repeat','time','pick','text','turns'].includes(topSheet().kind)) popSheet(); else closeSheets(); },
   'groups-menu'(){ pushSheet({kind:'menu', title:'Groups', items:[{label:'Join with a link', icon:'link', fn:() => { closeSheets(); S.flow = {kind:'join', link:LINK_HOST + 'greeters', back:'app'}; render(); }}]}); },
   'new-group'(){ startCreate(); },
 
@@ -1138,16 +1184,31 @@ const ACT = {
   'rm-job-row'(el){ S.flow.jobs.splice(+el.dataset.ref.split(':')[1], 1); render(); },
   'job-type'(el){ getDraft(el.dataset.ref).type = el.dataset.v; rerenderAll(); },
   'pick-repeat'(el){ pushSheet({kind:'repeat', ref:el.dataset.ref, tmp:Object.assign({nth:1, wd:0, date:addDays(TODAY,7)}, getDraft(el.dataset.ref).rep)}); },
-  'rep-kind'(el){ topSheet().tmp.kind = el.dataset.v; renderSheets(); },
+  'rep-kind'(el){ const t = topSheet().tmp; t.kind = el.dataset.v; if (t.kind === 'month') t.wds = [t.wd]; renderSheets(); },
   'rep-nth'(el){ topSheet().tmp.nth = +el.dataset.v; renderSheets(); },
-  'rep-wd'(el){ topSheet().tmp.wd = +el.dataset.v; renderSheets(); },
-  'rep-done'(){ const s = topSheet(); getDraft(s.ref).rep = Object.assign({}, s.tmp); popSheet(); render(); },
+  'rep-wd'(el){ const t = topSheet().tmp; t.wd = +el.dataset.v; t.wds = [t.wd]; renderSheets(); },
+  'rep-day'(el){
+    const t = topSheet().tmp, k = +el.dataset.v, on = repDays(t);
+    const next = on.includes(k) ? on.filter(x => x !== k) : on.concat(k).sort((a,b) => a-b);
+    if (!next.length) return; // at least one day stays on
+    t.wds = next; t.wd = next[0]; renderSheets();
+  },
+  'rep-done'(){ const s = topSheet(), t = Object.assign({}, s.tmp); if (t.kind === 'month' || t.kind === 'once') t.wds = [t.wd]; else t.wds = repDays(t); getDraft(s.ref).rep = t; popSheet(); render(); },
   'pick-time'(el){ const [h,m] = getDraft(el.dataset.ref).time.split(':').map(Number); pushSheet({kind:'time', ref:el.dataset.ref, tmp:{h:(h%12)||12, m:String(m).padStart(2,'0'), ap:h>=12?'pm':'am'}}); },
   'time-done'(){ const s = topSheet(), t = s.tmp; let h = +t.h % 12; if (t.ap === 'pm') h += 12; getDraft(s.ref).time = `${String(h).padStart(2,'0')}:${t.m}`; popSheet(); render(); },
   'add-name'(){ const inp = $('nameIn'); const v = inp.value.trim(); if (!v) { inp.focus(); return; } S.flow.people.push(v); render(); $('nameIn').focus(); },
   'rm-name'(el){ S.flow.people.splice(+el.dataset.k, 1); render(); },
   copy(el){ const url = LINK_HOST + (el.dataset.g ? G(el.dataset.g).slug : S.flow.slug); try { navigator.clipboard && navigator.clipboard.writeText('https://' + url).catch(() => {}); } catch(e){} toast('Link copied'); },
   qr(el){ pushSheet({kind:'qr', url: LINK_HOST + (el.dataset.g ? G(el.dataset.g).slug : S.flow.slug)}); },
+
+  /* turn order */
+  'turns-open'(el){ const g = G(el.dataset.g), j = J(g, el.dataset.j); pushSheet({kind:'turns', g:g.id, j:j.id, order:currentOrder(g, j)}); },
+  'turn-move'(el){ const o = topSheet().order, k = +el.dataset.k, t = k + +el.dataset.d; if (t < 0 || t >= o.length) return; [o[k], o[t]] = [o[t], o[k]]; renderSheets(); },
+  'turns-save'(){
+    const s = topSheet(), g = G(s.g), j = J(g, s.j), nx = occurrences(j, TODAY, addDays(TODAY, HORIZON))[0];
+    j.order = s.order.slice(); if (nx) j.anchor = nx; // the list starts at the next date
+    closeSheets(); render(); toast('Turn order saved');
+  },
 
   /* group settings */
   'edit-job'(el){ const j = J(G(el.dataset.g), el.dataset.j); pushSheet({kind:'job', g:el.dataset.g, jid:j.id, draft:{name:j.name, rep:Object.assign({nth:1, date:addDays(TODAY,7)}, j.rep), time:j.time, type:j.type}}); },
