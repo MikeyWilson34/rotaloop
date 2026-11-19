@@ -68,19 +68,27 @@ describe('Covers', () => {
     const t = new TestGroup();
     t.run({ type: 'decline', assignmentId: 'a3' }, 'ben');
     t.run({ type: 'cover', assignmentId: 'a3' }, 'ana');
-    const items = plan(t);
-    expect(items.every((i) => i.accountId === ACCOUNT.ben)).toBe(true);
+    const all = plan(t);
+    expect(all.some((i) => i.accountId === ACCOUNT.ana)).toBe(false);
+    // Ben rests on Dec 20 after his Make-up Turn, so others move up and hear about it too.
+    expect(all.filter((i) => i.accountId !== ACCOUNT.ben).every((i) => i.kind === 'scheduleChange')).toBe(true);
+    const items = all.filter((i) => i.accountId === ACCOUNT.ben);
     const covered = items.find((i) => i.kind === 'covered')!;
     expect(covered.title).toBe('Sound, Sun, Nov 29 is covered');
     expect(covered.body).toBe('Ana covered Sound on Sun, Nov 29 for you. · Sunday Team');
     // Pay It Back: Ben takes Ana's next Sound turn (Dec 13).
     const payBack = items.find((i) => i.kind === 'scheduleChange')!;
     expect(payBack.title).toBe('Schedule change: Sound, Sun, Dec 13');
-    expect(payBack.body).toContain('Reassigned from Ana to you (Make-up Turn)');
+    // Ben's own Dec 20 turn moves up to Dec 13: he serves once, then rests.
+    expect(payBack.body).toContain('Moved from Sun, Dec 20 to Sun, Dec 13 (Make-up Turn)');
 
     const [message] = composeMessages(items);
-    expect(message.title).toBe('2 updates · Sunday Team');
-    expect(message.body).toBe('Schedule change: Sound, Sun, Dec 13\nSound, Sun, Nov 29 is covered'.split('\n').reverse().join('\n'));
+    // Ben now serves Sound on Dec 13, so his Greeter dates shift too (no double booking).
+    expect(message.title).toBe(`${items.length} updates · Sunday Team`);
+    expect(message.body.split('\n').slice(0, 2)).toEqual([
+      'Sound, Sun, Nov 29 is covered',
+      'Schedule change: Sound, Sun, Dec 13',
+    ]);
     expect(message.url).toBe('/');
   });
 
