@@ -106,7 +106,7 @@ export default function GroupScreen() {
         </View>
         <ComingUp group={data} accountId={accountId} onOpen={setOpen} />
         {solo ? (
-          <InviteCard group={data} title="Invite" subtitle="Share the turns. Everyone gets their own reminders." />
+          <InviteCard group={data} title="Invite" subtitle={null} />
         ) : null}
 
         <View style={{ marginTop: space.lg }}>

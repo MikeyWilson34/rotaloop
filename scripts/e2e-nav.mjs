@@ -233,7 +233,7 @@ try {
   // Invite from the group page (feedback-2 ticket 03): no trip through settings.
   // Feedback-2 ticket 04: you're the only real member, so the invite card sits in the
   // page between Coming up and Members ("Invite") and not repeated under Members; "Add a stand-in" is a small link.
-  await expectScreen('group page: invite card between Coming up and Members when you are the only member', /Coming up[\s\S]*Share the turns\. Everyone gets their own reminders\.[\s\S]*Members/);
+  await expectScreen('group page: invite card between Coming up and Members when you are the only member', /Coming up[\s\S]*Show more dates[\s\S]*Invite\s*Members/);
   if (process.env.E2E_SHOTS) {
     await sleep(4500); // let the 'schedule is ready' toast go
     await page.getByRole('button', { name: 'Invite people', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();

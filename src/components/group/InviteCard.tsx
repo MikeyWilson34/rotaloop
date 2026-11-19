@@ -21,7 +21,7 @@ export function InviteCard({
 }: {
   group: GroupDetails;
   title?: string;
-  subtitle?: string;
+  subtitle?: string | null;
 }) {
   const { colors, radii, fonts } = useTheme();
   const [open, setOpen] = useState(false);
@@ -54,9 +54,11 @@ export function InviteCard({
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={{ fontFamily: fonts.extrabold, color: colors.primary, fontSize: 17 }}>{title}</Text>
-          <Text variant="subhead" style={{ color: colors.text }}>
-            {subtitle}
-          </Text>
+          {subtitle ? (
+            <Text variant="subhead" style={{ color: colors.text }}>
+              {subtitle}
+            </Text>
+          ) : null}
         </View>
       </Pressable>
       <InviteSheet

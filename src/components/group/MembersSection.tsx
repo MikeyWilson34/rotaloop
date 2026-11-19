@@ -91,7 +91,7 @@ export function MembersSection({
 
 function MemberRow({ member, onPress, onInvite }: { member: MemberItem; onPress?: () => void; onInvite?: () => void }) {
   const { colors, fonts } = useTheme();
-  const label = `${member.name}${member.isMe ? ' (you)' : ''}${member.isStandIn ? ', stand-in. Not on the app. You keep track for them.' : ''}`;
+  const label = `${member.name}${member.isMe ? ' (you)' : ''}${member.isStandIn ? ', stand-in' : ''}`;
   return (
     <View>
     <Pressable
@@ -119,11 +119,6 @@ function MemberRow({ member, onPress, onInvite }: { member: MemberItem; onPress?
             </Text>
           ) : null}
         </Text>
-        {member.isStandIn ? (
-          <Text variant="subhead" color="textSecondary">
-            Not on the app. You keep track for them.
-          </Text>
-        ) : null}
       </View>
       {member.isStandIn ? <Badge label="Stand-in" /> : null}
       {onPress ? <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.75} /> : null}
