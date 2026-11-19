@@ -33,13 +33,13 @@ export const displayStatuses: Record<
   pending: { label: 'Pending', icon: Clock, bg: 'warningTint', fg: 'warningText' },
   declined: { label: 'Declined', icon: CircleX, bg: 'dangerTint', fg: 'dangerText' },
   needsCoverage: {
-    label: 'Needs coverage',
+    label: 'Needs cover',
     icon: CircleAlert,
     bg: 'dangerTint',
     fg: 'dangerText',
   },
   /** A Coverage Request past the "find a replacement by" deadline with no taker. */
-  findReplacement: { label: 'Find a replacement', icon: CircleAlert, bg: 'dangerTint', fg: 'dangerText' },
+  findReplacement: { label: 'Needs cover', icon: CircleAlert, bg: 'dangerTint', fg: 'dangerText' },
   covered: { label: 'Covered', icon: Repeat, bg: 'primaryTint', fg: 'primary' },
   skipped: { label: 'Skipped', icon: CalendarX, bg: 'neutralTint', fg: 'textSecondary' },
   scheduled: { label: 'Scheduled', icon: Calendar, bg: 'neutralTint', fg: 'textSecondary' },

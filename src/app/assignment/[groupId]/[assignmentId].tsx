@@ -22,10 +22,10 @@ import { assignmentMakeUpNotices } from '@/schedule/workloadView';
 import { useTheme } from '@/theme';
 
 /**
- * Assignment details: the Group, Responsibility, date and time, who fills it (or covers it, or
- * "Open"), its status, the rest of the Event, notices (moved, Make-up Turn) and its history.
- * The actions (Confirm, Can't make it, I can cover, Mark covered: ticket 09) live in
- * `AssignmentActions`. `?action=decline|cover|markCovered` opens that sheet on arrival.
+ * A turn's details: the group, job, date and time, who does it (or covers it, or "Open"), its
+ * status, the rest of that date, notices (moved, swapped turn) and its history. The cover flow
+ * (Can't make it, I'll cover, Pick who's covering: simplify ticket 07) lives in
+ * `AssignmentActions`. `?action=decline|markCovered` opens that sheet on arrival.
  */
 export default function AssignmentScreen() {
   const { groupId, assignmentId, action } = useLocalSearchParams<{ groupId: string; assignmentId: string; action?: string }>();
@@ -120,7 +120,7 @@ export default function AssignmentScreen() {
           </View>
           {slot.makeUpTurn ? (
             <View style={{ marginTop: space.md }}>
-              <Tag label="Make-up Turn" />
+              <Tag label="Swapped turn" />
             </View>
           ) : null}
           <Text variant="title1" accessibilityRole="header" style={{ marginTop: slot.makeUpTurn ? space.xs : space.md }}>
@@ -136,7 +136,7 @@ export default function AssignmentScreen() {
           </View>
 
           {moved ? <InfoBox icon={CalendarClock} tone="warning" text={moved} /> : null}
-          {makeUp.paying ? <InfoBox icon={Handshake} tone="primary" text={`Make-up Turn. ${makeUp.paying}`} /> : null}
+          {makeUp.paying ? <InfoBox icon={Handshake} tone="primary" text={makeUp.paying} /> : null}
           {makeUp.created ? <InfoBox icon={Handshake} tone="primary" text={makeUp.created} /> : null}
 
           <AssignmentActions

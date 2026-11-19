@@ -6,7 +6,7 @@
  * Pure TypeScript: no React, Supabase or clock reads (callers pass `now` and the viewer's
  * time zone), so it is unit-tested under Node.
  */
-import { assignmentStatus, replacementDutyHolder } from '../engine/status';
+import { assignmentStatus } from '../engine/status';
 import type { Assignment, AssignmentStatus, Event, GroupSettings, GroupState, Instant, MemberId } from '../engine/types';
 import { dateOf, dayNumber, weekdayOf } from './expandSeries';
 import { addDays, dateIn, daysBetween, formatMonthDay } from './format';
@@ -41,13 +41,13 @@ export type DisplayStatus = 'confirmed' | 'pending' | 'needsCoverage' | 'findRep
 const STATUS_LABELS: Record<DisplayStatus, string> = {
   confirmed: 'Confirmed',
   pending: 'Pending',
-  needsCoverage: 'Needs coverage',
-  findReplacement: 'Find a replacement',
+  needsCoverage: 'Needs cover',
+  findReplacement: 'Needs cover',
   covered: 'Covered',
   scheduled: 'Scheduled',
 };
 
-/** "Needs coverage", for screen readers next to a status dot. */
+/** "Needs cover", for screen readers next to a status dot. */
 export function displayStatusLabel(status: DisplayStatus): string {
   return STATUS_LABELS[status];
 }
@@ -57,20 +57,17 @@ export function displayStatus(status: AssignmentStatus): DisplayStatus {
 }
 
 /**
- * The status shown for an Assignment at an Event starting at `startsAt`. Given the Group's
- * settings, a Coverage Request whose Replacement Duty has started is "Find a replacement".
+ * The status shown for an Assignment at an Event starting at `startsAt`. An open request is
+ * "Needs cover" for everyone until someone takes it (simplify ticket 07: no one is put on the
+ * spot after a deadline any more). `_settings` is kept for callers.
  */
 export function slotStatus(
   assignment: Assignment,
   startsAt: Instant,
   now: Instant,
-  settings?: GroupSettings,
+  _settings?: GroupSettings,
 ): DisplayStatus {
-  const status = displayStatus(assignmentStatus(assignment, startsAt, now));
-  if (status === 'needsCoverage' && settings && replacementDutyHolder(assignment, startsAt, settings, now) !== null) {
-    return 'findReplacement';
-  }
-  return status;
+  return displayStatus(assignmentStatus(assignment, startsAt, now));
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +89,7 @@ export type SlotView = {
   startsAt: Instant;
   status: DisplayStatus;
   who: Who;
-  /** "You", "Sam", "Pat (guest)" or "Open". */
+  /** "You", "Sam", "Pat (not in group)" or "Open". */
   whoLabel: string;
   /** For a covered Assignment: whose it was ("you" or a name). */
   coveredFor: string | null;
@@ -152,7 +149,7 @@ export function slotView(group: ScheduleGroup, assignment: Assignment, startsAt:
 }
 
 export function whoLabel(who: Who): string {
-  if (who.kind === 'guest') return `${who.name} (guest)`;
+  if (who.kind === 'guest') return `${who.name} (not in group)`;
   if (who.kind === 'member') return who.isMe ? 'You' : who.name;
   return 'Open';
 }

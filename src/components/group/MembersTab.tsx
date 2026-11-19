@@ -120,7 +120,7 @@ function WorkloadIntro({ note, debts }: { note: string; debts: string[] }) {
           <Handshake size={20} color={colors.primary} strokeWidth={1.75} />
           <Text variant="subhead" style={{ flex: 1 }}>
             <Text variant="subhead" style={{ fontFamily: fonts.bold }}>
-              Make-up Turns owed:{' '}
+              Swaps:{' '}
             </Text>
             {debts.join(' ')}
           </Text>

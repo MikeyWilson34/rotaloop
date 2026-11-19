@@ -28,7 +28,7 @@ function CardFrame({ children, padding = 14 }: { children: React.ReactNode; padd
   );
 }
 
-/** A small `primaryTint` tag, e.g. "Make-up Turn". */
+/** A small `primaryTint` tag, e.g. "Swapped turn". */
 export function Tag({ label }: { label: string }) {
   const { colors, fonts, radii } = useTheme();
   return (
@@ -65,7 +65,7 @@ export function MySlotCard({ event, slot, viewerTimeZone }: { event: EventView; 
   const { colors, fonts, radii, shadows, space } = useTheme();
   const time = eventTimeText(event.startsAt, event.groupTimeZone, viewerTimeZone);
   const label = [
-    slot.makeUpTurn ? 'Make-up Turn.' : '',
+    slot.makeUpTurn ? 'Swapped turn.' : '',
     `${slot.responsibilityName}, ${event.groupName}.`,
     `${formatDayShort(event.date)}, ${time}.`,
     slot.covering ? 'Covering.' : `${displayStatusLabel(slot.status)}.`,
@@ -92,7 +92,7 @@ export function MySlotCard({ event, slot, viewerTimeZone }: { event: EventView; 
       })}>
       <DateBox date={event.date} mine />
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-        {slot.makeUpTurn ? <Tag label="Make-up Turn" /> : null}
+        {slot.makeUpTurn ? <Tag label="Swapped turn" /> : null}
         <Text numberOfLines={1} style={{ fontFamily: fonts.bold, fontSize: 16, lineHeight: 22 }}>
           {slot.responsibilityName}
         </Text>
@@ -142,7 +142,7 @@ export function SlotRow({ slot }: { slot: SlotView }) {
           lineHeight: 20,
           color: open ? colors.dangerText : slot.mine ? colors.primary : colors.text,
         }}>
-        {slot.makeUpTurn && !open ? `${slot.whoLabel} · Make-up Turn` : slot.whoLabel}
+        {slot.makeUpTurn && !open ? `${slot.whoLabel} · swapped turn` : slot.whoLabel}
       </Text>
       <StatusDot status={slot.status} />
     </Pressable>

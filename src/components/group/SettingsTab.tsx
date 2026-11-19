@@ -11,7 +11,6 @@ import { resetGroupInviteToken } from '@/lib/inviteLinks';
 import { useTheme } from '@/theme';
 
 import type { RunCommand } from './MemberActionsSheet';
-import { CoverageSection } from './settings/CoverageSection';
 import { EventsSection } from './settings/EventsSection';
 import { GroupDetailsSection } from './settings/GroupDetailsSection';
 import { ResponsibilitiesSection } from './settings/ResponsibilitiesSection';
@@ -80,7 +79,6 @@ export function SettingsTab({
       <GroupDetailsSection group={group} isAdmin={isAdmin} reload={reload} />
       <ResponsibilitiesSection group={group} isAdmin={isAdmin} run={run} />
       <EventsSection group={group} isAdmin={isAdmin} run={run} />
-      <CoverageSection group={group} isAdmin={isAdmin} run={run} />
 
       <FieldLabel>People</FieldLabel>
       <SettingsList>

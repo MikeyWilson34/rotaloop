@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { BellRing, Scale, Star, Trash2, Users } from 'lucide-react-native';
+import { BellRing, Star, Trash2, Users } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
@@ -27,7 +27,6 @@ import {
   moveItem,
   NAME_MAX,
   newId,
-  outstandingMakeUpTurns,
   qualificationOptions,
   responsibilityChanges,
   rotationQueue,
@@ -45,7 +44,7 @@ function back(groupId: string) {
 
 /**
  * A Responsibility: add or edit it (name, headcount, confirmation, Primary), pick its
- * Qualified Members, reorder its Rotation, Rebalance, or remove it. Members see it read-only.
+ * Qualified Members, reorder its Rotation, or remove it. Members see it read-only.
  * `responsibilityId` "new" adds one.
  */
 export default function ResponsibilityScreen() {
@@ -230,7 +229,7 @@ function NewResponsibility({ group, run }: { group: GroupDetails; run: RunComman
   );
 }
 
-type Confirm = 'remove' | 'rebalance' | null;
+type Confirm = 'remove' | null;
 
 function EditResponsibility({ group, responsibilityId, run }: { group: GroupDetails; responsibilityId: string; run: RunCommand }) {
   const { space } = useTheme();
@@ -254,7 +253,6 @@ function EditResponsibility({ group, responsibilityId, run }: { group: GroupDeta
   const shownQueue = draftValid ? draftQueue.map((id) => queue.find((q) => q.memberId === id)!) : queue;
   const queueChanged = draftValid && draftQueue.some((id, i) => id !== queueIds[i]);
   const options = qualificationOptions(group.state, r.id);
-  const owed = outstandingMakeUpTurns(group.state, r.id);
   const otherNames = group.state.responsibilities.filter((x) => x.removedAt === null && x.id !== r.id).map((x) => x.name);
 
   const changes = (() => {
@@ -293,11 +291,6 @@ function EditResponsibility({ group, responsibilityId, run }: { group: GroupDeta
   async function confirmed() {
     if (confirm === 'remove') {
       if (await act({ type: 'removeResponsibility', responsibilityId: r.id }, 'removeResponsibility')) back(group.id);
-    } else if (confirm === 'rebalance') {
-      if (await act({ type: 'rebalance', responsibilityId: r.id }, 'rebalance', 'Rebalanced. Whoever has served least is now first.')) {
-        setDraftQueue(null);
-        setConfirm(null);
-      }
     }
   }
 
@@ -408,16 +401,6 @@ function EditResponsibility({ group, responsibilityId, run }: { group: GroupDeta
 
       <SettingsList>
         <ActionRow
-          icon={Scale}
-          label="Rebalance"
-          description="Whoever has served least goes first. Settles this Responsibility's Make-up Turns."
-          disabled={busy || queue.length < 2}
-          onPress={() => {
-            setError(null);
-            setConfirm('rebalance');
-          }}
-        />
-        <ActionRow
           icon={Trash2}
           label="Remove Responsibility"
           destructive
@@ -430,23 +413,9 @@ function EditResponsibility({ group, responsibilityId, run }: { group: GroupDeta
       </SettingsList>
 
       <ConfirmSheet
-        visible={confirm === 'rebalance'}
-        title={`Rebalance ${r.name}?`}
-        message={`The Rotation is reordered by workload: whoever has served least goes first. ${
-          owed > 0
-            ? `${owed} outstanding Make-up ${owed === 1 ? 'Turn is' : 'Turns are'} settled, so nobody owes a turn for ${r.name} anymore.`
-            : `Any outstanding Make-up Turns for ${r.name} are settled.`
-        } Upcoming turns may move, and anyone whose turn changes is asked to confirm again. This is recorded in the schedule history.`}
-        confirmLabel="Rebalance"
-        loading={busy}
-        error={error}
-        onConfirm={confirmed}
-        onCancel={() => setConfirm(null)}
-      />
-      <ConfirmSheet
         visible={confirm === 'remove'}
         title={`Remove ${r.name}?`}
-        message={`${r.name} won't be needed at any upcoming Event, so its future seats go away and the people assigned are freed up. Past Events keep their history. Its Make-up Turns are cancelled.`}
+        message={`${r.name} won't be needed at any upcoming Event, so its future seats go away and the people assigned are freed up. Past Events keep their history. Swapped turns for it are cancelled.`}
         confirmLabel="Remove Responsibility"
         tone="destructive"
         loading={busy}
