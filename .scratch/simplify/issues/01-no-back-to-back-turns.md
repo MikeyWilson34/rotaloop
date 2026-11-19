@@ -1,6 +1,6 @@
 # 01 Engine: rotation rules (swap wins, no back-to-back, no double booking)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: none
 
 Reference behaviour (approved): `design/prototype/simple.html`, function `jobInstances`/`fillJob`. Spec: `.scratch/simplify/spec.md` → "Rotation rules". Read GLOSSARY.md and docs/adr/0001 first.

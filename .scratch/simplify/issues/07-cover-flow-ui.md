@@ -1,6 +1,6 @@
 # 07 App: one cover flow in plain words
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01, 04
 
 Reference: `design/prototype/simple.html` sheets `cant`, `pick`, `cant-self`, `doCover`, `eventText`. Spec: `.scratch/simplify/spec.md` ("Coverage Policy / Replacement Duty / Guest Cover / Make-up Turn" row).

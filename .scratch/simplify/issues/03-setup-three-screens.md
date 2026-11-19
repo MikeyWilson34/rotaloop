@@ -1,6 +1,6 @@
 # 03 App: 3-screen group setup and shorter onboarding
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: none
 
 Reference: `design/prototype/simple.html` (flows `create`, `onb`, `jobRow`, repeat/time sheets). Spec: `.scratch/simplify/spec.md` → "New setup" and "Defaults replacing setup questions".
