@@ -1,9 +1,12 @@
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CircleCheck } from 'lucide-react-native';
+
 import { appColumnMaxWidth, useTheme } from '@/theme';
 
 import { Text } from './Text';
+import { useSheetNote } from './Toast';
 
 export type SheetProps = {
   visible: boolean;
@@ -38,8 +41,11 @@ export function Sheet({
   footer,
   closeLabel = 'Close',
 }: SheetProps) {
-  const { colors, radii, space, shadows } = useTheme();
+  const { colors, fonts, radii, space, shadows } = useTheme();
   const insets = useSafeAreaInsets();
+  // A confirmation shown while this sheet is open (showToast) appears inside it, not over it.
+  const note = useSheetNote(visible);
+  const NoteIcon = note?.icon ?? CircleCheck;
   const close = () => {
     if (!busy) onClose();
   };
@@ -83,6 +89,23 @@ export function Sheet({
             style={{ flexGrow: 0 }}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingHorizontal: space.xxl, gap: space.md }}>
+            {note ? (
+              <View
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  paddingVertical: 12,
+                  paddingHorizontal: 14,
+                  borderRadius: radii.md,
+                  backgroundColor: colors.successTint,
+                }}>
+                <NoteIcon size={20} color={colors.successText} strokeWidth={2} />
+                <Text style={{ flex: 1, fontFamily: fonts.bold, fontSize: 14, lineHeight: 20, color: colors.text }}>{note.message}</Text>
+              </View>
+            ) : null}
             {overline || title || message ? (
               <View style={{ gap: space.xs }}>
                 {overline ? (

@@ -232,6 +232,29 @@ try {
   current = 'tabs';
   await page.goto(`${BASE}/`);
   await expectScreen('Home', /Home/);
+  // Home is the next 7 days (big card, or "Nothing this week"), then Your groups.
+  await expectScreen('Home: this week', /Your next turn|Nothing this week/);
+  await expectScreen('Home: your groups', /Your groups/);
+  if (process.env.E2E_SHOTS) {
+    // Home at 375px in both schemes, for review (E2E_SHOTS=<folder>).
+    await page.setViewportSize({ width: 375, height: 812 });
+    for (const scheme of ['light', 'dark']) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await sleep(500);
+      await page.screenshot({ path: join(process.env.E2E_SHOTS, `home-375-${scheme}.png`) });
+      await page.mouse.move(187, 400);
+      await page.mouse.wheel(0, 2000);
+      await sleep(400);
+      await page.screenshot({ path: join(process.env.E2E_SHOTS, `home-375-${scheme}-scrolled.png`) });
+      await page.mouse.wheel(0, -2000);
+    }
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.setViewportSize({ width: 390, height: 844 });
+  }
+  await page.getByRole('button', { name: new RegExp(`^E2E Group ${stamp}\\. (Your next turn|No turns)`) }).filter({ visible: true }).first().click();
+  await expectScreen('Home → the Group', /Overview/);
+  await page.getByRole('button', { name: 'Back', exact: true }).first().click();
+  await expectScreen('the Group → back to Home', /Your groups/);
   const tabCount = await page.getByRole('tab').count();
   if (tabCount !== 3) throw new Error(`Expected 3 bottom tabs, found ${tabCount}`);
   for (let round = 1; round <= 3; round++) {
