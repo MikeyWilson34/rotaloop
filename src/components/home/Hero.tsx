@@ -1,76 +1,42 @@
-import { Check, CalendarCheck } from 'lucide-react-native';
+import { Check, CircleAlert, CircleCheck } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { GroupTile } from '@/components/group/GroupTile';
-import { displayStatuses, Text } from '@/components/ui';
+import { Text } from '@/components/ui';
+import type { HeadcountReply } from '@/engine/types';
 import type { HeroView } from '@/home/home';
 import { useTheme } from '@/theme';
 
-/** Colours on the navy card (prototype `--on-navy-2`, `--hero-*`), the same in both schemes. */
-const HERO = {
-  text2: '#C7D0DD',
-  raise: 'rgba(255,255,255,0.10)',
-  confirm: '#86BC95',
-  onConfirm: '#10213A',
-  amber: '#F2C46D',
-  sage: '#A9D4B3',
-  red: '#F2A196',
-  glass: 'rgba(255,255,255,0.12)',
-};
+import { YesNoButtons } from './YesNo';
 
-const pillIconColor = (status: HeroView['status']) =>
-  status === 'pending' ? HERO.amber : status === 'confirmed' ? HERO.sage : status === 'scheduled' ? HERO.text2 : HERO.red;
-
-function HeroPill({ status, label }: { status: HeroView['status']; label: string | null }) {
-  const { fonts } = useTheme();
-  const s = displayStatuses[status];
-  const Icon = s.icon;
-  return (
-    <View
-      accessible
-      accessibilityLabel={label ?? s.label}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 26, paddingHorizontal: 10, borderRadius: 999, backgroundColor: HERO.glass }}>
-      <Icon size={15} color={pillIconColor(status)} strokeWidth={2} />
-      <Text style={{ fontFamily: fonts.bold, fontSize: 13, lineHeight: 18, color: '#FFFFFF' }}>{label ?? s.label}</Text>
-    </View>
-  );
-}
-
-function SmallAvatar({ initials, index }: { initials: string; index: number }) {
-  const { colors, fonts } = useTheme();
-  return (
-    <View
-      style={{
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        marginLeft: index === 0 ? 0 : -8,
-        borderWidth: 2,
-        borderColor: colors.navy,
-        backgroundColor: '#DCE6F2',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-      <Text style={{ fontFamily: fonts.extrabold, fontSize: 10, lineHeight: 12, color: '#1F2D45' }}>{initials}</Text>
-    </View>
-  );
-}
+/** Colours on the navy card (prototype `--on-navy-2` and the note icons), the same in both schemes. */
+const ON_NAVY_2 = '#C7D0DD';
+const AMBER = '#F2C46D';
+const SAGE = '#A9D4B3';
+/** The prototype's thin inner ring that keeps filled buttons distinct on navy. */
+const RING = 'inset 0 0 0 1.5px rgba(255,255,255,0.4)';
 
 export type HeroProps = {
   hero: HeroView;
+  /** An action on the card is being sent. */
   busy: boolean;
   onOpen: () => void;
+  onCantMakeIt: () => void;
   onConfirm: () => void;
-  onDecline: () => void;
+  onAnswer?: (answer: HeadcountReply) => void;
+  /** Headcount: the answer being sent, if any. */
+  answering?: HeadcountReply | null;
 };
 
-/** "Your next Assignment" (prototype `heroCard`): the navy card at the top of Home. */
-export function Hero({ hero, busy, onOpen, onConfirm, onDecline }: HeroProps) {
+/** The big navy card at the top of Home (prototype `heroCard`): one main button. */
+export function Hero({ hero, busy, onOpen, onCantMakeIt, onConfirm, onAnswer, answering = null }: HeroProps) {
   const { colors, fonts, radii, shadows, scheme } = useTheme();
+  const headcount = hero.mode === 'headcount';
+  const label = headcount ? 'Coming?' : 'Your next turn';
   return (
     <View
       accessibilityRole="summary"
-      accessibilityLabel="Your next Assignment"
+      accessibilityLabel={label}
       style={{
         backgroundColor: colors.navy,
         borderRadius: radii.xl,
@@ -83,126 +49,100 @@ export function Hero({ hero, busy, onOpen, onConfirm, onDecline }: HeroProps) {
       {/* The soft glow in the corner. */}
       <View
         pointerEvents="none"
-        style={{
-          position: 'absolute',
-          right: -60,
-          top: -60,
-          width: 200,
-          height: 200,
-          borderRadius: 100,
-          backgroundColor: 'rgba(134,174,219,0.14)',
-        }}
+        style={{ position: 'absolute', right: -60, top: -60, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(134,174,219,0.14)' }}
       />
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <Text variant="overline" style={{ color: HERO.text2, flexShrink: 1 }}>
-          {`Next up · ${hero.relative}`}
-        </Text>
-        <HeroPill status={hero.status} label={hero.pillLabel} />
-      </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityHint="Opens the Assignment"
-        accessibilityLabel={`${hero.responsibilityName}, ${hero.groupName}. ${hero.dateLabel}, ${hero.timeLabel}.`}
+        accessibilityHint="Opens the details"
+        accessibilityLabel={`${hero.responsibilityName}, ${hero.groupName}. ${hero.dayLabel}, ${hero.timeLabel}. ${hero.relative}.`}
         onPress={onOpen}
         style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}>
-        {hero.makeUpTurn ? (
-          <Text style={{ marginTop: 14, fontFamily: fonts.extrabold, fontSize: 11, letterSpacing: 0.3, color: HERO.amber }}>MAKE-UP TURN</Text>
-        ) : null}
-        <Text
-          style={{
-            fontFamily: fonts.extrabold,
-            fontSize: 30,
-            lineHeight: 36,
-            letterSpacing: -0.3,
-            color: '#FFFFFF',
-            marginTop: hero.makeUpTurn ? 2 : 14,
-            marginBottom: 2,
-          }}>
-          {hero.responsibilityName}
+        <Text variant="overline" style={{ color: ON_NAVY_2 }}>
+          {label}
         </Text>
-        <Text style={{ fontFamily: fonts.bold, fontSize: 16, lineHeight: 22, color: '#FFFFFF' }}>{hero.dateLabel}</Text>
-        <Text style={{ fontSize: 14, lineHeight: 20, color: HERO.text2, marginTop: 2, fontFamily: fonts.regular }}>{hero.timeLabel}</Text>
-        {hero.notes.map((note) => (
-          <Text key={note} style={{ fontSize: 14, lineHeight: 20, color: HERO.amber, marginTop: 6, fontFamily: fonts.semibold }}>
-            {note}
-          </Text>
-        ))}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }}>
-          <GroupTile groupId={hero.groupId} size={28} />
-          <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: fonts.bold, fontSize: 14, color: HERO.text2 }}>
+          <GroupTile groupId={hero.groupId} size={24} />
+          <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: fonts.bold, fontSize: 14, color: ON_NAVY_2 }}>
             {hero.groupName}
           </Text>
         </View>
-        {hero.withLabel ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 }}>
-            <View style={{ flexDirection: 'row' }}>
-              {hero.with.slice(0, 3).map((p, i) => (
-                <SmallAvatar key={`${p.name}-${i}`} initials={p.initials} index={i} />
-              ))}
-            </View>
-            <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 14, color: HERO.text2, fontFamily: fonts.regular }}>
-              {hero.withLabel}
-            </Text>
-          </View>
+        <Text style={{ fontFamily: fonts.extrabold, fontSize: 30, lineHeight: 36, letterSpacing: -0.3, color: colors.onNavy, marginTop: 4, marginBottom: 2 }}>
+          {hero.responsibilityName}
+        </Text>
+        <Text style={{ fontFamily: fonts.bold, fontSize: 16, lineHeight: 22, color: colors.onNavy }}>{`${hero.dayLabel} · ${hero.timeLabel}`}</Text>
+        <Text style={{ fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: ON_NAVY_2, marginTop: 2 }}>{hero.relative}</Text>
+        {headcount && hero.headcount ? (
+          <Text style={{ fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: ON_NAVY_2, marginTop: 10 }}>
+            {`${hero.headcount.counts.coming} coming so far`}
+          </Text>
         ) : null}
       </Pressable>
 
-      {hero.mode === 'confirm' ? (
-        <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-          <HeroButton label="Confirm" icon onPress={onConfirm} busy={busy} primary />
-          <HeroButton label="Can't make it" onPress={onDecline} busy={false} disabled={busy} />
-        </View>
-      ) : (
+      {hero.note ? (
         <View
           style={{
-            marginTop: 20,
+            marginTop: 18,
             flexDirection: 'row',
-            alignItems: 'center',
-            gap: 12,
+            alignItems: 'flex-start',
+            gap: 10,
             backgroundColor: 'rgba(255,255,255,0.08)',
             borderRadius: 14,
-            paddingVertical: 8,
-            paddingLeft: 14,
-            paddingRight: 4,
+            paddingVertical: 12,
+            paddingHorizontal: 14,
           }}>
-          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: HERO.confirm, alignItems: 'center', justifyContent: 'center' }}>
-            {hero.mode === 'later' ? (
-              <CalendarCheck size={17} color={HERO.onConfirm} strokeWidth={2.25} />
-            ) : (
-              <Check size={18} color={HERO.onConfirm} strokeWidth={2.5} />
-            )}
-          </View>
-          <Text style={{ flex: 1, fontSize: 14, lineHeight: 20, color: '#FFFFFF', fontFamily: fonts.semibold }}>{hero.doneText}</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Details"
-            onPress={onOpen}
-            style={({ pressed }) => ({ minHeight: 48, paddingHorizontal: 12, justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
-            <Text style={{ fontFamily: fonts.bold, fontSize: 14, color: '#FFFFFF' }}>Details</Text>
-          </Pressable>
+          {hero.note.tone === 'warn' ? (
+            <CircleAlert size={20} color={AMBER} strokeWidth={2} />
+          ) : (
+            <CircleCheck size={20} color={SAGE} strokeWidth={2} />
+          )}
+          <Text style={{ flex: 1, fontSize: 14, lineHeight: 20, color: colors.onNavy, fontFamily: fonts.regular }}>
+            {hero.note.strong ? <Text style={{ fontFamily: fonts.extrabold, color: colors.onNavy }}>{`${hero.note.strong} `}</Text> : null}
+            {hero.note.text}
+          </Text>
         </View>
-      )}
+      ) : null}
+
+      {hero.mode === 'headcount' ? (
+        <View style={{ marginTop: 22 }}>
+          <YesNoButtons
+            appearance="filled"
+            value={hero.headcount?.answer ?? null}
+            busy={answering}
+            disabled={busy}
+            onChange={(a) => onAnswer?.(a)}
+          />
+        </View>
+      ) : hero.mode === 'confirm' ? (
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 22 }}>
+          <HeroButton label="Confirm" tone="success" icon onPress={onConfirm} busy={busy} />
+          <HeroButton label="Can't make it" tone="danger" onPress={onCantMakeIt} busy={false} disabled={busy} />
+        </View>
+      ) : hero.mode === 'cantMakeIt' ? (
+        <View style={{ flexDirection: 'row', marginTop: 22 }}>
+          <HeroButton label="Can't make it" tone="danger" onPress={onCantMakeIt} busy={busy} />
+        </View>
+      ) : null}
     </View>
   );
 }
 
 function HeroButton({
   label,
+  tone,
   onPress,
   busy,
-  primary,
   icon,
   disabled,
 }: {
   label: string;
+  tone: 'success' | 'danger';
   onPress: () => void;
   busy: boolean;
-  primary?: boolean;
   icon?: boolean;
   disabled?: boolean;
 }) {
-  const { fonts, radii } = useTheme();
-  const fg = primary ? HERO.onConfirm : '#FFFFFF';
+  const { colors, fonts, radii } = useTheme();
+  const fg = colors.onPrimary;
   return (
     <Pressable
       accessibilityRole="button"
@@ -214,7 +154,8 @@ function HeroButton({
         flex: 1,
         height: 56,
         borderRadius: radii.md,
-        backgroundColor: primary ? HERO.confirm : '#2F4363',
+        backgroundColor: tone === 'success' ? colors.success : colors.danger,
+        boxShadow: RING,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -233,29 +174,5 @@ function HeroButton({
         </>
       )}
     </Pressable>
-  );
-}
-
-/** No upcoming Assignments (prototype `.hero-empty`). */
-export function HeroEmpty({ title, text, children }: { title: string; text: string; children?: React.ReactNode }) {
-  const { colors, fonts, radii, shadows } = useTheme();
-  return (
-    <View
-      style={{
-        padding: 24,
-        borderRadius: radii.lg,
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-        boxShadow: shadows.shadow1,
-        alignItems: 'center',
-        gap: 4,
-      }}>
-      <Text style={{ fontFamily: fonts.extrabold, fontSize: 17, lineHeight: 24, textAlign: 'center' }}>{title}</Text>
-      <Text variant="subhead" color="textSecondary" style={{ textAlign: 'center' }}>
-        {text}
-      </Text>
-      {children ? <View style={{ marginTop: 12, alignSelf: 'stretch' }}>{children}</View> : null}
-    </View>
   );
 }

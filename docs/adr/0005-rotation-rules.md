@@ -1,0 +1,16 @@
+# Rotation rules: a Cover is a swap, no back-to-back turns, no double booking
+
+Extends [0001](0001-hybrid-queue-rotation.md): Rotations stay ordered queues, and the engine (`src/engine/schedule.ts`) fills each Event by applying three rules in this order. The goal is that nobody serves twice in a row and nobody is booked twice on one day, which testers noticed more than any fairness score.
+
+1. **A Cover is always a swap.** If C covers B's turn, B owes C (a Make-up Turn under the Pay It Back policy, the default and the only policy the simplified UI offers). When C's turn next comes up in that Responsibility's Rotation, B takes it instead, as long as B is free that day (rule 3) and B didn't have the previous date (rule 2); otherwise the swap waits for C's next turn after that. If B is on Time Off at that turn, the swap **lapses**: C serves their own turn, and the Make-up Turn is closed as `cancelled` / `lapsed` once that Event has passed. A lapse is decided the same way in planning and in `advanceTo`: the coverer is in the front seats of the Rotation (not on Time Off themselves) and the debtor is on Time Off.
+2. **No back-to-back turns when avoidable.** Whoever served the previous Event of a Responsibility (the coverer, for a Cover; including the latest past Event) rests: the next eligible Member in line takes the date, and the rested Member keeps their place at the front (they don't lose a turn; the queue's early-turn count handles it). Time Off routing also prefers a partner who didn't just serve. Only when no one else can serve does a Member serve back-to-back (for example a 2-person group with one on Time Off). A Cover the Member asked for can still put the coverer on two dates in a row: pinned Assignments are never moved.
+3. **No double booking.** A Member with a seat anywhere on the same calendar day (any Event, any Responsibility, including Covers booked later that day) is unavailable. Responsibilities are filled in the Group's order, so the later one routes around. Days are counted in the time zone of the Group's Event Series (UTC if none). If nobody is free, the seat is a Coverage Request with reason `noOneAvailable` ("Needs cover"). The `allowDoubling` setting still lifts this rule, but the simplified UI no longer shows it.
+
+Example: Jordan, Sam and Tom on a weekly Job, Tom covers Sam on week 2. Weeks 1-12: Jordan, Tom (covering Sam), Sam (swap: Tom's turn), Jordan, Sam, Tom, Jordan, Sam, Tom, Jordan, Sam, Tom. This matches the approved prototype (`design/prototype/simple.html`, `fillJob`).
+
+## Consequences
+
+- Changing one date can now shift several later dates (a Member who serves rests at the next one), so changes produce more schedule-change notices than before. With headcount 1 the ripple stays among the Members involved.
+- With two Jobs on the same day and Rotations of the same length, a swap can keep landing on days the debtor is busy with the other Job, and so keep waiting. It stays outstanding until it fits, a Rebalance settles it, or it lapses.
+- Lapses are not history entries of their own; the Make-up Turn's status records them. Adding `lapsed` needed a new `make_up_turn_closed_reason` value (migration `20261122000000_make_up_turn_lapsed.sql`).
+- In the UI these are Job, Turn, Cover and Dates off. Make-up Turn, Responsibility and Event Series stay engine words.

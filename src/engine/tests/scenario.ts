@@ -58,6 +58,7 @@ export function timeOff(
 
 export interface ScenarioResponsibility {
   id: string;
+  kind?: 'turns' | 'headcount';
   headcount?: number;
   requiresConfirmation?: boolean;
   qualified: string[];
@@ -93,6 +94,7 @@ export function setup(scenario: Scenario = {}): GroupState {
     responsibilities: responsibilities.map((r) => ({
       id: r.id,
       name: r.id,
+      kind: r.kind,
       headcount: r.headcount ?? 1,
       requiresConfirmation: r.requiresConfirmation ?? false,
       qualifiedMemberIds: r.qualified,

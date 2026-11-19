@@ -6,28 +6,32 @@
  * and delivers.
  *
  * Two entry points:
- * - `planCommandNotifications`: right after a command, from its history entries (a new
- *   Coverage Request, a Cover, "Mark covered", schedule changes, confirmation requests).
- * - `planScheduledNotifications`: on the 15-minute job (reminders, the Coverage Request
- *   follow-up, Replacement Duty, Admin alerts).
+ * - `planCommandNotifications`: right after a command, from its history entries (a turn that
+ *   needs cover, a cover being set, schedule changes, confirmation requests).
+ * - `planScheduledNotifications`: on the 15-minute job (reminders and the one "still needs
+ *   cover" follow-up).
+ *
+ * One cover flow (simplify ticket 07): a turn that needs cover goes to every Member in the
+ * group, in plain words; the first to tap "I'll cover" takes it. There are no Admin alerts and
+ * no "Replacement Duty": if nobody takes it, the group page shows "Needs cover" to everyone.
  *
  * Rules that hold everywhere:
- * - Only Members with an account get anything (never a Placeholder, a former Member or a
- *   Guest Cover), and only when their profile has push on. Email and SMS are stored
+ * - Only Members with an account get anything (never a Stand-in, a former Member or an
+ *   outside cover), and only when their profile has push on. Email and SMS are stored
  *   preferences that the MVP does not deliver.
  * - The Member who acted is never told about their own action.
  * - Every item has a `dedupeKey`: the notification log stores it under a unique
  *   constraint, so a retried or overlapping run never sends the same thing twice.
  * - Topic toggles: "Coverage Requests" (`notifyCoverageRequests`) gates Coverage Requests
  *   and their follow-up; "Schedule changes" (`notifyChanges`) gates moved, reassigned,
- *   added and removed Assignments. Reminders, anything about your own Coverage Request,
- *   confirmation requests, Replacement Duty and Admin alerts are always on (with push).
+ *   added and removed Assignments. Reminders, anything about your own turn being covered,
+ *   and confirmation requests are always on (with push).
  */
-import { isUnconfirmed } from '../engine/status';
-import type { Assignment, AssignmentChange, Event, GroupState, HistoryEntry, Instant, Member, MemberId } from '../engine/types';
+import type { Assignment, AssignmentChange, Event, GroupState, HistoryEntry, Instant, MemberId } from '../engine/types';
 import { localDate, zonedTimeToInstant } from '../schedule/expandSeries';
 import { addDays, dateIn, formatDayShort, formatTimeIn, relativeDay, safeZone } from '../schedule/format';
-import { describeAssignmentChange, describeHistoryEntry, type HistoryContext } from '../schedule/history';
+import { answerOf, nextHeadcounts } from '../schedule/headcount';
+import { coverSentence, describeAssignmentChange, describeHistoryEntry, type HistoryContext } from '../schedule/history';
 
 const MINUTE = 60_000;
 const DAY_MS = 24 * 60 * MINUTE;
@@ -137,12 +141,9 @@ function eventOf(state: GroupState, eventId: string): Event | undefined {
 }
 
 function responsibilityName(state: GroupState, id: string): string {
-  return state.responsibilities.find((r) => r.id === id)?.name ?? 'a Responsibility';
+  return state.responsibilities.find((r) => r.id === id)?.name ?? 'a job';
 }
 
-function nameOf(state: GroupState, id: MemberId | null | undefined): string {
-  return state.members.find((m) => m.id === id)?.name ?? 'Someone';
-}
 
 /** "Sound, Sun, Nov 22" in the recipient's time zone. */
 function seatLabel(state: GroupState, a: Assignment, zone: string): string {
@@ -165,30 +166,50 @@ function historyContext(state: GroupState, r: Recipient): HistoryContext {
 
 const withGroup = (text: string, group: NotifyGroup) => `${text} · ${group.name}`;
 
-/** Whether the Member holds another seat at that Event (they can't take a second one). */
-function seatedAt(state: GroupState, memberId: MemberId, eventId: string, exceptAssignmentId: string): boolean {
-  return state.assignments.some(
-    (a) => a.eventId === eventId && a.id !== exceptAssignmentId && a.memberId === memberId && !isOpen(a),
-  );
+/**
+ * Whether the Member already has another job in the group that day (on their own clock):
+ * they aren't asked to cover, as the app doesn't offer them "I'll cover" either.
+ */
+function busyThatDay(state: GroupState, memberId: MemberId, target: Assignment, zone: string): boolean {
+  const event = eventOf(state, target.eventId);
+  if (!event) return false;
+  const day = dateIn(event.startsAt, zone);
+  return state.assignments.some((a) => {
+    if (a.id === target.id || a.memberId !== memberId || isOpen(a)) return false;
+    const other = eventOf(state, a.eventId);
+    return !!other && !other.skipDate && dateIn(other.startsAt, zone) === day;
+  });
 }
 
-/** Qualified Members to ask to Cover: active, with push, not excluded, free at that Event. */
+/** Who to ask to cover: every active Member with push on, not excluded, free that day. */
 function coverCandidates(group: NotifyGroup, profiles: ProfileLookup, a: Assignment, exclude: (MemberId | null)[]): Recipient[] {
   const { state } = group;
-  const queue = state.rotations.find((r) => r.responsibilityId === a.responsibilityId)?.queue ?? [];
   const out: Recipient[] = [];
-  for (const id of queue) {
-    if (exclude.includes(id)) continue;
-    if (!state.settings.allowDoubling && seatedAt(state, id, a.eventId, a.id)) continue;
-    const r = recipientOf(state, profiles, id);
-    if (r && r.profile.notifyCoverageRequests) out.push(r);
+  for (const m of state.members) {
+    if (exclude.includes(m.id)) continue;
+    const r = recipientOf(state, profiles, m.id);
+    if (!r || !r.profile.notifyCoverageRequests) continue;
+    if (busyThatDay(state, m.id, a, zoneOf(r.profile))) continue;
+    out.push(r);
   }
   return out;
 }
 
-function activeAdmins(state: GroupState): Member[] {
-  return state.members.filter((m) => m.isAdmin && m.leftAt === null && m.accountId !== null);
+/** "Grace" from "Grace Hopper". */
+function firstNameOf(state: GroupState, id: MemberId | null | undefined): string | null {
+  const name = id ? state.members.find((m) => m.id === id)?.name.trim() : undefined;
+  return name ? name.split(/s+/)[0] : null;
 }
+
+/** "Grace can't make Greeter on Sun, Nov 29 at 10:00 AM." or "Greeter on ... needs cover." */
+function needsCoverLine(state: GroupState, a: Assignment, zone: string): string {
+  const who = firstNameOf(state, a.coverageRequest?.requestedBy ?? a.turnOf);
+  const note = a.coverageRequest?.note?.trim();
+  const why = note ? `: “${note}”` : '';
+  return who ? `${who} can't make ${seatSentence(state, a, zone)}${why}.` : `${seatSentence(state, a, zone)} needs cover.`;
+}
+
+const FIRST_TAP = "The first to tap \"I'll cover\" takes it.";
 
 // ---------------------------------------------------------------------------
 // Right after a command
@@ -214,10 +235,11 @@ function addedEventIds(entry: HistoryEntry): Set<string> {
 
 /**
  * The notifications a command causes, from its history entries:
- * - a new Coverage Request → its Qualified Members (not the Member who declined, not
- *   anyone already serving at that Event), if they have "Coverage Requests" on;
- * - a Cover → the Member who asked for coverage; a withdrawn Cover → that Member again;
- * - "Mark covered" by a Group Member → that Member, asked to confirm;
+ * - a turn that needs cover → every Member (not whoever can't make it, not anyone with another
+ *   job that day), if they have "Coverage Requests" on: "Can you cover Greeter, Sun, Nov 29?";
+ * - a cover set (volunteered, picked, or found by the person themselves) → whoever couldn't
+ *   make it and the coverer, in the swap sentence Activity shows ("Sam's covering for you on
+ *   Nov 29. You'll take Sam's next turn on Dec 13."); a withdrawn cover → whoever asked;
  * - a confirmation request → the Member asked;
  * - an Assignment moved, reassigned, added (at an existing Event) or removed → the
  *   Members it affects, if they have "Schedule changes" on.
@@ -256,18 +278,27 @@ export function planCommandNotifications(input: CommandInput): NotificationItem[
     };
     const line = (r: Recipient) => describeHistoryEntry(entry, historyContext(state, r)).text;
 
-    for (const change of entry.changes) {
+    // Who heard about a cover in this entry: the swap it makes isn't also a "schedule change".
+    const told = new Set<MemberId>();
+    const swapTurns = new Set(entry.makeUpTurns.filter((c) => c.before === null).map((c) => c.makeUpTurnId));
+    const coveredNow = (c: AssignmentChange) => !!c.before && !!c.after?.coverageRequest?.cover && !c.before.coverageRequest?.cover;
+    const ordered = [...entry.changes.filter(coveredNow), ...entry.changes.filter((c) => !coveredNow(c))];
+
+    for (const change of ordered) {
       const { before, after } = change;
 
-      // A new (or reopened) Coverage Request.
+      // A turn that needs cover (new, or reopened when the coverer can't after all).
       if (after && isOpen(after) && !isOpen(before)) {
         const requester = after.coverageRequest!.requestedBy;
+        const reopenedBy = before?.coverageRequest?.cover?.kind === 'member' ? before.coverageRequest.cover.memberId : null;
         for (const r of coverCandidates(group, profiles, after, [requester, actor])) {
           const zone = zoneOf(r.profile);
-          const reopened = !!before?.coverageRequest?.cover;
+          const why = reopenedBy
+            ? `${firstNameOf(state, reopenedBy) ?? 'Someone'} can't cover ${seatSentence(state, after, zone)} after all.`
+            : needsCoverLine(state, after, zone);
           push(r, 'coverageRequest', after, {
             title: `Can you cover ${seatLabel(state, after, zone)}?`,
-            body: reopened || entry.cause.type !== 'decline' ? `${describeAssignmentChange(change, historyContext(state, r)).text}.` : line(r),
+            body: `${why} ${FIRST_TAP}`,
             url: assignmentUrl(group.id, after.id, 'cover'),
           });
         }
@@ -284,23 +315,27 @@ export function planCommandNotifications(input: CommandInput): NotificationItem[
         continue;
       }
 
-      // Covered: by a Member who volunteered, or marked covered (a Member or a Guest Cover).
-      if (before && isOpen(before) && after?.coverageRequest?.cover) {
-        const requester = recipientOf(state, profiles, before.coverageRequest!.requestedBy);
+      // Covered: someone tapped "I'll cover", was picked, or was found by the person themselves
+      // (a Member, or an outside cover). Told in the swap sentence, from each side.
+      if (coveredNow(change) && after?.coverageRequest?.cover) {
+        const sentence = (r: Recipient) => coverSentence(entry, historyContext(state, r)) ?? line(r);
+        const requesterId = after.coverageRequest.requestedBy;
+        const requester = recipientOf(state, profiles, requesterId);
         if (requester) {
+          told.add(requester.member.id);
           push(requester, 'covered', after, {
             title: `${seatLabel(state, after, zoneOf(requester.profile))} is covered`,
-            body: line(requester),
+            body: sentence(requester),
           });
         }
         const cover = after.coverageRequest.cover;
-        if (cover.kind === 'member' && entry.cause.type === 'markCovered') {
+        if (cover.kind === 'member') {
           const coverer = recipientOf(state, profiles, cover.memberId);
           if (coverer) {
-            const zone = zoneOf(coverer.profile);
+            told.add(coverer.member.id);
             push(coverer, 'askedToConfirmCover', after, {
-              title: `Please confirm: ${seatLabel(state, after, zone)}`,
-              body: `${nameOf(state, actor)} has you down to cover ${seatSentence(state, after, zone)}. Please confirm.`,
+              title: `You're covering ${seatLabel(state, after, zoneOf(coverer.profile))}`,
+              body: sentence(coverer),
             });
           }
         }
@@ -331,11 +366,13 @@ export function planCommandNotifications(input: CommandInput): NotificationItem[
       }
 
       planScheduleChange(change, added, (memberId, a) => {
+        // The swapped turn itself was just told in the cover sentence.
+        if (told.has(memberId) && after?.makeUpTurnId && swapTurns.has(after.makeUpTurnId)) return;
         const r = recipientOf(state, profiles, memberId);
         if (!r || !r.profile.notifyChanges) return;
         const ctx = historyContext(state, r);
         const what = describeAssignmentChange(change, ctx).text;
-        const madeUp = after?.makeUpTurnId && !before?.makeUpTurnId && after.memberId === memberId ? ' (Make-up Turn)' : '';
+        const madeUp = after?.makeUpTurnId && !before?.makeUpTurnId && after.memberId === memberId ? ' (a swapped turn)' : '';
         push(r, 'scheduleChange', a, {
           title: `Schedule change: ${seatLabel(state, a, zoneOf(r.profile))}`,
           body: `${what}${madeUp}. ${line(r)}`,
@@ -416,17 +453,13 @@ export function confirmationRequestsDue(state: GroupState, now: Instant, windowM
  * - **Reminders**: for each of the holder's `reminderDaysBefore`, at `reminderDueAt`, if
  *   that moment passed less than `graceMs` ago. Not for a seat the holder asked to have
  *   covered (it is the coverer's then; a Guest Cover gets none).
- * - **Coverage Request follow-up**: at the Group's "find a replacement by" deadline, once,
- *   to the Qualified Members (as for a new request), unless the request only opened after it.
- * - **Replacement Duty**: once the deadline passes with no taker, to whoever holds it: the
- *   Member who declined (the default; a Placeholder's falls to the Admins) or the Admins
- *   (not the decliner, unless they are the only Admin). Sent even if the job was late. The
- *   Member who declined after the deadline already knows, so isn't told.
- * - **Admin alerts**: at each Admin's `adminAlertLeadTimeMs` before the Event, for each
- *   Assignment that is Unconfirmed or Needs coverage in a Group they administer, once per
- *   Assignment and status (also when it only turns Unconfirmed or Needs coverage later).
- *   Not about the Admin's own seat, and not when the same run already sends them
- *   Replacement Duty for it.
+ * - **"Still needs cover"**: at the old "find a replacement by" moment (the Group's stored
+ *   deadline), once, to every Member free that day (as for a new request), unless the request
+ *   only opened after it. There is no Replacement Duty and there are no Admin alerts any more
+ *   (simplify ticket 07): the group page shows "Needs cover" to everyone.
+ * - **"Coming?"** (headcount Jobs, ticket 09): for the next date of each headcount Job, at the
+ *   same reminder times, every Member who hasn't answered is asked "Coming?" and every Member
+ *   who said Yes is reminded. Those who said No hear nothing. It opens Home (Yes / No there).
  */
 export function planScheduledNotifications(input: ScheduledInput): NotificationItem[] {
   const { profiles, now } = input;
@@ -476,7 +509,6 @@ export function planScheduledNotifications(input: ScheduledInput): NotificationI
         }
       }
 
-      const dutyTo = new Set<string>();
       if (open) {
         const request = a.coverageRequest!;
         const deadline = start - state.settings.replacementDeadlineMs;
@@ -486,64 +518,52 @@ export function planScheduledNotifications(input: ScheduledInput): NotificationI
           if (openedBefore && due(deadline)) {
             for (const r of coverCandidates(group, profiles, a, [request.requestedBy])) {
               const zone = zoneOf(r.profile);
-              const whose = request.requestedBy ? `${nameOf(state, request.requestedBy)}'s` : 'This';
-              add(r, 'coverageFollowUp', a, 'deadline', {
+                            add(r, 'coverageFollowUp', a, 'deadline', {
                 title: `Still needs cover: ${seatLabel(state, a, zone)}`,
-                body: `${whose} ${seatSentence(state, a, zone)} still needs someone. Can you cover?`,
+                body: `${needsCoverLine(state, a, zone)} It still needs cover. ${FIRST_TAP}`,
                 url: assignmentUrl(group.id, a.id, 'cover'),
               });
             }
           }
 
-          // Replacement Duty.
-          const requester = request.requestedBy ? state.members.find((m) => m.id === request.requestedBy) : undefined;
-          const toAdmins = state.settings.replacementDuty === 'admins' || !requester || requester.accountId === null;
-          if (!toAdmins) {
-            const r = recipientOf(state, profiles, requester.id);
-            if (r && openedBefore) {
-              dutyTo.add(r.member.accountId!);
-              add(r, 'replacementDuty', a, 'deadline', {
-                title: `Find a replacement: ${seatLabel(state, a, zoneOf(r.profile))}`,
-                body: 'No one has covered your turn yet. Please find someone and mark it covered.',
-                url: assignmentUrl(group.id, a.id, 'markCovered'),
-              });
-            }
-          } else {
-            const admins = activeAdmins(state);
-            const others = admins.filter((m) => m.id !== request.requestedBy);
-            for (const admin of others.length > 0 ? others : admins) {
-              const r = recipientOf(state, profiles, admin.id);
-              if (!r) continue;
-              dutyTo.add(r.member.accountId!);
-              const whose = request.requestedBy ? `${nameOf(state, request.requestedBy)}'s` : 'The';
-              add(r, 'replacementDuty', a, 'deadline', {
-                title: `Find a replacement: ${seatLabel(state, a, zoneOf(r.profile))}`,
-                body: `No one has covered ${whose} ${seatSentence(state, a, zoneOf(r.profile))} yet. As an Admin, please find someone and mark it covered.`,
-                url: assignmentUrl(group.id, a.id, 'markCovered'),
-              });
-            }
-          }
         }
       }
+    }
 
-      // Admin alerts.
-      for (const admin of activeAdmins(state)) {
-        if (admin.id === a.memberId) continue;
-        const r = recipientOf(state, profiles, admin.id);
-        if (!r || dutyTo.has(r.member.accountId!)) continue;
-        const lead = r.profile.adminAlertLeadTimeMs;
-        if (t < start - lead) continue;
-        const status = open ? 'needsCoverage' : isUnconfirmed(a, event.startsAt, now, lead) ? 'unconfirmed' : null;
-        if (!status) continue;
+    // "Coming?" for the next date of each headcount Job.
+    for (const date of nextHeadcounts(state, now)) {
+      for (const m of state.members) {
+        const r = recipientOf(state, profiles, m.id);
+        if (!r) continue;
+        const answer = answerOf(state, date.eventId, date.responsibilityId, m.id);
+        if (answer === 'no') continue;
         const zone = zoneOf(r.profile);
-        const who = a.memberId ? nameOf(state, a.memberId) : null;
-        add(r, 'adminAlert', a, status, {
-          title: `${status === 'needsCoverage' ? 'Needs coverage' : 'Unconfirmed'}: ${seatLabel(state, a, zone)}`,
-          body:
-            status === 'needsCoverage'
-              ? `${seatSentence(state, a, zone)} still needs someone${who ? ` (${who} can't make it)` : ''}.`
-              : `${who ?? 'Someone'} hasn't confirmed ${seatSentence(state, a, zone)} yet. Nothing is declined automatically.`,
-        });
+        const day = formatDayShort(dateIn(date.startsAt, zone));
+        const time = formatTimeIn(date.startsAt, zone);
+        for (const days of [...new Set(r.profile.reminderDaysBefore)].sort((x, y) => y - x)) {
+          const at = reminderDueAt(date.startsAt, days, r.profile);
+          if (!at || !due(Date.parse(at))) continue;
+          const when = relativeDay(dateIn(date.startsAt, zone), dateIn(now, zone));
+          const offsetKey = `${days}d`;
+          items.push({
+            dedupeKey: `reminder:${group.id}:hc:${date.responsibilityId}:${date.eventId}:${offsetKey}:${m.accountId}`,
+            accountId: m.accountId!,
+            kind: 'reminder',
+            groupId: group.id,
+            groupName: group.name,
+            assignmentId: null,
+            eventId: date.eventId,
+            offsetKey,
+            title: answer === 'yes' ? `${when}: ${date.jobName}` : `Coming? ${date.jobName}, ${day}`,
+            body: withGroup(
+              answer === 'yes'
+                ? `You said you're coming to ${date.jobName} on ${day} at ${time}.`
+                : `${date.jobName} on ${day} at ${time}. Tap to answer Yes or No.`,
+              group,
+            ),
+            url: '/',
+          });
+        }
       }
     }
   }

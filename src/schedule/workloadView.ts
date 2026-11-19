@@ -98,8 +98,8 @@ export function turnsLabel(n: number): string {
 }
 
 /**
- * Outstanding Make-up Turns as sentences: "Ana owes Ben a Make-up Turn: Jan 4 Sound." (the
- * date is the turn it's placed on), with "You" for the viewer.
+ * Outstanding swaps (Make-up Turns) as sentences: "Ana takes Ben's next Sound turn on Jan 4."
+ * (the date is the turn it's placed on), with "You" for the viewer.
  */
 export function makeUpTurnLines(state: GroupState, myMemberId: MemberId | null, timeZone: string): string[] {
   const name = (id: MemberId) =>
@@ -107,15 +107,15 @@ export function makeUpTurnLines(state: GroupState, myMemberId: MemberId | null, 
   return state.makeUpTurns
     .filter((t) => t.status === 'outstanding')
     .map((t) => {
-      const what = state.responsibilities.find((r) => r.id === t.responsibilityId)?.name ?? 'a Responsibility';
+      const what = state.responsibilities.find((r) => r.id === t.responsibilityId)?.name ?? 'a job';
       const paying = state.assignments.find((a) => a.makeUpTurnId === t.id);
       const event = paying && state.events.find((e) => e.id === paying.eventId);
       const debtor = name(t.debtorId);
       const creditor = name(t.creditorId);
-      const owes = debtor === 'You' ? 'owe' : 'owes';
-      const target = creditor === 'You' ? 'you' : creditor;
-      const when = event ? `: ${formatMonthDay(dateIn(event.startsAt, timeZone))} ${what}` : ` (${what})`;
-      return `${debtor} ${owes} ${target} a Make-up Turn${when}.`;
+      const takes = debtor === 'You' ? 'take' : 'takes';
+      const whose = creditor === 'You' ? 'your' : `${creditor}'s`;
+      const when = event ? ` on ${formatMonthDay(dateIn(event.startsAt, timeZone))}` : '';
+      return `${debtor} ${takes} ${whose} next ${what} turn${when}.`;
     });
 }
 

@@ -8,9 +8,9 @@ import {
   findEvent,
   findMember,
   findResponsibility,
+  headcountsNeeded,
   initialConfirmation,
   isActiveMember,
-  isAdmin,
   isPinned,
   isQualified,
   nextId,
@@ -28,9 +28,11 @@ import type {
   Command,
   CommandContext,
   CommandResult,
+  CoverTarget,
   Event,
   EventSeriesChanges,
   GroupState,
+  HeadcountAnswer,
   HistoryEntry,
   Instant,
   MakeUpTurn,
@@ -47,6 +49,8 @@ import type {
 export const MAX_SKIP_REASON = 300;
 /** The longest Decline reason accepted (stored as the Coverage Request's `note`). */
 export const MAX_DECLINE_REASON = 300;
+/** The longest name of an outside cover (someone not in the Group) accepted. */
+export const MAX_GUEST_NAME = 80;
 
 type Outcome = { ok: true; state: GroupState } | { ok: false; reason: RejectionReason; message: string };
 
@@ -81,6 +85,11 @@ export function applyCommand(state: GroupState, command: Command, context: Comma
   if (denied) return denied;
   const outcome = handle(before, command, ctx);
   if (!outcome.ok) return outcome;
+  if (command.type === 'answerHeadcount') {
+    // A "Coming?" answer touches no seat: nothing to reschedule and no history entry (the
+    // answer itself records who gave it and when).
+    return { ok: true, state: outcome.state, changes: [], history };
+  }
   const after = schedule(outcome.state, before.events, now);
   if (command.type === 'withdrawDecline') {
     const lost = seatLost(before, after, command.assignmentId);
@@ -131,44 +140,42 @@ function isHistory(state: GroupState, a: Assignment, now: Instant): boolean {
 
 /**
  * Who may run what. The system (`actorId: null`) may do anything. Otherwise the actor
- * must be an active Member (or be joining: adding themselves). Admins may do
- * everything. Members may manage their own Time Off, name and membership, add and
- * remove Skip Dates, and act on Assignments (confirm, Decline, Cover, mark covered),
- * whose finer rules each command checks against the Assignment.
+ * must be an active Member (or be joining: adding themselves, as a plain Member who may
+ * be put in every Rotation). There are no Admins for now: the `isAdmin` flag is kept but
+ * grants nothing extra, so every active Member may run every Group-wide command (Jobs,
+ * Group dates off, settings, adding Stand-ins, picking someone for a turn). What concerns
+ * one person (their Time Off, name, membership, a Decline without a Cover, confirming) is
+ * theirs to do, or anyone's for a Stand-in (a Placeholder Member, who has no account to
+ * act with); see `actsFor`. Assignment commands check those rules themselves.
  */
 function permissionError(state: GroupState, command: Command, ctx: Context): Rejection | null {
   const actor = ctx.actorId;
   if (actor === null) return null;
   if (command.type === 'addMember' && command.member.id === actor && !findMember(state, actor)) {
-    const joining = command.member.accountId && !command.member.isAdmin && !command.qualifiedFor?.length;
-    return joining ? null : reject('notPermitted', 'Members join as plain Members; an Admin sets the rest');
+    const joining = command.member.accountId && !command.member.isAdmin;
+    return joining ? null : reject('notPermitted', 'Members join as plain Members');
   }
   if (!isActiveMember(state, actor)) return reject('notPermitted', 'Only active Members of the Group can do this');
-  if (isAdmin(state, actor)) return null;
 
-  const own = (memberId: MemberId | undefined, what: string) =>
-    memberId === undefined || memberId === actor ? null : reject('notPermitted', `Members can only ${what}`);
+  const forMember = (memberId: MemberId | undefined, what: string) =>
+    memberId === undefined || actsFor(state, ctx, memberId)
+      ? null
+      : reject('notPermitted', `Members can only ${what} (or a Stand-in's)`);
   switch (command.type) {
-    case 'addSkipDate':
-    case 'removeSkipDate':
-    case 'confirm':
-    case 'decline':
-    case 'withdrawDecline':
-    case 'cover':
-    case 'markCovered':
-      return null;
     case 'addTimeOff':
-      return own(command.timeOff.memberId, 'add their own Time Off');
+      return forMember(command.timeOff.memberId, 'add their own Time Off');
     case 'removeTimeOff':
-      return own(state.timeOff.find((t) => t.id === command.timeOffId)?.memberId, 'remove their own Time Off');
+      return forMember(state.timeOff.find((t) => t.id === command.timeOffId)?.memberId, 'remove their own Time Off');
     case 'renameMember':
-      return own(command.memberId, 'rename themselves');
+      return forMember(command.memberId, 'rename themselves');
     case 'removeMember':
-      return own(command.memberId, 'leave the Group themselves');
+      return forMember(command.memberId, 'leave the Group themselves');
     case 'claimPlaceholder':
-      return own(command.memberId, 'claim their own Placeholder');
+      return command.memberId === actor ? null : reject('notPermitted', 'Members can only claim their own Stand-in');
+    case 'answerHeadcount':
+      return forMember(command.memberId, 'answer for themselves');
     default:
-      return reject('notPermitted', 'Admins only');
+      return null;
   }
 }
 
@@ -191,11 +198,13 @@ function handle(state: GroupState, command: Command, ctx: Context): Outcome {
     case 'confirm':
       return confirm(state, command.assignmentId, ctx);
     case 'decline':
-      return decline(state, command.assignmentId, command.reason ?? null, ctx);
+      return decline(state, command, ctx);
     case 'withdrawDecline':
       return withdrawDecline(state, command.assignmentId, ctx);
     case 'cover':
       return cover(state, command.assignmentId, ctx);
+    case 'answerHeadcount':
+      return answerHeadcount(state, command, ctx);
     case 'markCovered':
       return markCovered(state, command, ctx);
     case 'changeSettings':
@@ -259,7 +268,11 @@ function addEvents(state: GroupState, events: NewEvent[]): Outcome {
 
 /** Removes future Events. Their Assignments are reconciled away by the schedule step. */
 function withoutEvents(state: GroupState, eventIds: Set<string>): GroupState {
-  return { ...state, events: state.events.filter((e) => !eventIds.has(e.id)) };
+  return {
+    ...state,
+    events: state.events.filter((e) => !eventIds.has(e.id)),
+    headcountAnswers: state.headcountAnswers.filter((a) => !eventIds.has(a.eventId)),
+  };
 }
 
 function removeEvent(state: GroupState, eventId: string, ctx: Context): Outcome {
@@ -441,6 +454,37 @@ function removeTimeOff(state: GroupState, timeOffId: string, ctx: Context): Outc
 }
 
 // ---------------------------------------------------------------------------
+// Headcount answers
+
+/**
+ * "Coming?" Yes / No for one future date of a headcount Job. The date must still need the Job
+ * (not a group date off), and the Member must be active. One answer per Member and date:
+ * a new answer replaces the old one in place.
+ */
+function answerHeadcount(state: GroupState, command: Extract<Command, { type: 'answerHeadcount' }>, ctx: Context): Outcome {
+  const { eventId, responsibilityId, memberId, answer } = command;
+  if (answer !== 'yes' && answer !== 'no') return reject('invalid', 'Answer Yes or No');
+  const event = findEvent(state, eventId);
+  if (!event) return reject('notFound', `No Event ${eventId}`);
+  if (isPast(event, ctx.now)) return reject('eventHasPassed', 'The Event has already started');
+  const job = findActiveResponsibility(state, responsibilityId);
+  if (!job || job.kind !== 'headcount') return reject('notFound', 'No such headcount Job');
+  if (!headcountsNeeded(state, event).some((r) => r.id === responsibilityId)) {
+    return reject('invalid', 'That date does not need this Job');
+  }
+  if (!isActiveMember(state, memberId)) return reject('notFound', 'No such Member');
+  const given: HeadcountAnswer = { eventId, responsibilityId, memberId, answer, answeredBy: ctx.actorId, answeredAt: ctx.now };
+  const same = (a: HeadcountAnswer) => a.eventId === eventId && a.responsibilityId === responsibilityId && a.memberId === memberId;
+  const existing = state.headcountAnswers.some(same);
+  return done({
+    ...state,
+    headcountAnswers: existing
+      ? state.headcountAnswers.map((a) => (same(a) ? given : a))
+      : [...state.headcountAnswers, given],
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Confirmation, Decline and Cover
 
 type Found = { ok: true; assignment: Assignment } | { ok: false; reason: RejectionReason; message: string };
@@ -482,13 +526,29 @@ function confirm(state: GroupState, assignmentId: string, ctx: Context): Outcome
   return done(updateAssignment(state, assignmentId, (a) => ({ ...a, confirmation: 'confirmed' })));
 }
 
-function decline(state: GroupState, assignmentId: string, rawReason: string | null, ctx: Context): Outcome {
+/**
+ * "Can't make it". Without `coveredBy` it opens a Coverage Request: the group is asked and the
+ * first volunteer takes it. Only the holder may do that, or anyone for a Stand-in (the request's
+ * asker is then the Stand-in). With `coveredBy` the turn goes straight to that cover, in one
+ * step and one history entry ("I'll find someone to cover", or "Pick someone to do it" on
+ * anyone's turn): a Member cover is a swap as for any Cover, and an outside cover (a name)
+ * creates none. Any active Member may name a cover.
+ */
+function decline(state: GroupState, command: Extract<Command, { type: 'decline' }>, ctx: Context): Outcome {
+  const { assignmentId, coveredBy } = command;
   const found = futureAssignment(state, assignmentId, ctx);
   if (!found.ok) return found;
   const { assignment } = found;
   const request = assignment.coverageRequest;
-  const note = rawReason?.trim() || null;
+  const note = command.reason?.trim() || null;
   if (note !== null && note.length > MAX_DECLINE_REASON) return reject('invalid', 'The reason is too long');
+
+  if (coveredBy) {
+    if (request) return reject('alreadyNeedsCoverage', 'The Assignment already needs coverage; mark it covered instead');
+    if (assignment.memberId === null) return reject('invalid', 'No one holds this Assignment');
+    const opened = openRequest(state, assignment, note, ctx);
+    return coverWith(opened, assignmentId, coveredBy, ctx);
+  }
 
   if (request?.cover) {
     // Declining a Cover withdraws it: the Coverage Request opens again, keeping the
@@ -502,16 +562,18 @@ function decline(state: GroupState, assignmentId: string, rawReason: string | nu
   if (request) return reject('alreadyNeedsCoverage', 'The Assignment already needs coverage');
   if (assignment.memberId === null) return reject('invalid', 'No one holds this Assignment');
   if (!actsFor(state, ctx, assignment.memberId)) return reject('notPermitted', 'Only the assigned Member can decline');
+  return done(openRequest(state, assignment, note, ctx));
+}
 
-  let next = updateAssignment(state, assignmentId, (a) => ({
+/** Turns the holder's seat into an open Coverage Request asked by the holder. */
+function openRequest(state: GroupState, assignment: Assignment, note: string | null, ctx: Context): GroupState {
+  const next = updateAssignment(state, assignment.id, (a) => ({
     ...a,
     coverageRequest: { reason: 'declined', requestedBy: a.memberId, requestedAt: ctx.now, note, cover: null },
   }));
   // Declining a Make-up Turn settles it; whoever covers is owed instead.
-  if (assignment.makeUpTurnId) {
-    next = closeMakeUpTurns(next, (t) => t.id === assignment.makeUpTurnId, 'settled', 'movedAlong', ctx.now);
-  }
-  return done(next);
+  if (!assignment.makeUpTurnId) return next;
+  return closeMakeUpTurns(next, (t) => t.id === assignment.makeUpTurnId, 'settled', 'movedAlong', ctx.now);
 }
 
 /**
@@ -542,9 +604,8 @@ function withdrawDecline(state: GroupState, assignmentId: string, ctx: Context):
   const memberId = request.requestedBy;
   const member = findMember(state, memberId);
   const self = ctx.actorId === memberId;
-  const forPlaceholder = ctx.actorId === null || (isAdmin(state, ctx.actorId) && member?.accountId === null);
-  if (!self && !forPlaceholder) return reject('notPermitted', 'Only the Member who declined can take it back');
-  if (!isActiveMember(state, memberId)) return reject('notFound', 'No such Member');
+  if (!member || member.leftAt) return reject('notFound', 'No such Member');
+  if (!actsFor(state, ctx, memberId)) return reject('notPermitted', 'Only the Member who declined can take it back');
 
   const responsibility = findResponsibility(state, assignment.responsibilityId);
   const confirmation = !responsibility?.requiresConfirmation ? 'notRequired' : self ? 'confirmed' : 'requested';
@@ -612,16 +673,25 @@ function markCovered(state: GroupState, command: Extract<Command, { type: 'markC
   const request = assignment.coverageRequest;
   if (!request) return reject('noCoverageRequest', 'The Assignment is not a Coverage Request');
   if (request.cover) return reject('alreadyCovered', 'Someone already covered this Assignment');
-  const holdsDuty =
-    ctx.actorId === null ||
-    isAdmin(state, ctx.actorId) ||
-    (state.settings.replacementDuty === 'assignedMember' && ctx.actorId === request.requestedBy);
-  if (!holdsDuty) return reject('notPermitted', 'Only the holder of Replacement Duty can mark this covered');
+  // No Admins for now: any active Member (checked by permissionError) may pick the cover.
+  return coverWith(state, assignment.id, command.by, ctx);
+}
+
+/**
+ * Covers an open Coverage Request with the given Member (a swap: a Make-up Turn, as for any
+ * Cover) or an outside cover: a typed name of someone not in the Group, who holds the seat
+ * once (`memberId: null`, no Make-up Turn, since they have no turns to swap).
+ */
+function coverWith(state: GroupState, assignmentId: string, by: CoverTarget, ctx: Context): Outcome {
+  const assignment = state.assignments.find((a) => a.id === assignmentId);
+  const request = assignment?.coverageRequest;
+  if (!assignment || !request) return reject('noCoverageRequest', 'The Assignment is not a Coverage Request');
   const arrangedBy = ctx.actorId ?? request.requestedBy ?? 'system';
 
-  if ('guestName' in command.by) {
-    const guestName = command.by.guestName.trim();
-    if (!guestName) return reject('invalid', 'A Guest Cover needs a name');
+  if ('guestName' in by) {
+    const guestName = by.guestName.trim();
+    if (!guestName) return reject('invalid', 'An outside cover needs a name');
+    if (guestName.length > MAX_GUEST_NAME) return reject('invalid', 'The name is too long');
     return done(
       updateAssignment(state, assignment.id, (a) => ({
         ...a,
@@ -632,7 +702,7 @@ function markCovered(state: GroupState, command: Extract<Command, { type: 'markC
     );
   }
 
-  const memberId = command.by.memberId;
+  const memberId = by.memberId;
   if (!isActiveMember(state, memberId)) return reject('notFound', 'No such Member');
   if (memberId === request.requestedBy) return reject('invalid', 'The Member who asked for coverage cannot cover it');
   const conflict = seatConflict(state, assignment, memberId);
@@ -716,9 +786,20 @@ function closeMakeUpTurns(
   };
 }
 
-/** Whether the actor may act on behalf of this Member: themselves, an Admin, or the system. */
+/**
+ * Whether the actor may act on behalf of this Member: the system, the Member themselves, or
+ * any active Member for a Stand-in (a Placeholder Member: no account, so others act for them).
+ */
 function actsFor(state: GroupState, ctx: Context, memberId: MemberId | null): boolean {
-  return ctx.actorId === null || (memberId !== null && ctx.actorId === memberId) || isAdmin(state, ctx.actorId);
+  if (ctx.actorId === null) return true;
+  if (memberId === null) return false;
+  return ctx.actorId === memberId || (isActiveMember(state, ctx.actorId) && isStandIn(state, memberId));
+}
+
+/** A Placeholder Member still in the Group: in the Rotations like anyone, but not on the app. */
+function isStandIn(state: GroupState, memberId: MemberId): boolean {
+  const member = findMember(state, memberId);
+  return member !== undefined && member.leftAt === null && member.accountId === null;
 }
 
 // ---------------------------------------------------------------------------
@@ -764,7 +845,10 @@ function addMember(state: GroupState, command: Extract<Command, { type: 'addMemb
 
 function qualifyMember(state: GroupState, memberId: string, responsibilityId: string): Outcome {
   if (!isActiveMember(state, memberId)) return reject('notFound', 'No such Member');
-  if (!findActiveResponsibility(state, responsibilityId)) return reject('notFound', 'No such Responsibility');
+  const job = findActiveResponsibility(state, responsibilityId);
+  if (!job) return reject('notFound', 'No such Responsibility');
+  // A headcount Job has no Rotation: everyone in the Group is asked "Coming?".
+  if (job.kind === 'headcount') return done(state);
   return done(withRotation(state, appendToQueue(rotationOf(state, responsibilityId), memberId)));
 }
 
@@ -796,9 +880,6 @@ function unqualifyMember(state: GroupState, memberId: string, responsibilityId: 
 function removeMember(state: GroupState, memberId: string, ctx: Context): Outcome {
   const member = findMember(state, memberId);
   if (!member || member.leftAt) return reject('notFound', 'No such Member');
-  if (isLastAdmin(state, memberId)) {
-    return reject('lastAdmin', 'The last Admin cannot leave or be removed; appoint another Admin first');
-  }
 
   let next: GroupState = {
     ...state,
@@ -863,6 +944,9 @@ function setAdmin(state: GroupState, memberId: string, value: boolean): Outcome 
 
 function responsibilityChangesError(changes: ResponsibilityChanges): Outcome | null {
   if (changes.name !== undefined && changes.name.trim() === '') return reject('invalid', 'A name is needed');
+  if (changes.kind !== undefined && changes.kind !== 'turns' && changes.kind !== 'headcount') {
+    return reject('invalid', 'A Job takes turns or is a headcount');
+  }
   if (changes.headcount !== undefined && (!Number.isInteger(changes.headcount) || changes.headcount < 1)) {
     return reject('invalid', 'Headcount must be a whole number of at least 1');
   }
@@ -902,10 +986,23 @@ function editResponsibility(state: GroupState, id: string, changes: Responsibili
   const updated = {
     ...current,
     name: changes.name?.trim() ?? current.name,
+    kind: changes.kind ?? current.kind,
     headcount: changes.headcount ?? current.headcount,
     requiresConfirmation: changes.requiresConfirmation ?? current.requiresConfirmation,
   };
   let next: GroupState = { ...state, responsibilities: state.responsibilities.map((r) => (r.id === id ? updated : r)) };
+  if (updated.kind !== current.kind) {
+    if (updated.kind === 'headcount') {
+      // No more turns: the Rotation empties, its future seats go (the schedule step) and so
+      // do the swaps owed in it.
+      next = withRotation(next, withQueueOrder(rotationOf(next, id), []));
+      next = closeMakeUpTurns(next, (t) => t.responsibilityId === id, 'cancelled', 'responsibilityRemoved', ctx.now);
+    } else {
+      // Everyone does every Job: the whole Group takes turns, in join order.
+      const everyone = next.members.filter((m) => m.leftAt === null).map((m) => m.id);
+      next = withRotation(next, withQueueOrder(rotationOf(next, id), everyone));
+    }
+  }
   if (updated.requiresConfirmation !== current.requiresConfirmation) {
     next = {
       ...next,

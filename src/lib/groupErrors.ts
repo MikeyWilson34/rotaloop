@@ -5,8 +5,7 @@
 import type { GroupCommandFailure } from '../db/protocol';
 
 /**
- * What the person was trying to do, for messages that depend on it (mostly `lastAdmin`,
- * which the engine uses for stepping down, leaving and being removed alike).
+ * What the person was trying to do, for messages that depend on it, such as `invalid` and `notFound`.
  */
 export type GroupAction =
   | 'leave'
@@ -41,99 +40,83 @@ export type GroupAction =
   | 'removeTimeOff'
   | 'addSkipDate'
   | 'removeSkipDate'
+  /** "Coming?" Yes / No for a headcount job (simplify ticket 09). */
+  | 'answerHeadcount'
   | 'other';
 
-const LAST_ADMIN: Record<GroupAction, string> = {
-  leave: "You're the only Admin, so you can't leave yet. Make someone else an Admin first.",
-  stepDown: "You're the only Admin, so you can't step down yet. Make someone else an Admin first.",
-  removeMember: "That's the group's only Admin. Make someone else an Admin first.",
-  appointAdmin: 'The group needs at least one Admin. Make someone else an Admin first.',
-  rename: 'The group needs at least one Admin. Make someone else an Admin first.',
-  addPlaceholder: 'The group needs at least one Admin. Make someone else an Admin first.',
-  join: 'The group needs at least one Admin. Make someone else an Admin first.',
-  createGroup: 'The group needs at least one Admin.',
-  saveResponsibility: 'The group needs at least one Admin. Make someone else an Admin first.',
-  removeResponsibility: 'The group needs at least one Admin. Make someone else an Admin first.',
-  qualify: 'The group needs at least one Admin. Make someone else an Admin first.',
-  reorder: 'The group needs at least one Admin. Make someone else an Admin first.',
-  rebalance: 'The group needs at least one Admin. Make someone else an Admin first.',
-  saveSeries: 'The group needs at least one Admin. Make someone else an Admin first.',
-  removeSeries: 'The group needs at least one Admin. Make someone else an Admin first.',
-  addEvent: 'The group needs at least one Admin. Make someone else an Admin first.',
-  removeEvent: 'The group needs at least one Admin. Make someone else an Admin first.',
-  changeSettings: 'The group needs at least one Admin. Make someone else an Admin first.',
-  groupDetails: 'The group needs at least one Admin. Make someone else an Admin first.',
-  confirm: 'The group needs at least one Admin. Make someone else an Admin first.',
-  decline: 'The group needs at least one Admin. Make someone else an Admin first.',
-  cover: 'The group needs at least one Admin. Make someone else an Admin first.',
-  markCovered: 'The group needs at least one Admin. Make someone else an Admin first.',
-  withdrawDecline: 'The group needs at least one Admin. Make someone else an Admin first.',
-  addTimeOff: 'The group needs at least one Admin. Make someone else an Admin first.',
-  removeTimeOff: 'The group needs at least one Admin. Make someone else an Admin first.',
-  addSkipDate: 'The group needs at least one Admin. Make someone else an Admin first.',
-  removeSkipDate: 'The group needs at least one Admin. Make someone else an Admin first.',
-  other:'The group needs at least one Admin. Make someone else an Admin first.',
-};
+/**
+ * `lastAdmin`: the engine still keeps one Admin per Group, though the app has no Admins for
+ * now (docs/adr/0006-members-only.md), so nothing in the UI should reach this.
+ */
+const LAST_ADMIN = "That can't be changed right now. Pull down to refresh, then try again.";
 
 const INVALID: Partial<Record<GroupAction, string>> = {
-  appointAdmin: "They haven't joined yet. Send them their personal invite link, then make them an Admin.",
+  appointAdmin: "They haven't joined yet. Send them their personal invite link first.",
   rename: 'Enter a name.',
   addPlaceholder: 'Enter a name.',
   createGroup: 'Check the group name and time zone, then try again.',
-  saveResponsibility: 'Check the name and how many people each Event needs, then try again.',
+  saveResponsibility: 'Check the job name, then try again.',
   reorder: 'The list changed while you were editing. Pull down to refresh, then try again.',
-  saveSeries: 'Check the days, time, start date and Responsibilities, then try again.',
-  addEvent: 'Check the date and time. A one-off Event needs at least one Responsibility.',
-  removeEvent: 'Only one-off Events can be removed. To skip one Event of a series, add a Skip Date.',
+  saveSeries: 'Check the days, time and start date, then try again.',
+  addEvent: 'Check the date and time, then try again.',
+  removeEvent: "Only one-off dates can be removed. To skip one date of a repeating job, add it to the group's dates off.",
   changeSettings: "That setting isn't available. Pull down to refresh, then try again.",
   groupDetails: 'Check the group name and time zone, then try again.',
   addTimeOff: 'Check the days you picked, then try again.',
   decline: 'Keep the reason under 300 characters, then try again.',
-  addSkipDate: "That Event is already a Skip Date, or the reason is too long. Pull down to refresh, then try again.",
+  addSkipDate: "That date is already off, or the reason is too long. Pull down to refresh, then try again.",
 };
 
 const NOT_FOUND: Partial<Record<GroupAction, string>> = {
-  saveResponsibility: "That Responsibility isn't in the group anymore. Pull down to refresh.",
-  removeResponsibility: "That Responsibility isn't in the group anymore. Pull down to refresh.",
-  qualify: "That person or Responsibility isn't in the group anymore. Pull down to refresh.",
-  rebalance: "That Responsibility isn't in the group anymore. Pull down to refresh.",
-  saveSeries: "That Event Series or one of its Responsibilities isn't in the group anymore. Pull down to refresh.",
-  removeSeries: "That Event Series isn't in the group anymore. Pull down to refresh.",
-  removeEvent: "That Event isn't on the schedule anymore. Pull down to refresh.",
-  removeTimeOff: 'That Time Off was already removed. Pull down to refresh.',
-  addSkipDate: "That Event isn't on the schedule anymore. Pull down to refresh.",
-  removeSkipDate: "That Skip Date was already removed. Pull down to refresh.",
+  saveResponsibility: "That job isn't in the group anymore. Pull down to refresh.",
+  removeResponsibility: "That job isn't in the group anymore. Pull down to refresh.",
+  qualify: "That person or job isn't in the group anymore. Pull down to refresh.",
+  rebalance: "That job isn't in the group anymore. Pull down to refresh.",
+  saveSeries: "That job isn't in the group anymore. Pull down to refresh.",
+  removeSeries: "That job isn't in the group anymore. Pull down to refresh.",
+  removeEvent: "That date isn't on the schedule anymore. Pull down to refresh.",
+  removeTimeOff: 'Those dates off were already removed. Pull down to refresh.',
+  addSkipDate: "That date isn't on the schedule anymore. Pull down to refresh.",
+  removeSkipDate: 'Those dates off were already removed. Pull down to refresh.',
 };
 
-/** Assignment actions (ticket 09): messages that replace the general ones for that action. */
+/** The cover flow's actions (simplify ticket 07): messages that replace the general ones for that action. */
 const ASSIGNMENT: Partial<Record<GroupAction, Partial<Record<string, string>>>> = {
   confirm: {
-    notPermitted: "Only the person assigned can confirm this. Pull down to refresh.",
-    alreadyNeedsCoverage: "You've already said you can't make it, so this needs coverage now.",
+    notPermitted: "Only the person whose turn it is can confirm this. Pull down to refresh.",
+    alreadyNeedsCoverage: "You've already said you can't make it, so this needs cover now.",
   },
   decline: {
-    notPermitted: "Only the person assigned can say they can't make it. Pull down to refresh.",
-    alreadyNeedsCoverage: 'This already needs coverage. Qualified Members have been asked.',
-    invalid: 'No one holds this Assignment anymore. Pull down to refresh.',
+    notPermitted: "Only the person whose turn it is can say they can't make it. Pull down to refresh.",
+    alreadyNeedsCoverage: 'This already needs cover. The group has been asked.',
+    alreadyAssignedAtEvent: 'They already have another job then. Pick someone else.',
+    invalid: "Enter their name, or pick someone other than the person who can't make it.",
+    notFound: "That person isn't in the group anymore. Pick someone else.",
   },
   cover: {
-    notPermitted: 'Only Members of this group can cover.',
-    notQualified: "Only Qualified Members for this Responsibility can cover it. Ask an Admin to add you.",
-    noCoverageRequest: "This doesn't need coverage anymore. Pull down to refresh.",
-    alreadyAssignedAtEvent: "You already have an Assignment at this Event, so you can't cover this one too.",
-    invalid: "You asked for coverage on this one, so you can't cover it yourself.",
+    notPermitted: 'Only people in this group can cover.',
+    notQualified: "You're not in the turns for this job, so you can't cover it.",
+    noCoverageRequest: "This doesn't need cover anymore. Pull down to refresh.",
+    alreadyAssignedAtEvent: "You already have another job then, so you can't cover this one too.",
+    invalid: "You can't make this one, so you can't cover it yourself.",
   },
   withdrawDecline: {
     alreadyCovered: 'Someone already covered this, so it’s theirs now. Pull down to refresh.',
     noCoverageRequest: "You're already back on this one. Pull down to refresh.",
     notPermitted: 'Only the person who said they can’t make it can take it back.',
-    invalid:
-      'The Rotation changed since you said you can’t make it, so this turn has moved on. Ask an Admin, or cover someone else’s turn.',
+    invalid: 'The turns changed since you said you can’t make it, so this one has moved on. Cover someone else’s turn instead.',
+  },
+  answerHeadcount: {
+    notPermitted: "You can only answer for yourself, or for someone who isn't on the app.",
+    eventHasPassed: 'That date has already started, so the answers are closed.',
+    notFound: "That date or job isn't in the group anymore. Pull down to refresh.",
+    invalid: "That date doesn't need this job anymore. Pull down to refresh.",
   },
   markCovered: {
-    notPermitted: 'Only whoever is finding a replacement, or an Admin, can mark this covered.',
-    noCoverageRequest: "This doesn't need coverage anymore. Pull down to refresh.",
-    invalid: "Enter the guest's name, or pick someone other than the person who can't make it.",
+    notPermitted: 'Only people in this group can say who is covering.',
+    noCoverageRequest: "This doesn't need cover anymore. Pull down to refresh.",
+    alreadyAssignedAtEvent: 'They already have another job then. Pick someone else.',
+    invalid: "Enter their name, or pick someone other than the person who can't make it.",
     notFound: "That person isn't in the group anymore. Pick someone else.",
   },
 };
@@ -143,9 +126,9 @@ export function groupCommandMessage(reason: GroupCommandFailure | string, action
   if (specific) return specific;
   switch (reason) {
     case 'lastAdmin':
-      return LAST_ADMIN[action];
+      return LAST_ADMIN;
     case 'notPermitted':
-      return 'Only Admins can do that. Ask an Admin of this group.';
+      return "You can't change that. Pull down to refresh, then try again.";
     case 'notFound':
       if (action === 'join') return "That invite link isn't working. Ask for a new one.";
       return NOT_FOUND[action] ?? "That person or item isn't in the group anymore. Pull down to refresh.";
@@ -154,25 +137,25 @@ export function groupCommandMessage(reason: GroupCommandFailure | string, action
     case 'invalidRequest':
       return INVALID[action] ?? "Something in that request wasn't right. Check it and try again.";
     case 'eventHasPassed':
-      return 'That Event has already happened, so it can no longer change.';
+      return 'That date has already passed, so it can no longer change.';
     case 'alreadyCovered':
       return 'Someone else already covered that.';
     case 'notQualified':
-      return "That person isn't a Qualified Member for this Responsibility.";
+      return "That person isn't in the turns for this job.";
     case 'noCoverageRequest':
-      return 'There is no Coverage Request for that Assignment anymore.';
+      return "That turn doesn't need cover anymore.";
     case 'alreadyNeedsCoverage':
-      return 'That Assignment already needs coverage.';
+      return 'That turn already needs cover.';
     case 'alreadyAssignedAtEvent':
-      return 'That person already has an Assignment at this Event.';
+      return 'That person already has a turn then.';
     case 'unauthenticated':
       return 'Your session has ended. Close and reopen the app, then try again.';
     case 'notMember':
-      return "You're no longer a Member of this group.";
+      return "You're no longer in this group.";
     case 'invalidInvite':
       return "That invite link isn't working. It may have been reset or already used: ask for a new one.";
     case 'alreadyMember':
-      return "You're already a Member of this group.";
+      return "You're already in this group.";
     case 'conflict':
       return 'Others were changing the group at the same moment. Please try again.';
     case 'serverError':

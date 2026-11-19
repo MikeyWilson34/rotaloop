@@ -277,7 +277,7 @@ export function timeOffPreview(plan: TimeOffPlan, now: Instant, viewerTimeZone: 
       if (same) continue;
       const event = eventOf(before, was.eventId);
       if (!event) continue;
-      const responsibility = before.responsibilities.find((r) => r.id === was.responsibilityId)?.name ?? 'Responsibility';
+      const responsibility = before.responsibilities.find((r) => r.id === was.responsibilityId)?.name ?? 'Job';
       const title = `${responsibility}, ${formatDayShort(dateIn(event.startsAt, viewerTimeZone))}`;
       const line = { key: `${group.id}/${was.id}`, groupId: group.id, groupName: group.name, startsAt: event.startsAt, title };
       const now_ = c.after;
@@ -326,11 +326,11 @@ export function timeOffPreview(plan: TimeOffPlan, now: Instant, viewerTimeZone: 
 export function savedToast(preview: TimeOffPreview): string {
   const routed = preview.lines.filter((l) => l.kind !== 'coverage').length;
   const requests = preview.lines.length - routed;
-  if (routed === 0 && requests === 0) return 'Time Off saved. We’ll schedule around it.';
+  if (routed === 0 && requests === 0) return 'Dates off saved. We’ll schedule around it.';
   const parts: string[] = [];
   if (routed) parts.push(`Routed around ${routed} ${routed === 1 ? 'Assignment' : 'Assignments'}`);
   if (requests) parts.push(`${requests} ${requests === 1 ? 'Coverage Request' : 'Coverage Requests'} sent`);
-  return `Time Off saved. ${parts.join('; ')}.`;
+  return `Dates off saved. ${parts.join('; ')}.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -414,7 +414,7 @@ export function timeOffItems(groups: TimeOffGroup[], now: Instant): TimeOffItem[
     const allScope = all.some((x) => x.timeOff.responsibilityIds === null);
     const groupNames = [...new Set(all.map((x) => x.group.name))];
     const detail = [
-      allScope || scopeNames.length === 0 ? 'All Responsibilities' : scopeNames.join(', '),
+      allScope || scopeNames.length === 0 ? 'All jobs' : scopeNames.join(', '),
       groups.length > 1 ? groupNames.join(', ') : '',
       sample.note ?? '',
     ]

@@ -14,6 +14,7 @@ import type {
   GroupState,
   HistoryEntry,
   Instant,
+  MakeUpTurn,
   MakeUpTurnChange,
   MemberId,
 } from '../engine/types';
@@ -55,11 +56,11 @@ function actorName(ctx: HistoryContext, actorId: MemberId | null): string {
 }
 
 function responsibilityName(ctx: HistoryContext, id: string | null | undefined): string {
-  return ctx.state.responsibilities.find((r) => r.id === id)?.name ?? 'a Responsibility';
+  return ctx.state.responsibilities.find((r) => r.id === id)?.name ?? 'a job';
 }
 
 function seriesName(ctx: HistoryContext, id: string): string {
-  return ctx.state.eventSeries.find((s) => s.id === id)?.name ?? 'an Event Series';
+  return ctx.state.eventSeries.find((s) => s.id === id)?.name ?? 'a job';
 }
 
 function eventDate(ctx: HistoryContext, eventId: string | null | undefined, short = true): string | null {
@@ -90,19 +91,15 @@ const object = (name: string) => (name === 'You' ? 'you' : name);
 // ---------------------------------------------------------------------------
 // Settings
 
-const POLICY = { payItBack: 'Pay It Back', countRealWork: 'Count Real Work' } as const;
 const TIME_OFF = { routeAround: 'Route around', askVolunteer: 'Ask for a volunteer' } as const;
-const DUTY = { assignedMember: 'Assigned Member', admins: 'Admins' } as const;
 
 function settingPhrases(settings: Partial<GroupSettings>): string[] {
   const out: string[] = [];
-  if (settings.coveragePolicy) out.push(`the Coverage Policy to ${POLICY[settings.coveragePolicy]}`);
-  if (settings.timeOffHandling) out.push(`Time Off handling to ${TIME_OFF[settings.timeOffHandling]}`);
-  if (settings.replacementDuty) out.push(`Replacement Duty to ${DUTY[settings.replacementDuty]}`);
-  if (settings.replacementDeadlineMs !== undefined) {
-    const days = Math.round(settings.replacementDeadlineMs / 86_400_000);
-    out.push(`"Find a replacement by" to ${days === 0 ? 'on the day' : `${plural(days, 'day')} before`}`);
+  // The cover options are hidden now (simplify ticket 07): one plain phrase for any of them.
+  if (settings.coveragePolicy || settings.replacementDuty || settings.replacementDeadlineMs !== undefined) {
+    out.push('how covers work');
   }
+  if (settings.timeOffHandling) out.push(`Time Off handling to ${TIME_OFF[settings.timeOffHandling]}`);
   if (settings.allowDoubling !== undefined) {
     out.push(settings.allowDoubling ? 'one person to hold two seats at an Event' : 'one seat per person per Event');
   }
@@ -147,12 +144,12 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
     }
     case 'addSkipDate':
       return {
-        text: `${actor} marked ${eventDate(ctx, cause.eventId) ?? 'an Event'} as a Skip Date${skipReasonPhrase(cause.reason)}. Turns move forward one Event.`,
+        text: `${actor} marked ${eventDate(ctx, cause.eventId) ?? 'an Event'} as a day off${skipReasonPhrase(cause.reason)}. Turns move forward one date.`,
         tone: 'neutral',
       };
     case 'removeSkipDate':
       return {
-        text: `${actor} removed the Skip Date${onDate(eventDate(ctx, cause.eventId))}. The Rotation is restored.`,
+        text: `${actor} removed the day off${onDate(eventDate(ctx, cause.eventId))}. The turns are back as they were.`,
         tone: 'neutral',
       };
     case 'addTimeOff': {
@@ -180,41 +177,41 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
       const change = entry.changes.find((c) => c.assignmentId === cause.assignmentId);
       const a = assignmentIn(entry, ctx, cause.assignmentId);
       if (change?.before?.coverageRequest?.cover) {
-        return { text: `${actor} can no longer cover ${assignmentPhrase(ctx, a)}. It needs coverage again.`, tone: 'bad' };
+        return { text: `${actor} can no longer cover ${assignmentPhrase(ctx, a)}. It needs cover again.`, tone: 'bad' };
       }
-      const holder = change?.before?.memberId ?? a?.memberId ?? null;
+      const holder = change?.before?.memberId ?? a?.coverageRequest?.requestedBy ?? a?.memberId ?? null;
       const why = quoted(cause.reason);
+      if (cause.coveredBy) {
+        // The cover was found straight away ("I'll find someone to cover", "Pick someone to do it").
+        const sentence = coverSentence(entry, ctx);
+        if (sentence) return { text: sentence, tone: 'info' };
+      }
       if (holder && entry.actorId !== null && holder !== entry.actorId) {
-        // An Admin declining for someone else (e.g. a Placeholder Member).
+        // Someone saying it for a Stand-in.
         const name = nameOf(ctx, holder);
         return {
-          text: `${actor} said ${object(name)} can't make ${assignmentPhrase(ctx, a)}${why}. Coverage requested.`,
+          text: `${actor} said ${object(name)} can't make ${assignmentPhrase(ctx, a)}${why}. The group was asked to cover.`,
           tone: 'bad',
         };
       }
-      return { text: `${actor} can't make ${assignmentPhrase(ctx, a)}${why}. Coverage requested.`, tone: 'bad' };
+      return { text: `${actor} can't make ${assignmentPhrase(ctx, a)}${why}. The group was asked to cover.`, tone: 'bad' };
     }
     case 'withdrawDecline': {
-      // Ticket 16: "Ana can make Sound on Sun, Nov 22 after all; Coverage Request withdrawn."
+      // "Ana can make Sound on Sun, Nov 22 after all."
       const change = entry.changes.find((c) => c.assignmentId === cause.assignmentId);
       const a = assignmentIn(entry, ctx, cause.assignmentId);
       const holder = change?.after?.memberId ?? a?.memberId ?? null;
-      const phrase = `can make ${assignmentPhrase(ctx, a)} after all; Coverage Request withdrawn.`;
+      const phrase = `can make ${assignmentPhrase(ctx, a)} after all.`;
       if (holder && entry.actorId !== null && holder !== entry.actorId) {
         return { text: `${actor} said ${object(nameOf(ctx, holder))} ${phrase}`, tone: 'ok' };
       }
       return { text: `${actor} ${phrase}`, tone: 'ok' };
     }
-    case 'cover': {
-      const a = assignmentIn(entry, ctx, cause.assignmentId);
-      const forWhom = a?.coverageRequest?.requestedBy ?? a?.turnOf ?? null;
-      const tail = forWhom ? ` for ${object(nameOf(ctx, forWhom))}` : '';
-      return { text: `${actor} covered ${assignmentPhrase(ctx, a)}${tail}.`, tone: 'info' };
-    }
+    case 'cover':
     case 'markCovered': {
-      const a = assignmentIn(entry, ctx, cause.assignmentId);
-      const by = 'guestName' in cause.by ? `${cause.by.guestName.trim()} (guest)` : object(nameOf(ctx, cause.by.memberId));
-      return { text: `${actor} marked ${assignmentPhrase(ctx, a)} covered by ${by}.`, tone: 'info' };
+      const sentence = coverSentence(entry, ctx);
+      if (sentence) return { text: sentence, tone: 'info' };
+      return { text: `${actor} covered ${assignmentPhrase(ctx, assignmentIn(entry, ctx, cause.assignmentId))}.`, tone: 'info' };
     }
     case 'changeSettings': {
       const parts = settingPhrases(cause.settings);
@@ -224,16 +221,16 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
       };
     }
     case 'rebalance':
-      return { text: `${actor} rebalanced the ${responsibilityName(ctx, cause.responsibilityId)} Rotation by workload.`, tone: 'neutral' };
+      return { text: `${actor} reordered ${responsibilityName(ctx, cause.responsibilityId)} so whoever has done the fewest turns goes first.`, tone: 'neutral' };
     case 'addMember': {
       const name = cause.member.name;
       if (self(cause.member.id)) return { text: `${name} joined the group.`, tone: 'neutral' };
       const placeholder = !cause.member.accountId;
-      return { text: `${actor} added ${name}${placeholder ? ' as a Placeholder Member' : ''}.`, tone: 'neutral' };
+      return { text: `${actor} added ${name}${placeholder ? ' as a stand-in' : ''}.`, tone: 'neutral' };
     }
     case 'qualifyMember':
       return {
-        text: `${actor} made ${object(nameOf(ctx, cause.memberId))} a Qualified Member for ${responsibilityName(ctx, cause.responsibilityId)}.`,
+        text: `${actor} added ${object(nameOf(ctx, cause.memberId))} to the ${responsibilityName(ctx, cause.responsibilityId)} turns.`,
         tone: 'neutral',
       };
     case 'unqualifyMember':
@@ -253,12 +250,11 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
         ? { text: `You changed your name to ${cause.name}.`, tone: 'neutral' }
         : { text: `${cause.name} changed their name.`, tone: 'neutral' };
     case 'setAdmin':
-      if (!cause.isAdmin && self(cause.memberId)) return { text: `${actor} stepped down as Admin.`, tone: 'neutral' };
-      return cause.isAdmin
-        ? { text: `${actor} made ${object(nameOf(ctx, cause.memberId))} an Admin.`, tone: 'neutral' }
-        : { text: `${actor} removed ${object(nameOf(ctx, cause.memberId))} as Admin.`, tone: 'neutral' };
+      // No Admins in the app for now (ADR 0006); older history still has these entries.
+      if (self(cause.memberId)) return { text: `${actor} changed their group permissions.`, tone: 'neutral' };
+      return { text: `${actor} changed ${object(nameOf(ctx, cause.memberId))}'s group permissions.`, tone: 'neutral' };
     case 'addResponsibility':
-      return { text: `${actor} added the Responsibility ${cause.responsibility.name}.`, tone: 'neutral' };
+      return { text: `${actor} added the job ${cause.responsibility.name}.`, tone: 'neutral' };
     case 'editResponsibility': {
       const { changes } = cause;
       const parts: string[] = [];
@@ -269,40 +265,40 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
       if (changes.requiresConfirmation !== undefined) {
         parts.push(changes.requiresConfirmation ? 'turned on confirmation' : 'turned off confirmation');
       }
-      const name = changes.name !== undefined ? 'a Responsibility' : responsibilityName(ctx, cause.responsibilityId);
+      const name = changes.name !== undefined ? 'a job' : responsibilityName(ctx, cause.responsibilityId);
       return { text: `${actor} changed ${name}${parts.length ? `: ${joinPhrases(parts)}` : ''}.`, tone: 'neutral' };
     }
     case 'removeResponsibility':
-      return { text: `${actor} removed the Responsibility ${responsibilityName(ctx, cause.responsibilityId)}.`, tone: 'warn' };
+      return { text: `${actor} removed the job ${responsibilityName(ctx, cause.responsibilityId)}.`, tone: 'warn' };
     case 'reorderResponsibilities':
-      return { text: `${actor} changed the order Responsibilities are filled in.`, tone: 'neutral' };
+      return { text: `${actor} changed the order jobs are filled in.`, tone: 'neutral' };
     case 'setPrimaryResponsibility':
       return cause.responsibilityId
-        ? { text: `${actor} made ${responsibilityName(ctx, cause.responsibilityId)} the Primary Responsibility.`, tone: 'neutral' }
-        : { text: `${actor} cleared the Primary Responsibility.`, tone: 'neutral' };
+        ? { text: `${actor} made ${responsibilityName(ctx, cause.responsibilityId)} the group's main job.`, tone: 'neutral' }
+        : { text: `${actor} cleared the group's main job.`, tone: 'neutral' };
     case 'reorderQueue':
       return { text: `${actor} reordered the ${responsibilityName(ctx, cause.responsibilityId)} Rotation.`, tone: 'neutral' };
     case 'addEventSeries': {
       const n = cause.events?.length ?? 0;
-      return { text: `${actor} added the Event Series ${cause.series.name}${n ? ` (${plural(n, 'Event')})` : ''}.`, tone: 'neutral' };
+      return { text: `${actor} added dates for ${cause.series.name}${n ? ` (${plural(n, 'date')})` : ''}.`, tone: 'neutral' };
     }
     case 'editEventSeries': {
       const moved = cause.replaceFutureEvents !== undefined || cause.changes.repeat !== undefined;
       const name = cause.changes.name ?? seriesName(ctx, cause.seriesId);
       return {
-        text: `${actor} changed the Event Series ${name}${moved ? '. Turns follow to the new dates' : ''}.`,
+        text: `${actor} changed when ${name} happens${moved ? '. Turns follow to the new dates' : ''}.`,
         tone: moved ? 'warn' : 'neutral',
       };
     }
     case 'removeEventSeries':
-      return { text: `${actor} removed the Event Series ${seriesName(ctx, cause.seriesId)}.`, tone: 'warn' };
+      return { text: `${actor} removed the dates for ${seriesName(ctx, cause.seriesId)}.`, tone: 'warn' };
     case 'removeEvent':
       return { text: `${actor} removed the Event${onDate(eventDate(ctx, cause.eventId))}.`, tone: 'warn' };
     case 'makeUpTurnPaid': {
       const turn = ctx.state.makeUpTurns.find((t) => t.id === cause.makeUpTurnId);
-      if (!turn) return { text: 'A Make-up Turn was paid.', tone: 'ok' };
+      if (!turn) return { text: 'A swapped turn was taken.', tone: 'ok' };
       return {
-        text: `${nameOf(ctx, turn.debtorId)} paid back the ${responsibilityName(ctx, turn.responsibilityId)} Make-up Turn owed to ${object(nameOf(ctx, turn.creditorId))}.`,
+        text: `${nameOf(ctx, turn.debtorId)} took ${possessive(nameOf(ctx, turn.creditorId))} ${responsibilityName(ctx, turn.responsibilityId)} turn, as swapped.`,
         tone: 'ok',
       };
     }
@@ -314,32 +310,103 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
 /** Causes about one Assignment, where "1 Assignment changed" adds nothing. */
 const SINGLE_ASSIGNMENT = new Set(['confirm', 'decline', 'withdrawDecline', 'cover', 'markCovered', 'requestConfirmation']);
 
+/** What happened to swaps (a cover's "takes your next turn"), in plain words. */
 function makeUpTurnText(ctx: HistoryContext, changes: MakeUpTurnChange[]): string[] {
   const out: string[] = [];
   for (const c of changes) {
     const turn = ctx.state.makeUpTurns.find((t) => t.id === c.makeUpTurnId);
     if (!turn) continue;
     const debtor = nameOf(ctx, turn.debtorId);
-    const creditor = object(nameOf(ctx, turn.creditorId));
+    const creditor = possessive(nameOf(ctx, turn.creditorId));
     const what = responsibilityName(ctx, turn.responsibilityId);
+    const takes = debtor === 'You' ? 'take' : 'takes';
     if (c.before === null && c.after === 'outstanding') {
-      out.push(`${debtor} ${debtor === 'You' ? 'owe' : 'owes'} ${creditor} a ${what} Make-up Turn.`);
-    } else if (c.after === 'cancelled') {
-      out.push(`${debtor === 'You' ? 'Your' : `${debtor}'s`} ${what} Make-up Turn to ${creditor} was cancelled.`);
-    } else if (c.after === 'settled') {
-      out.push(`${debtor === 'You' ? 'Your' : `${debtor}'s`} ${what} Make-up Turn to ${creditor} is settled.`);
+      out.push(`${debtor} ${takes} ${creditor} next ${what} turn.`);
+    } else if (c.after === 'cancelled' || c.after === 'settled') {
+      out.push(`${debtor} no longer ${takes} ${creditor} next ${what} turn.`);
     }
   }
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Covers in plain words (simplify ticket 07)
+
+/** How an outside cover (a typed name, not a Member) is labelled. */
+export const NOT_IN_GROUP = 'Not in group';
+
+/** "your" for the viewer, otherwise "Sam's". */
+function possessive(name: string): string {
+  return name === 'You' ? 'your' : `${name}'s`;
+}
+
+/** A Member's first name ("You" for the viewer), as covers are told in sentences. */
+function firstNameOf(ctx: HistoryContext, id: MemberId): string {
+  if (id === ctx.myMemberId) return 'You';
+  const name = ctx.state.members.find((m) => m.id === id)?.name.trim();
+  return name ? name.split(/\s+/)[0] : 'A former member';
+}
+
 /**
- * One history entry as a readable line, e.g. "Ben covered Sound on Sun, Nov 22 for Ana."
- * with detail "Ana owes Ben a Sound Make-up Turn."
+ * The sentence for a covered turn, from the viewer's side, with the swap the engine made
+ * (`swapTurn`: the Make-up Turn the cover created; the date is the turn it was placed on):
+ * - coverer: "You're covering Grace's Greeter turn on Nov 29. Grace takes your next turn on Dec 13."
+ * - who couldn't make it: "Sam's covering for you on Nov 29. You'll take Sam's next turn on Dec 13."
+ * - anyone else: "Sam is covering Grace's Greeter turn on Nov 29. Grace takes Sam's next turn on Dec 13."
+ * An outside cover has no swap sentence. Null when the Assignment isn't covered.
+ */
+export function coverMessage(ctx: HistoryContext, a: Assignment, swapTurn: MakeUpTurn | null | undefined): string | null {
+  const request = a.coverageRequest;
+  const cover = request?.cover;
+  if (!request || !cover) return null;
+  const job = responsibilityName(ctx, a.responsibilityId);
+  const date = eventDate(ctx, a.eventId, false);
+  const on = date ? ` on ${date}` : '';
+  const requester = request.requestedBy ? firstNameOf(ctx, request.requestedBy) : null;
+  const coverer = cover.kind === 'guest' ? cover.guestName.trim() : firstNameOf(ctx, cover.memberId);
+
+  let swapDate: string | null | undefined;
+  if (cover.kind === 'member' && requester && swapTurn && (swapTurn.status === 'outstanding' || swapTurn.status === 'paid')) {
+    const paying = ctx.state.assignments.find((x) => x.makeUpTurnId === swapTurn.id);
+    swapDate = paying ? eventDate(ctx, paying.eventId, false) : null;
+  }
+  const swapOn = swapDate ? `turn on ${swapDate}` : `${job} turn`;
+
+  if (coverer === 'You') {
+    const what = requester ? `${possessive(requester)} ${job} turn` : job;
+    const swap = swapDate !== undefined ? ` ${requester} takes your next ${swapOn}.` : '';
+    return `You're covering ${what}${on}.${swap}`;
+  }
+  if (requester === 'You') {
+    const swap = swapDate !== undefined ? ` You'll take ${coverer}'s next ${swapOn}.` : '';
+    return `${coverer}'s covering for you${on}.${swap}`;
+  }
+  const what = requester ? `${possessive(requester)} ${job} turn` : job;
+  const swap = swapDate !== undefined ? ` ${requester} takes ${coverer}'s next ${swapOn}.` : '';
+  return `${coverer} is covering ${what}${on}.${swap}`;
+}
+
+/** The cover sentence for a history entry that covered a turn (`cover`, `markCovered`, `decline` with a cover). */
+export function coverSentence(entry: HistoryEntry, ctx: HistoryContext): string | null {
+  const cause = entry.cause;
+  if (cause.type !== 'cover' && cause.type !== 'markCovered' && !(cause.type === 'decline' && cause.coveredBy)) return null;
+  const after = entry.changes.find((c) => c.assignmentId === cause.assignmentId)?.after;
+  if (!after?.coverageRequest?.cover) return null;
+  const created = new Set(entry.makeUpTurns.filter((c) => c.before === null).map((c) => c.makeUpTurnId));
+  const swapTurn = ctx.state.makeUpTurns.find((t) => created.has(t.id) && t.coverAssignmentId === after.id);
+  return coverMessage(ctx, after, swapTurn);
+}
+
+/** Causes whose line is the cover sentence when they covered a turn. */
+const COVER_CAUSES = new Set(['cover', 'markCovered', 'decline']);
+
+/**
+ * One history entry as a readable line, e.g. "Ben is covering Ana's Sound turn on Nov 22.
+ * Ana takes Ben's next turn on Dec 6."
  */
 export function describeHistoryEntry(entry: HistoryEntry, ctx: HistoryContext): HistoryLine {
   const { text, tone } = causeText(entry, ctx);
-  const details = makeUpTurnText(ctx, entry.makeUpTurns);
+  const details = COVER_CAUSES.has(entry.cause.type) && coverSentence(entry, ctx) ? [] : makeUpTurnText(ctx, entry.makeUpTurns);
   const n = entry.changes.length;
   if (n > 0 && !SINGLE_ASSIGNMENT.has(entry.cause.type) && entry.cause.type !== 'makeUpTurnPaid') {
     details.unshift(`${plural(n, 'Assignment')} changed.`);
@@ -363,7 +430,7 @@ export type AssignmentHistoryLine = {
 function coverLabel(ctx: HistoryContext, a: Assignment): string | null {
   const cover = a.coverageRequest?.cover;
   if (!cover) return null;
-  return cover.kind === 'guest' ? `${cover.guestName} (guest)` : object(nameOf(ctx, cover.memberId));
+  return cover.kind === 'guest' ? `${cover.guestName} (${NOT_IN_GROUP.toLowerCase()})` : object(nameOf(ctx, cover.memberId));
 }
 
 /** A Decline reason as ': “Traveling”', or nothing (ticket 16). */
@@ -387,7 +454,7 @@ export function describeAssignmentChange(change: AssignmentChange, ctx: HistoryC
   if (!before && after) {
     const who = after.memberId ? nameOf(ctx, after.memberId) : null;
     if (!who) return { text: 'Added. No one was available yet', tone: 'bad' };
-    if (after.makeUpTurnId) return { text: `Assigned to ${object(who)} as a Make-up Turn`, tone: 'info' };
+    if (after.makeUpTurnId) return { text: `Assigned to ${object(who)} as a swapped turn`, tone: 'info' };
     return { text: `Assigned to ${object(who)} by Rotation`, tone: 'neutral' };
   }
   if (before && !after) return { text: 'Removed from the schedule', tone: 'warn' };
@@ -403,13 +470,13 @@ export function describeAssignmentChange(change: AssignmentChange, ctx: HistoryC
   const coverBefore = before.coverageRequest?.cover ?? null;
   const coverAfter = after.coverageRequest?.cover ?? null;
   if (!coverBefore && coverAfter) return { text: `Covered by ${coverLabel(ctx, after)}`, tone: 'info' };
-  if (coverBefore && !coverAfter && after.coverageRequest) return { text: 'Cover withdrawn. Needs coverage again', tone: 'bad' };
+  if (coverBefore && !coverAfter && after.coverageRequest) return { text: 'Cover withdrawn. Needs cover again', tone: 'bad' };
   if (!before.coverageRequest && after.coverageRequest) {
     const who = nameOf(ctx, after.coverageRequest.requestedBy ?? after.memberId);
     const reason = after.coverageRequest.reason;
-    if (reason === 'declined') return { text: `${who} can't make it${quoted(after.coverageRequest.note)}. Needs coverage`, tone: 'bad' };
-    if (reason === 'timeOff') return { text: `${who} ${who === 'You' ? 'are' : 'is'} on Time Off. Needs coverage`, tone: 'bad' };
-    return { text: 'No one available. Needs coverage', tone: 'bad' };
+    if (reason === 'declined') return { text: `${who} can't make it${quoted(after.coverageRequest.note)}. Needs cover`, tone: 'bad' };
+    if (reason === 'timeOff') return { text: `${who} ${who === 'You' ? 'have' : 'has'} dates off. Needs cover`, tone: 'bad' };
+    return { text: 'No one available. Needs cover', tone: 'bad' };
   }
   if (before.coverageRequest && !after.coverageRequest) return { text: `Back with ${object(nameOf(ctx, after.memberId))}`, tone: 'neutral' };
   if (before.memberId !== after.memberId) {
@@ -417,8 +484,8 @@ export function describeAssignmentChange(change: AssignmentChange, ctx: HistoryC
     const from = before.memberId ? object(nameOf(ctx, before.memberId)) : 'no one';
     return { text: `Reassigned from ${from} to ${to}`, tone: 'warn' };
   }
-  if (!before.makeUpTurnId && after.makeUpTurnId) return { text: 'Now a Make-up Turn', tone: 'info' };
-  if (before.makeUpTurnId && !after.makeUpTurnId) return { text: 'No longer a Make-up Turn', tone: 'neutral' };
+  if (!before.makeUpTurnId && after.makeUpTurnId) return { text: 'Now a swapped turn', tone: 'info' };
+  if (before.makeUpTurnId && !after.makeUpTurnId) return { text: 'No longer a swapped turn', tone: 'neutral' };
   if (before.confirmation !== after.confirmation) {
     if (after.confirmation === 'confirmed') return { text: `Confirmed by ${object(nameOf(ctx, after.memberId))}`, tone: 'ok' };
     if (after.confirmation === 'requested') return { text: `${nameOf(ctx, after.memberId)} asked to confirm`, tone: 'warn' };
@@ -452,7 +519,7 @@ export function assignmentHistory(
       assignment?.makeUpTurnId &&
       entry.cause.makeUpTurnId === assignment.makeUpTurnId
     ) {
-      out.push({ key: `${entry.id}:paid`, at: entry.at, text: 'Make-up Turn paid', detail: null, tone: 'ok' });
+      out.push({ key: `${entry.id}:paid`, at: entry.at, text: 'Swapped turn taken', detail: null, tone: 'ok' });
     }
   }
   return out;

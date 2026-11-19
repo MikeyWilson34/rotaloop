@@ -102,14 +102,18 @@ describe('Pay It Back', () => {
     expect(state.makeUpTurns[0]).toMatchObject({ status: 'settled', closedReason: 'movedAlong' });
     state = covered(state, 'w3', 'ana', 'dee').state;
     expect(state.makeUpTurns[1]).toMatchObject({ debtorId: 'ana', creditorId: 'dee', status: 'outstanding' });
-    expect(lineup(state)).toEqual(['w1 cal', 'w2 ben', 'w3 dee', 'w4 ana', 'w5 ana', 'w6 ben', 'w7 cal', 'w8 dee']);
+    // ana pays dee back at w4, then rests at w5 (no back-to-back) and takes w6 instead.
+    expect(lineup(state)).toEqual(['w1 cal', 'w2 ben', 'w3 dee', 'w4 ana', 'w5 ben', 'w6 ana', 'w7 cal', 'w8 dee']);
   });
 
-  it("Pay It Back: a Make-up Turn waits for the coverer's next turn the decliner can take", () => {
+  it("Pay It Back: the swap lapses when the decliner is on Time Off at the coverer's next turn", () => {
     let state = declined(setup(), 'w1', 'ana').state;
     state = covered(state, 'w1', 'ana', 'cal').state;
     state = act(state, { type: 'addTimeOff', timeOff: timeOff('t1', 'ana', 3) }, { by: 'ana' }).state;
-    expect(lineup(state)).toEqual(['w1 cal', 'w2 ben', 'w3 cal', 'w4 dee', 'w5 ana', 'w6 ben', 'w7 ana', 'w8 dee']);
+    expect(lineup(state)).toEqual(['w1 cal', 'w2 ben', 'w3 cal', 'w4 dee', 'w5 ana', 'w6 ben', 'w7 cal', 'w8 dee']);
+    const later = act(state, { type: 'fillSchedule' }, { at: afterWeek(3) });
+    expect(later.state.makeUpTurns[0]).toMatchObject({ status: 'cancelled', closedReason: 'lapsed' });
+    expect(lineup(later.state)).toEqual(lineup(state));
   });
 
   it('Count Real Work: a Cover creates no Make-up Turn and moves no one else', () => {
@@ -131,10 +135,8 @@ describe('Pay It Back', () => {
     ]);
   });
 
-  it('Changing settings is for Admins only', () => {
-    expect(rejected(setup(), { type: 'changeSettings', settings: { allowDoubling: true } }, { by: 'ana' })).toBe(
-      'notPermitted',
-    );
+  it('Any Member may change settings (no Admins for now)', () => {
+    act(setup(), { type: 'changeSettings', settings: { allowDoubling: true } }, { by: 'ana' });
   });
 });
 
@@ -163,7 +165,7 @@ describe('Replacement Duty', () => {
     expect(assignmentOf(result.state, 'w1', 'eve').confirmation).toBe('requested');
   });
 
-  it('Replacement Duty with Admins: only an Admin may mark it covered, and a Qualified coverer is owed', () => {
+  it('Any Member may mark it covered (whatever Replacement Duty says), and a Qualified coverer is owed', () => {
     let state = setup({
       members: WITH_EVE,
       admins: ['eve'],
@@ -173,8 +175,7 @@ describe('Replacement Duty', () => {
     state = declined(state, 'w1', 'ana').state;
     const assignmentId = assignmentOf(state, 'w1', 'ana').id;
     const command = { type: 'markCovered', assignmentId, by: { memberId: 'ben' } } as const;
-    expect(rejected(state, command, { by: 'ana' })).toBe('notPermitted');
-    state = act(state, command, { by: 'eve' }).state;
+    state = act(state, command, { by: 'cal' }).state;
     expect(state.makeUpTurns).toEqual([expect.objectContaining({ debtorId: 'ana', creditorId: 'ben' })]);
   });
 });

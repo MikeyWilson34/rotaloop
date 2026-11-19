@@ -196,13 +196,14 @@ describe('invite links', () => {
   const linkCount = () =>
     t.db.query<{ n: number }>('select count(*)::int n from public.invite_links where group_id = $1', [GROUP_A]).then((r) => r.rows[0].n);
 
-  it('creates a join link with each Group, visible only to its Admins', async () => {
+  it('creates a join link with each Group, visible to its active Members only (no Admins for now)', async () => {
     expect(await t.asUser(ANA, linkCount)).toBe(1);
-    expect(await t.asUser(BEN, linkCount)).toBe(0);
+    expect(await t.asUser(BEN, linkCount)).toBe(1);
+    expect(await t.asUser(CAL, linkCount)).toBe(0);
     expect(await t.asUser(OUT, linkCount)).toBe(0);
   });
 
-  it('lets only Admins reset the join link', async () => {
+  it('lets any active Member reset the join link, and no one else', async () => {
     const old = await t.asUser(ANA, () =>
       t.db.query<{ token: string }>('select token from public.invite_links where group_id = $1 and member_id is null', [GROUP_A]),
     );
@@ -212,12 +213,19 @@ describe('invite links', () => {
     expect(fresh).toMatch(/^[0-9a-f]{64}$/);
     expect(fresh).not.toBe(old.rows[0].token);
     expect(await t.asUser(ANA, linkCount)).toBe(1);
-    await expect(t.asUser(BEN, () => t.db.query('select public.reset_invite_link($1)', [GROUP_A]))).rejects.toThrow(
-      /Admins only/,
+    const byBen = await t.asUser(BEN, () =>
+      t.db.query<{ t: string }>('select public.reset_invite_link($1) t', [GROUP_A]).then((r) => r.rows[0].t),
+    );
+    expect(byBen).not.toBe(fresh);
+    await expect(t.asUser(CAL, () => t.db.query('select public.reset_invite_link($1)', [GROUP_A]))).rejects.toThrow(
+      /Members only/,
+    );
+    await expect(t.asUser(OUT, () => t.db.query('select public.reset_invite_link($1)', [GROUP_A]))).rejects.toThrow(
+      /Members only/,
     );
   });
 
-  it('gives Admins a claim link only for Placeholder Members, and previews it', async () => {
+  it('gives any active Member a claim link only for Stand-ins (Placeholder Members), and previews it', async () => {
     const claim = await t.asUser(ANA, () =>
       t.db.query<{ t: string }>(`select public.claim_link_for($1, 'dee') t`, [GROUP_A]).then((r) => r.rows[0].t),
     );
@@ -228,8 +236,12 @@ describe('invite links', () => {
     await expect(t.asUser(ANA, () => t.db.query(`select public.claim_link_for($1, 'ben')`, [GROUP_A]))).rejects.toThrow(
       /Not a Placeholder/,
     );
-    await expect(t.asUser(BEN, () => t.db.query(`select public.claim_link_for($1, 'dee')`, [GROUP_A]))).rejects.toThrow(
-      /Admins only/,
+    const byBen = await t.asUser(BEN, () =>
+      t.db.query<{ t: string }>(`select public.claim_link_for($1, 'dee') t`, [GROUP_A]).then((r) => r.rows[0].t),
+    );
+    expect(byBen).toBe(claim);
+    await expect(t.asUser(OUT, () => t.db.query(`select public.claim_link_for($1, 'dee')`, [GROUP_A]))).rejects.toThrow(
+      /Members only/,
     );
 
     const preview = await t.asUser(OUT, () => t.db.query('select * from public.invite_link_preview($1)', [claim]));
@@ -279,13 +291,16 @@ describe('invite links', () => {
     );
   });
 
-  it('lets Admins rename the Group, and no one else', async () => {
-    await t.asUser(ANA, () => t.db.query(`select public.update_group_details($1, ' Crew A ', 'America/Chicago')`, [GROUP_A]));
+  it('lets any active Member rename the Group or change its time zone, and no one else', async () => {
+    await t.asUser(BEN, () => t.db.query(`select public.update_group_details($1, ' Crew A ', 'America/Chicago')`, [GROUP_A]));
     const g = await t.asUser(BEN, () => t.db.query<{ name: string; time_zone: string }>('select name, time_zone from public.groups where id = $1', [GROUP_A]));
     expect(g.rows[0]).toEqual({ name: 'Crew A', time_zone: 'America/Chicago' });
     await expect(
-      t.asUser(BEN, () => t.db.query(`select public.update_group_details($1, 'Mine', 'UTC')`, [GROUP_A])),
-    ).rejects.toThrow(/Admins only/);
+      t.asUser(CAL, () => t.db.query(`select public.update_group_details($1, 'Mine', 'UTC')`, [GROUP_A])),
+    ).rejects.toThrow(/Members only/);
+    await expect(
+      t.asUser(OUT, () => t.db.query(`select public.update_group_details($1, 'Mine', 'UTC')`, [GROUP_A])),
+    ).rejects.toThrow(/Members only/);
   });
 });
 

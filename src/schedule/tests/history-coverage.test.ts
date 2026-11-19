@@ -19,10 +19,10 @@ describe('Decline reasons in history', () => {
     const a = seat(b.state, '2026-11-22', 'sound');
     run(b, { type: 'decline', assignmentId: a.id, reason: 'Traveling: back on the 10th' }, 'ana');
     expect(historyLines(b.history, ctxOf(b))[0].text).toBe(
-      "Ana can't make Sound on Sun, Nov 22: “Traveling: back on the 10th”. Coverage requested.",
+      "Ana can't make Sound on Sun, Nov 22: “Traveling: back on the 10th”. The group was asked to cover.",
     );
     expect(assignmentHistory(b.history, a.id, ctxOf(b)).at(-1)!.text).toBe(
-      "Ana can't make it: “Traveling: back on the 10th”. Needs coverage",
+      "Ana can't make it: “Traveling: back on the 10th”. Needs cover",
     );
   });
 
@@ -30,7 +30,7 @@ describe('Decline reasons in history', () => {
     const b = buildGroup();
     const a = seat(b.state, '2026-11-22', 'sound');
     run(b, { type: 'decline', assignmentId: a.id }, 'ana');
-    expect(historyLines(b.history, ctxOf(b))[0].text).toBe("Ana can't make Sound on Sun, Nov 22. Coverage requested.");
+    expect(historyLines(b.history, ctxOf(b))[0].text).toBe("Ana can't make Sound on Sun, Nov 22. The group was asked to cover.");
   });
 });
 
@@ -42,12 +42,12 @@ describe('withdrawDecline in history', () => {
     run(b, { type: 'withdrawDecline', assignmentId: a.id }, 'ana');
     const line = historyLines(b.history, ctxOf(b))[0];
     expect(line).toMatchObject({
-      text: 'Ana can make Sound on Sun, Nov 22 after all; Coverage Request withdrawn.',
+      text: 'Ana can make Sound on Sun, Nov 22 after all.',
       detail: null,
       tone: 'ok',
     });
     expect(historyLines(b.history, ctxOf(b, 'ana'))[0].text).toBe(
-      'You can make Sound on Sun, Nov 22 after all; Coverage Request withdrawn.',
+      'You can make Sound on Sun, Nov 22 after all.',
     );
     expect(assignmentHistory(b.history, a.id, ctxOf(b)).at(-1)!.text).toBe('Back with Ana');
   });
@@ -59,7 +59,7 @@ describe('withdrawDecline in history', () => {
     run(b, { type: 'decline', assignmentId: a.id }, 'ana');
     run(b, { type: 'withdrawDecline', assignmentId: a.id }, 'ana');
     expect(historyLines(b.history, ctxOf(b))[0].text).toBe(
-      'Ana said Pat can make Greeter on Sun, Nov 22 after all; Coverage Request withdrawn.',
+      'Ana said Pat can make Greeter on Sun, Nov 22 after all.',
     );
   });
 });

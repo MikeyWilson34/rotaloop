@@ -122,7 +122,7 @@ export default function ScheduleScreen() {
       </EmptyCard>
     );
   } else if (allEvents.length === 0) {
-    body = <EmptyCard title="No Events yet" text="No Events yet. An Admin can add an Event Series in Settings." />;
+    body = <EmptyCard title="No Events yet" text="No dates yet. Add a job in the group's settings." />;
   } else if (view === 'list') {
     body =
       weeks.length === 0 ? (

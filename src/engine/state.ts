@@ -47,7 +47,8 @@ export function createGroupState(group: NewGroup): GroupState {
     responsibilities: group.responsibilities.map(({ qualifiedMemberIds: _, ...r }) => toResponsibility(r)),
     rotations: group.responsibilities.map((r) => ({
       responsibilityId: r.id,
-      queue: [...r.qualifiedMemberIds],
+      // A headcount Job has no turns: everyone is asked "Coming?" instead.
+      queue: r.kind === 'headcount' ? [] : [...r.qualifiedMemberIds],
       turnsTakenEarly: {},
     })),
     eventSeries: (group.eventSeries ?? []).map(toEventSeries),
@@ -55,6 +56,7 @@ export function createGroupState(group: NewGroup): GroupState {
     timeOff: [],
     assignments: [],
     makeUpTurns: [],
+    headcountAnswers: [],
     rotatedThrough: null,
     idSequence: 0,
   };
@@ -71,7 +73,14 @@ export function toMember(member: NewMember): Member {
 }
 
 export function toResponsibility(r: NewResponsibility): Responsibility {
-  return { id: r.id, name: r.name, headcount: r.headcount, requiresConfirmation: r.requiresConfirmation, removedAt: null };
+  return {
+    id: r.id,
+    name: r.name,
+    kind: r.kind ?? 'turns',
+    headcount: r.headcount,
+    requiresConfirmation: r.requiresConfirmation,
+    removedAt: null,
+  };
 }
 
 export function toEventSeries(s: NewEventSeries): EventSeries {
@@ -162,6 +171,16 @@ export function responsibilitiesNeeded(state: GroupState, event: Event): Respons
   const ids =
     event.responsibilityIds ?? state.eventSeries.find((s) => s.id === event.seriesId)?.responsibilityIds ?? [];
   return state.responsibilities.filter((r) => r.removedAt === null && ids.includes(r.id));
+}
+
+/** The take-turns Jobs an Event needs: the ones that get seats (Assignments), in fill order. */
+export function seatsNeeded(state: GroupState, event: Event): Responsibility[] {
+  return responsibilitiesNeeded(state, event).filter((r) => r.kind !== 'headcount');
+}
+
+/** The headcount Jobs an Event needs: everyone is asked "Coming?" for them. */
+export function headcountsNeeded(state: GroupState, event: Event): Responsibility[] {
+  return responsibilitiesNeeded(state, event).filter((r) => r.kind === 'headcount');
 }
 
 export function initialConfirmation(responsibility: Responsibility | undefined, memberId: string | null) {

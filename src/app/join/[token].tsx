@@ -141,7 +141,7 @@ export default function JoinTokenScreen() {
             <Text color="textSecondary">{"You're already a Member of this group."}</Text>
           ) : preview.placeholderName ? (
             <Text color="textSecondary">
-              {`You'll join as ${preview.placeholderName}. An Admin added you by that name, so you keep your place and history.`}
+              {`You'll join as ${preview.placeholderName}. Someone in the group added you by that name, so you keep your place and history.`}
             </Text>
           ) : (
             <Text color="textSecondary">

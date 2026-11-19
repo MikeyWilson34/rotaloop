@@ -21,16 +21,22 @@ describe('a new Coverage Request', () => {
     expect(who(items)).toEqual([`${ACCOUNT.ana}:coverageRequest`]);
     const [item] = items;
     expect(item.title).toBe('Can you cover Sound, Sun, Nov 29?');
-    expect(item.body).toBe("Ben can't make Sound on Sun, Nov 29: “Traveling”. Coverage requested. · Sunday Team");
+    expect(item.body).toBe(
+      "Ben can't make Sound on Sun, Nov 29 at 9:00 AM: “Traveling”. The first to tap \"I'll cover\" takes it. · Sunday Team",
+    );
     expect(item.url).toBe('/assignment/g1/a3?action=cover');
     expect(item.dedupeKey).toBe(`cmd:g1:v${t.version}:0:a3:coverageRequest:${ACCOUNT.ana}`);
   });
 
-  it('includes Members serving elsewhere at the Event when the Group allows doubling', () => {
+  it('goes to every Member, not only the job’s rotation, but never to someone with another job that day', () => {
     const t = new TestGroup();
     t.run({ type: 'changeSettings', settings: { allowDoubling: true } }, 'ana');
     t.run({ type: 'decline', assignmentId: 'a3' }, 'ben');
-    expect(who(plan(t))).toEqual([`${ACCOUNT.ana}:coverageRequest`, `${ACCOUNT.cal}:coverageRequest`]);
+    // Cal greets on Nov 29: still not asked, as the app doesn't offer them "I'll cover".
+    expect(who(plan(t))).toEqual([`${ACCOUNT.ana}:coverageRequest`]);
+    // Ben declines his Dec 6 Greeter turn: Ana isn't in the Greeter rotation, but is asked too.
+    t.run({ type: 'decline', assignmentId: t.seat('2026-12-06', 'greeter').id }, 'ben');
+    expect(who(plan(t))).toContain(`${ACCOUNT.ana}:coverageRequest`);
   });
 
   it('respects the "Coverage Requests" toggle and push being off', () => {
@@ -40,13 +46,13 @@ describe('a new Coverage Request', () => {
     expect(who(plan(t, profiles({ ana: { notifyCoverageRequests: false }, cal: { pushEnabled: false } })))).toEqual([]);
   });
 
-  it('is not sent to the actor when an Admin declines for a Placeholder', () => {
+  it('is not sent to the actor when someone says a Stand-in can’t make it', () => {
     const t = new TestGroup();
-    // Pat (Placeholder) is Greeter on Nov 22; Ana (Admin) declines for Pat.
+    // Pat (a Stand-in) is Greeter on Nov 22; Ana says Pat can't make it.
     t.run({ type: 'decline', assignmentId: 'a2' }, 'ana');
     const items = plan(t);
     expect(who(items)).toEqual([`${ACCOUNT.ben}:coverageRequest`, `${ACCOUNT.cal}:coverageRequest`]);
-    expect(items[0].body).toContain("Ana said Pat can't make Greeter on Sun, Nov 22");
+    expect(items[0].body).toContain("Pat can't make Greeter on Sun, Nov 22 at 9:00 AM.");
   });
 
   it('nothing is sent for Events that have started', () => {
@@ -64,27 +70,28 @@ describe('a new Coverage Request', () => {
 });
 
 describe('Covers', () => {
-  it('a Cover tells the decliner, not the coverer; the Make-up Turn it creates is batched in', () => {
+  it('"I’ll cover" tells whoever couldn’t make it the swap, in plain words; not the coverer', () => {
     const t = new TestGroup();
     t.run({ type: 'decline', assignmentId: 'a3' }, 'ben');
     t.run({ type: 'cover', assignmentId: 'a3' }, 'ana');
-    const items = plan(t);
-    expect(items.every((i) => i.accountId === ACCOUNT.ben)).toBe(true);
+    const all = plan(t);
+    expect(all.some((i) => i.accountId === ACCOUNT.ana)).toBe(false);
+    // Ben rests on Dec 20 after his Make-up Turn, so others move up and hear about it too.
+    expect(all.filter((i) => i.accountId !== ACCOUNT.ben).every((i) => i.kind === 'scheduleChange')).toBe(true);
+    const items = all.filter((i) => i.accountId === ACCOUNT.ben);
     const covered = items.find((i) => i.kind === 'covered')!;
     expect(covered.title).toBe('Sound, Sun, Nov 29 is covered');
-    expect(covered.body).toBe('Ana covered Sound on Sun, Nov 29 for you. · Sunday Team');
-    // Pay It Back: Ben takes Ana's next Sound turn (Dec 13).
-    const payBack = items.find((i) => i.kind === 'scheduleChange')!;
-    expect(payBack.title).toBe('Schedule change: Sound, Sun, Dec 13');
-    expect(payBack.body).toContain('Reassigned from Ana to you (Make-up Turn)');
+    expect(covered.body).toBe("Ana's covering for you on Nov 29. You'll take Ana's next turn on Dec 13. · Sunday Team");
+    // The swapped Sound turn (Dec 13) is in that sentence, so it isn't also a "schedule change".
+    expect(items.some((i) => i.title === 'Schedule change: Sound, Sun, Dec 13')).toBe(false);
+    expect(JSON.stringify(all)).not.toMatch(/Make-up Turn/);
 
+    // Batched with anything else Ben hears, the cover comes first.
     const [message] = composeMessages(items);
-    expect(message.title).toBe('2 updates · Sunday Team');
-    expect(message.body).toBe('Schedule change: Sound, Sun, Dec 13\nSound, Sun, Nov 29 is covered'.split('\n').reverse().join('\n'));
-    expect(message.url).toBe('/');
+    expect(message.body.split('\n')[0]).toBe(items.length > 1 ? 'Sound, Sun, Nov 29 is covered' : covered.body);
   });
 
-  it('"Mark covered" by an Admin tells the decliner and asks the coverer to confirm', () => {
+  it('"Pick who’s covering" by anyone tells both sides; nobody is asked to confirm', () => {
     const t = new TestGroup();
     t.run({ type: 'changeSettings', settings: { allowDoubling: true } }, 'ana');
     t.run({ type: 'decline', assignmentId: 'a3' }, 'ben');
@@ -93,13 +100,16 @@ describe('Covers', () => {
     expect(who(items)).toContain(`${ACCOUNT.ben}:covered`);
     const ask = items.find((i) => i.kind === 'askedToConfirmCover')!;
     expect(ask.accountId).toBe(ACCOUNT.cal);
-    expect(ask.title).toBe('Please confirm: Sound, Sun, Nov 29');
-    expect(ask.body).toBe('Ana has you down to cover Sound on Sun, Nov 29 at 9:00 AM. Please confirm. · Sunday Team');
+    expect(ask.title).toBe("You're covering Sound, Sun, Nov 29");
+    expect(ask.body).toBe("You're covering Ben's Sound turn on Nov 29. Ben takes your next turn on Dec 6. · Sunday Team");
+    expect(items.find((i) => i.kind === 'covered')!.body).toBe(
+      "Cal's covering for you on Nov 29. You'll take Cal's next turn on Dec 6. · Sunday Team",
+    );
     expect(ask.url).toBe('/assignment/g1/a3');
     expect(items.some((i) => i.accountId === ACCOUNT.ana)).toBe(false);
   });
 
-  it('the decliner marking it covered themselves (Replacement Duty) only tells the coverer', () => {
+  it('the person who couldn’t make it naming the cover only tells the coverer', () => {
     const t = new TestGroup();
     t.run({ type: 'changeSettings', settings: { allowDoubling: true } }, 'ana');
     t.run({ type: 'decline', assignmentId: 'a3' }, 'ben');
@@ -110,14 +120,24 @@ describe('Covers', () => {
     ]);
   });
 
-  it('a Guest Cover reaches no guest; the decliner hears only if someone else arranged it', () => {
+  it('an outside cover reaches no one outside; the person who couldn’t make it hears it with no swap', () => {
     const t = new TestGroup();
     t.run({ type: 'changeSettings', settings: { allowDoubling: true } }, 'ana');
     t.run({ type: 'decline', assignmentId: 'a3' }, 'ben');
     t.run({ type: 'markCovered', assignmentId: 'a3', by: { guestName: 'Sam' } }, 'ana');
     const items = plan(t);
     expect(who(items)).toEqual([`${ACCOUNT.ben}:covered`]);
-    expect(items[0].body).toBe('Ana marked Sound on Sun, Nov 29 covered by Sam (guest). · Sunday Team');
+    expect(items[0].body).toBe("Sam's covering for you on Nov 29. · Sunday Team");
+  });
+
+  it('"I’ll find someone to cover" in one step tells the coverer the swap', () => {
+    const t = new TestGroup();
+    t.run({ type: 'decline', assignmentId: 'a3', coveredBy: { memberId: 'ana' } }, 'ben');
+    const items = plan(t);
+    const ask = items.find((i) => i.kind === 'askedToConfirmCover')!;
+    expect(ask.accountId).toBe(ACCOUNT.ana);
+    expect(ask.body).toBe("You're covering Ben's Sound turn on Nov 29. Ben takes your next turn on Dec 13. · Sunday Team");
+    expect(items.some((i) => i.accountId === ACCOUNT.ben)).toBe(false);
   });
 
   it('a withdrawn Cover reopens the request: the decliner and Qualified Members hear', () => {
@@ -142,7 +162,7 @@ describe('schedule changes', () => {
     const anaFirst = items.find((i) => i.accountId === ACCOUNT.ana && i.assignmentId === 'a1')!;
     expect(anaFirst.title).toBe('Schedule change: Sound, Sun, Nov 29');
     expect(anaFirst.body).toBe(
-      'Moved from Sun, Nov 22 to Sun, Nov 29. Cal marked Sun, Nov 22 as a Skip Date (Holiday). Turns move forward one Event. · Sunday Team',
+      'Moved from Sun, Nov 22 to Sun, Nov 29. Cal marked Sun, Nov 22 as a day off (Holiday). Turns move forward one date. · Sunday Team',
     );
   });
 

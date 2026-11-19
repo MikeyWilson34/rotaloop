@@ -20,6 +20,7 @@ import {
   type EventRow,
   type EventSeriesRow,
   type GroupRow,
+  type HeadcountAnswerRow,
   type MemberRow,
   type ResponsibilityRow,
 } from '../db/groupRows';
@@ -45,7 +46,12 @@ export type MySchedule = {
 const GROUP_COLUMNS =
   'id, name, time_zone, coverage_policy, time_off_handling, allow_doubling, replacement_duty, replacement_deadline_ms, primary_responsibility_id, rotated_through, id_sequence';
 const MEMBER_COLUMNS = 'group_id, id, position, display_name, is_admin, account_id, left_at';
-const RESPONSIBILITY_COLUMNS = 'group_id, id, position, name, headcount, requires_confirmation, removed_at';
+/**
+ * Every column, so `kind` (20261124000000_headcount_jobs.sql) comes along once it exists
+ * without breaking the query against a database that doesn't have it yet.
+ */
+const RESPONSIBILITY_COLUMNS = '*';
+const ANSWER_COLUMNS = 'group_id, event_id, responsibility_id, member_id, position, answer, answered_by, answered_at';
 const SERIES_COLUMNS = 'group_id, id, position, name, responsibility_ids, repeat, removed_at';
 const EVENT_COLUMNS = 'group_id, id, position, series_id, starts_at, responsibility_ids, skip_date_marked_at, skip_date_marked_by';
 const ASSIGNMENT_COLUMNS =
@@ -102,7 +108,17 @@ export async function fetchMySchedule(userId: string, now: Date = new Date()): P
   for (const result of [members, responsibilities, series, events]) if (result.error) throw result.error;
 
   const membersBy = byGroup((members.data ?? []) as unknown as WithGroup<MemberRow>[]);
-  const responsibilitiesBy = byGroup((responsibilities.data ?? []) as unknown as WithGroup<ResponsibilityRow>[]);
+  const responsibilityRows = (responsibilities.data ?? []) as unknown as WithGroup<ResponsibilityRow>[];
+  const responsibilitiesBy = byGroup(responsibilityRows);
+  // "Coming?" answers, only for Groups with a headcount Job (none before the migration).
+  const headcountGroups = [...new Set(responsibilityRows.filter((r) => r.kind === 'headcount').map((r) => r.group_id))];
+  let answerRows: WithGroup<HeadcountAnswerRow>[] = [];
+  if (headcountGroups.length) {
+    const answers = await supabase.from('headcount_answers').select(ANSWER_COLUMNS).in('group_id', headcountGroups);
+    if (answers.error) throw answers.error;
+    answerRows = (answers.data ?? []) as unknown as WithGroup<HeadcountAnswerRow>[];
+  }
+  const answersBy = byGroup(answerRows);
   const seriesBy = byGroup((series.data ?? []) as unknown as WithGroup<EventSeriesRow>[]);
   const eventsBy = byGroup((events.data ?? []) as unknown as EventWithAssignments[]);
 
@@ -118,6 +134,8 @@ export async function fetchMySchedule(userId: string, now: Date = new Date()): P
       time_off: [],
       make_up_turns: [],
       assignments: groupEvents.flatMap((e) => e.assignments ?? []),
+      // Only answers for the Events loaded here.
+      headcount_answers: (answersBy.get(group.id) ?? []).filter((a) => groupEvents.some((e) => e.id === a.event_id)),
     });
     return { id: group.id, name: group.name, timeZone: group.time_zone, state, myMemberId: memberId };
   });

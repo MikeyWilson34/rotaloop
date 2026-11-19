@@ -81,7 +81,7 @@ export function responsibilityViews(state: GroupState): ResponsibilityView[] {
   return activeResponsibilities(state).map((r) => {
     const qualifiedCount = queueOf(state, r.id).length;
     const parts = [
-      plural(qualifiedCount, 'Qualified Member'),
+      plural(qualifiedCount, 'member'),
       `${r.headcount} per Event`,
       r.requiresConfirmation ? 'Needs confirmation' : 'No confirmation',
     ];
@@ -133,7 +133,7 @@ export function validateResponsibilityForm(
   if (!name) errors.name = 'Give it a name, like Host or Setup.';
   else if (name.length > NAME_MAX) errors.name = `Keep the name under ${NAME_MAX} characters.`;
   else if (otherNames.some((n) => n.trim().toLowerCase() === name.toLowerCase())) {
-    errors.name = 'There is already a Responsibility with that name.';
+    errors.name = 'There is already a job with that name.';
   }
   const headcount = Number(form.headcount.trim());
   if (!/^\d+$/.test(form.headcount.trim()) || headcount < 1 || headcount > HEADCOUNT_MAX) {
@@ -344,7 +344,7 @@ export function validateSeriesForm(
   if (weekOfMonth !== null && ![1, 2, 3, 4, -1].includes(weekOfMonth)) errors.days = 'Pick which week of the month.';
 
   const responsibilityIds = form.responsibilityIds.filter((id) => activeResponsibilityIds.includes(id));
-  if (responsibilityIds.length === 0) errors.responsibilities = 'Pick at least one Responsibility for these Events.';
+  if (responsibilityIds.length === 0) errors.responsibilities = 'Pick at least one job for these dates.';
 
   if (Object.keys(errors).length > 0 || !startTime || !startsOn) return { ok: false, errors };
   return {
@@ -450,7 +450,7 @@ export function validateOneOffForm(
   if (!date) errors.date = 'Enter a date like 2026-12-05.';
   if (!time) errors.time = 'Enter a time like 6:30 PM or 18:30.';
   const responsibilityIds = form.responsibilityIds.filter((id) => activeResponsibilityIds.includes(id));
-  if (responsibilityIds.length === 0) errors.responsibilities = 'Pick at least one Responsibility.';
+  if (responsibilityIds.length === 0) errors.responsibilities = 'Pick at least one job.';
   let startsAt: string | null = null;
   if (date && time) {
     startsAt = zonedTimeToInstant(date, time, isValidTimeZone(timeZone) ? timeZone : 'UTC');
@@ -481,7 +481,7 @@ export function upcomingOneOffEvents(state: GroupState, now: Date): OneOffView[]
 export type Choice<T extends string> = { value: T; label: string; description: string };
 
 export const COVERAGE_POLICY_CHOICES: readonly Choice<CoveragePolicy>[] = [
-  { value: 'payItBack', label: 'Pay It Back', description: 'Whoever declines owes the person who covers a Make-up Turn.' },
+  { value: 'payItBack', label: 'Pay It Back', description: "Whoever can't make it takes the coverer's next turn." },
   {
     value: 'countRealWork',
     label: 'Count Real Work',
@@ -493,9 +493,9 @@ export const REPLACEMENT_DUTY_CHOICES: readonly Choice<ReplacementDuty>[] = [
   {
     value: 'assignedMember',
     label: 'Assigned Member',
-    description: 'If nobody volunteers by the alert time, the Member who declined finds a replacement.',
+    description: "If nobody volunteers by the alert time, the person who can't make it finds someone.",
   },
-  { value: 'admins', label: 'Admins', description: 'If nobody volunteers by the alert time, the Admins find a replacement.' },
+  { value: 'admins', label: 'The group', description: 'If nobody volunteers by the alert time, the group finds someone.' },
 ];
 
 export const TIME_OFF_CHOICES: readonly Choice<TimeOffHandling>[] = [
@@ -510,7 +510,7 @@ export const TIME_OFF_CHOICES: readonly Choice<TimeOffHandling>[] = [
 export const DOUBLING_COPY = {
   label: 'Allow the same person twice at one Event',
   off: 'Off: one Assignment per person per Event',
-  on: 'On: one person can hold two Responsibilities at the same Event',
+  on: 'On: one person can have two jobs on the same date',
 };
 
 export const REPLACEMENT_DEADLINE_DAYS = [1, 2, 3, 4, 5, 7, 10, 14] as const;
@@ -544,8 +544,8 @@ export function countRealWorkWarning(state: GroupState): string {
   const n = outstandingMakeUpTurns(state);
   const lost =
     n === 0
-      ? 'There are no outstanding Make-up Turns right now.'
-      : `The ${plural(n, 'outstanding Make-up Turn')} will be cancelled.`;
+      ? 'There are no swapped turns waiting right now.'
+      : `The ${plural(n, 'swapped turn')} still waiting will be cancelled.`;
   return `Covering will count toward workload and declining creates no debt. ${lost} This is recorded in the schedule history.`;
 }
 
@@ -580,14 +580,14 @@ export function setupChecklist(state: GroupState): { show: boolean; items: Check
     items: [
       {
         key: 'responsibilities',
-        label: 'Add Responsibilities',
+        label: 'Add jobs',
         description: 'The duties your group shares, like Host or Setup.',
         done: hasResponsibilities,
       },
       {
         key: 'qualified',
-        label: "Choose who's Qualified",
-        description: 'Pick who can take each Responsibility. They rotate in order.',
+        label: 'Choose who takes turns',
+        description: 'Pick who takes each job. They rotate in order.',
         done: allQualified,
       },
       {

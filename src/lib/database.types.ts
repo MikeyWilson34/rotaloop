@@ -295,6 +295,68 @@ export type Database = {
           },
         ]
       }
+      headcount_answers: {
+        Row: {
+          answer: Database["public"]["Enums"]["headcount_reply"]
+          answered_at: string
+          answered_by: string | null
+          event_id: string
+          group_id: string
+          member_id: string
+          position: number
+          responsibility_id: string
+        }
+        Insert: {
+          answer: Database["public"]["Enums"]["headcount_reply"]
+          answered_at: string
+          answered_by?: string | null
+          event_id: string
+          group_id: string
+          member_id: string
+          position: number
+          responsibility_id: string
+        }
+        Update: {
+          answer?: Database["public"]["Enums"]["headcount_reply"]
+          answered_at?: string
+          answered_by?: string | null
+          event_id?: string
+          group_id?: string
+          member_id?: string
+          position?: number
+          responsibility_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "headcount_answers_group_id_event_id_fkey"
+            columns: ["group_id", "event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["group_id", "id"]
+          },
+          {
+            foreignKeyName: "headcount_answers_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "headcount_answers_group_id_member_id_fkey"
+            columns: ["group_id", "member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["group_id", "id"]
+          },
+          {
+            foreignKeyName: "headcount_answers_group_id_responsibility_id_fkey"
+            columns: ["group_id", "responsibility_id"]
+            isOneToOne: false
+            referencedRelation: "responsibilities"
+            referencedColumns: ["group_id", "id"]
+          },
+        ]
+      }
       invite_links: {
         Row: {
           created_at: string
@@ -594,6 +656,7 @@ export type Database = {
           group_id: string
           headcount: number
           id: string
+          kind: Database["public"]["Enums"]["job_kind"]
           name: string
           position: number
           removed_at: string | null
@@ -603,6 +666,7 @@ export type Database = {
           group_id: string
           headcount: number
           id: string
+          kind?: Database["public"]["Enums"]["job_kind"]
           name: string
           position: number
           removed_at?: string | null
@@ -612,6 +676,7 @@ export type Database = {
           group_id?: string
           headcount?: number
           id?: string
+          kind?: Database["public"]["Enums"]["job_kind"]
           name?: string
           position?: number
           removed_at?: string | null
@@ -838,6 +903,9 @@ export type Database = {
         | "memberNoLongerQualified"
         | "coverWithdrawn"
         | "responsibilityRemoved"
+        | "lapsed"
+      headcount_reply: "yes" | "no"
+      job_kind: "turns" | "headcount"
       make_up_turn_status: "outstanding" | "paid" | "settled" | "cancelled"
       notification_kind:
         | "coverageRequest"
@@ -999,7 +1067,10 @@ export const Constants = {
         "memberNoLongerQualified",
         "coverWithdrawn",
         "responsibilityRemoved",
+        "lapsed",
       ],
+      headcount_reply: ["yes", "no"],
+      job_kind: ["turns", "headcount"],
       make_up_turn_status: ["outstanding", "paid", "settled", "cancelled"],
       notification_kind: [
         "coverageRequest",

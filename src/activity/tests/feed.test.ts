@@ -199,10 +199,10 @@ describe('activityItems', () => {
     const items = activityItems(entries, [asGroup(b.state)], { now: NOW, viewerTimeZone: ZONE, lastSeenAt: '2026-11-17T00:00:00.000Z' });
     expect(items.map((i) => i.kind)).toEqual(['change', 'coverage', 'confirm', 'confirm']);
     const [skip, decline, confirm] = items;
-    expect(skip.text).toMatch(/^You marked Sun, Jan 10 as a Skip Date/);
+    expect(skip.text).toMatch(/^You marked Sun, Jan 10 as a day off/);
     expect(skip.icon).toBe('calX');
     expect(skip.unread).toBe(false); // my own
-    expect(decline.text).toBe("Cal can't make Sound on Sun, Dec 6. Coverage requested.");
+    expect(decline.text).toBe("Cal can't make Sound on Sun, Dec 6. The group was asked to cover.");
     expect(decline.tone).toBe('bad');
     expect(decline.meta).toBe('Sunday Team · 5:00 AM');
     expect(decline.unread).toBe(true);
@@ -251,5 +251,29 @@ describe('activityItems', () => {
     // An Assignment no longer on the schedule opens the Group.
     const gone = { ...byType('confirm'), cause: { type: 'confirm', assignmentId: 'nope' } as Cause };
     expect(activityTarget(gone, g)).toEqual({ kind: 'group', groupId: 'g1' });
+  });
+});
+
+describe('Activity tells covers in plain words (simplify ticket 07)', () => {
+  it('the swap sentence, from each side, with the engine’s dates; an outside cover has none', () => {
+    const b = buildGroup();
+    // Ben can't make his Nov 29 Sound turn; Ana takes it, so Ben takes Ana's Dec 13 turn.
+    const sound = seat(b.state, '2026-11-29', 'sound');
+    run(b, { type: 'decline', assignmentId: sound.id }, 'ben');
+    run(b, { type: 'cover', assignmentId: sound.id }, 'ana');
+    // Pat's (a Stand-in's) Dec 13 Greeter turn goes to someone outside the group.
+    run(b, { type: 'decline', assignmentId: seat(b.state, '2026-12-13', 'greeter').id, coveredBy: { guestName: 'Jo' } }, 'cal');
+    const entries: FeedEntry[] = b.history.map((h) => ({ ...h, groupId: 'g1' }));
+    const ctx = { now: NOW, viewerTimeZone: ZONE, lastSeenAt: null };
+    const texts = (me: string) =>
+      activityItems(entries, [asGroup(b.state, me)], ctx)
+        .filter((i) => i.icon === 'userCheck' || i.icon === 'repeat')
+        .map((i) => i.text);
+    expect(texts('ana')).toContain("You're covering Ben's Sound turn on Nov 29. Ben takes your next turn on Dec 13.");
+    expect(texts('ben')).toContain("Ana's covering for you on Nov 29. You'll take Ana's next turn on Dec 13.");
+    expect(texts('cal')).toContain("Ana is covering Ben's Sound turn on Nov 29. Ben takes Ana's next turn on Dec 13.");
+    expect(texts('ana')).toContain("Jo is covering Pat's Greeter turn on Dec 13.");
+    const all = activityItems(entries, [asGroup(b.state, 'ana')], ctx);
+    expect(all.find((i) => i.text.startsWith("You're covering"))!.detail).toBeNull();
   });
 });
