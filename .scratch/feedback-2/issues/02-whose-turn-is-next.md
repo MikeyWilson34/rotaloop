@@ -1,6 +1,6 @@
 # 02 Joining a rotation that's already going: "Whose turn is next?"
 
-Status: needs-triage (design agreed, prototype first)
+Status: needs-triage (revised design in prototype, waiting for owner confirmation)
 Blocked by: none
 
 From the product owner (2026-11-19): when a group's rotation is already running before they start using the app, they need a way to say "I'm next and Thain has the week after". It must be optional.
@@ -17,3 +17,9 @@ A simple, optional part of group creation, for each Take turns Job:
 - Rows should show the actual dates the people get, so it reads as "who has which week".
 - Can't add the same person twice in a row? Open question: allow repeats at all? Default guess: each person once.
 - Engine: maps to the initial Rotation queue order (ADR 0001).
+
+## Revised design (worked out with the product owner in the Orca worker, 2026-11-19; supersedes the above)
+- No extra step in group creation; setup stays 3 screens.
+- Group settings gets a "Turn order" section: one row per Take turns job, showing "Next: <name> · Change the order".
+- Tapping it opens a "Turn order" sheet: one row per member in order, each row = date, coloured initials circle, name, with up/down arrows. After the last person it starts again from the top. One "Save" button.
+- Saving sets the job's rotation order starting from the next date. See `design/prototype/simple.html` (Version 4 of the prototype artifact).
