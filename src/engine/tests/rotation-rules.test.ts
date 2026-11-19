@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { GroupState, NewEvent } from '../index';
+import { planSchedule } from '../schedule';
 import { act, afterWeek, assignmentOf, lineup, setup, sundays, timeOff, week } from './scenario';
 
 /**
@@ -123,5 +124,22 @@ describe('Rotation rules', () => {
     expect(lineup(state, 'teach')[1]).toBe('t2 b');
     expect(lineup(state, 'greeter')[1]).not.toBe('g2 b');
     expect(doubleBooked(state)).toEqual([]);
+  });
+});
+
+describe('Rests for display ("break for")', () => {
+  it('marks the seat that went to someone else because the next in line just served', () => {
+    let state = covered(weekly(TRIO, 8), 'w2', 'sam', 'tom');
+    state = act(state, { type: 'addTimeOff', timeOff: timeOff('t1', 'sam', 3) }, { by: 'sam' }).state;
+    // Tom covered w2, so he rests at w3: Jordan takes it, "break for Tom".
+    const rests = planSchedule(state)
+      .filter((s) => s.restedFor)
+      .map((s) => `${s.eventId} ${s.memberId} for ${s.restedFor}`);
+    expect(rests).toEqual(['w3 jordan for tom']);
+  });
+
+  it('marks nothing in a plain rotation', () => {
+    expect(planSchedule(weekly(TRIO, 6)).some((s) => s.restedFor)).toBe(false);
+    expect(planSchedule(weekly(['a', 'b'], 6)).some((s) => s.restedFor)).toBe(false);
   });
 });
