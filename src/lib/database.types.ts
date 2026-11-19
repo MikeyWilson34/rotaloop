@@ -838,6 +838,7 @@ export type Database = {
         | "memberNoLongerQualified"
         | "coverWithdrawn"
         | "responsibilityRemoved"
+        | "lapsed"
       make_up_turn_status: "outstanding" | "paid" | "settled" | "cancelled"
       notification_kind:
         | "coverageRequest"
@@ -999,6 +1000,7 @@ export const Constants = {
         "memberNoLongerQualified",
         "coverWithdrawn",
         "responsibilityRemoved",
+        "lapsed",
       ],
       make_up_turn_status: ["outstanding", "paid", "settled", "cancelled"],
       notification_kind: [

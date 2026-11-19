@@ -175,7 +175,8 @@ describe('describeHistoryEntry', () => {
       'You changed Replacement Duty to Admins and "Find a replacement by" to 2 days before.',
       'You changed the Coverage Policy to Count Real Work.',
     ]);
-    expect(texts('makeUpTurnPaid')).toEqual(['You paid back the Sound Make-up Turn owed to Ben.']);
+    // Ana's Sound swap keeps waiting (she greets on Ben's Sound dates), so Cal's is the one paid.
+    expect(texts('makeUpTurnPaid')).toEqual(['Cal paid back the Greeter Make-up Turn owed to Pat.']);
     expect(first('makeUpTurnPaid').tone).toBe('ok');
   });
 

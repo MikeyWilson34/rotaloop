@@ -39,7 +39,7 @@ One Member filling one seat of one Responsibility at one Event.
 _Avoid_: Shift, slot, booking, duty
 
 **Rotation**:
-The ordered queue of Qualified Members for one Responsibility, which decides who is assigned next. A Member passed over because they were unavailable keeps their place at the front.
+The ordered queue of Qualified Members for one Responsibility, which decides who is assigned next. A Member passed over because they were unavailable keeps their place at the front. Filling each Event follows three rules, in order (ADR 0005): a Cover is a swap (the Member who was covered takes the coverer's next turn, unless they're on Time Off then, in which case it lapses); no one serves two Events of a Responsibility in a row unless no one else can; and no one holds two seats on the same day. In the UI: "Job" for Responsibility, "Turn" for Assignment, "Cover", and "Dates off" for Time Off; never Event Series, Responsibility or Make-up Turn.
 _Avoid_: Roster, cycle, order
 
 **Rebalance**:
@@ -93,5 +93,5 @@ A per-Group setting that decides what a Decline costs: either Count Real Work (n
 _Avoid_: Debt mode, fairness mode
 
 **Make-up Turn**:
-Under the Pay It Back policy, the turn a Member who declined owes to the Member who covered them. It is paid by taking that Member's next turn in the same Responsibility.
+Under the Pay It Back policy, the turn a Member who declined owes to the Member who covered them. It is paid by taking that Member's next turn in the same Responsibility that the debtor can serve (not on a day they're already booked, and not right after their own previous turn). If the debtor is on Time Off at that turn, it lapses. Engine-only: the UI calls it a swap ("You'll take Sam's next turn").
 _Avoid_: Debt, IOU, owed turn

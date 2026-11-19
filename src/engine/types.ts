@@ -231,7 +231,9 @@ export type MakeUpTurnClosedReason =
   | 'memberLeft'
   | 'memberNoLongerQualified'
   | 'coverWithdrawn'
-  | 'responsibilityRemoved';
+  | 'responsibilityRemoved'
+  /** The debtor was on Time Off at the coverer's next natural turn, so the swap lapsed. */
+  | 'lapsed';
 
 /**
  * Under Pay It Back: the debtor (who asked for coverage) owes the creditor (who
