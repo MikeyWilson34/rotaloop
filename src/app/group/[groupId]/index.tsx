@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Info, Settings } from 'lucide-react-native';
+import { ChevronLeft, Settings } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { InviteCard } from '@/components/group/InviteCard';
 import { ComingUp } from '@/components/group/ComingUp';
 import { GroupTile } from '@/components/group/GroupTile';
 import { MembersSection } from '@/components/group/MembersSection';
@@ -11,7 +12,7 @@ import type { RunCommand } from '@/components/group/runCommand';
 import { TurnSheet } from '@/components/group/TurnSheet';
 import { HeadcountSheet } from '@/components/home/HeadcountSheet';
 import { SectionHeading } from '@/components/schedule/parts';
-import { Button, InfoNote, Notice, Text } from '@/components/ui';
+import { Button, Notice, Text } from '@/components/ui';
 import type { TurnRow } from '@/lib/groupPage';
 import { activeMemberCount, memberCountLabel, myMember } from '@/lib/groupViews';
 import { GROUP_GONE, useGroup, useRunCommand } from '@/lib/groups';
@@ -85,6 +86,8 @@ export default function GroupScreen() {
     );
   } else {
     const count = activeMemberCount(data.state);
+    // Only real member (the rest are stand-ins): the invite card sits up top, not under Members too.
+    const solo = data.state.members.every((m) => m.leftAt !== null || m.id === me.id || m.accountId === null);
     body = (
       <View style={{ paddingHorizontal: space.lg, gap: space.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingBottom: space.xs }}>
@@ -98,10 +101,8 @@ export default function GroupScreen() {
             </Text>
           </View>
         </View>
-        {count < 2 ? (
-          <InfoNote icon={Info}>
-            <Text variant="subhead">All turns are yours until people join. Tap Invite people under Members to share the link.</Text>
-          </InfoNote>
+        {solo ? (
+          <InviteCard group={data} title="Invite your group" subtitle="Share the turns. Everyone gets their own reminders." />
         ) : null}
 
         <View style={{ marginTop: space.md }}>
@@ -112,7 +113,7 @@ export default function GroupScreen() {
         <View style={{ marginTop: space.lg }}>
           <SectionHeading title="Members" />
         </View>
-        <MembersSection group={data} myMemberId={me.id} run={run} />
+        <MembersSection group={data} myMemberId={me.id} run={run} showInviteCard={!solo} />
 
         {open?.headcount ? (
           <HeadcountSheet

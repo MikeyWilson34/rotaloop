@@ -231,13 +231,25 @@ try {
   }
   await expectScreen('the new group: typed name is a stand-in', new RegExp(`E2E Standin ${stamp}[\\s\\S]*Stand-in`));
   // Invite from the group page (feedback-2 ticket 03): no trip through settings.
+  // Feedback-2 ticket 04: you're the only real member, so the invite card is at the top of the
+  // page ("Invite your group") and not repeated under Members; "Add a stand-in" is a small link.
+  await expectScreen('group page: invite card up top when you are the only member', /Invite your group[\s\S]*Coming up/);
   if (process.env.E2E_SHOTS) {
-    await page.getByRole('button', { name: 'Invite people', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
-    await shoot('group-members-invite');
+    await sleep(4500); // let the 'schedule is ready' toast go
+    await shoot('group-solo-top-card');
+    await page.getByRole('button', { name: 'Add a stand-in', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+    await shoot('group-members-standins');
   }
+  await page.getByRole('button', { name: 'Invite people', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
   await click('Invite people');
   await expectScreen('group page: invite sheet shows the join link', /Anyone with this link[\s\S]*\/join\/[0-9a-f]{64}/);
   if (process.env.E2E_SHOTS) await shoot('group-invite-sheet');
+  await click('Done');
+  await sleep(600);
+  // "Invite <first name>" on a stand-in's row opens that person's own link.
+  await page.getByRole('button', { name: 'Invite E2E', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+  await click('Invite E2E');
+  await expectScreen("stand-in row: Invite opens that person's own link", new RegExp(`Invite E2E Standin ${stamp}[\\s\\S]*just for[\\s\\S]*[0-9a-f]{64}`));
   await click('Done');
   await sleep(600);
 
