@@ -107,26 +107,6 @@ export function SectionHead({
   );
 }
 
-/** "You're all caught up." (prototype `.caught`). */
-export function CaughtUp({ text }: { text: string }) {
-  const { colors, fonts, radii } = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        borderRadius: radii.lg,
-        backgroundColor: colors.successTint,
-      }}>
-      <CircleCheck size={20} color={colors.successText} strokeWidth={1.75} />
-      <Text style={{ flex: 1, fontFamily: fonts.bold, fontSize: 14, lineHeight: 20, color: colors.successText }}>{text}</Text>
-    </View>
-  );
-}
-
 /** A filter chip with an optional count; the row scrolls sideways instead of wrapping. */
 export function FilterChips<T extends string>({
   options,

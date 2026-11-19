@@ -109,7 +109,15 @@ describe('3-screen group setup', () => {
     expect(greeterTurns.length).toBeGreaterThan(4);
     // Every Sunday at 10:00 in Chicago (16:00 UTC in winter).
     expect(greeterTurns[0].startsAt).toBe('2026-12-06T16:00:00.000Z');
-    expect(greeterTurns.slice(0, 6).map((x) => x.a.memberId)).toEqual([ana, ben, cal, ana, ben, cal]);
+    // Join order, adjusted by the no-double-booking rule: Coffee (1st Sunday) goes Ana on Dec 6
+    // and Ben on Jan 3, so they are kept off Greeter those mornings and keep their place.
+    expect(greeterTurns.slice(0, 6).map((x) => x.a.memberId)).toEqual([ben, ana, cal, ana, cal, ben]);
+    const coffeeHolders = new Map(
+      state.assignments
+        .filter((a) => a.responsibilityId === state.responsibilities[1].id)
+        .map((a) => [state.events.find((e) => e.id === a.eventId)!.startsAt.slice(0, 10), a.memberId]),
+    );
+    for (const { a, startsAt } of greeterTurns) expect(coffeeHolders.get(startsAt.slice(0, 10))).not.toBe(a.memberId);
     for (const { a, startsAt } of greeterTurns) {
       expect(a.memberId).not.toBeNull();
       expect(a.confirmation).toBe('notRequired');

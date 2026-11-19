@@ -1,7 +1,9 @@
 /**
- * What Home shows (ticket 12), derived from the person's Groups: the greeting, the "Your next
- * Assignment" hero, "Needs your attention", the "Your groups" cards (with Admin-only health
- * stats) and their filters.
+ * What Home shows (simplify ticket 05), derived from the person's Groups: only the next
+ * 7 days. The big card is the viewer's first turn this week; under it "Needs you" (covers they
+ * can take and anything waiting on them, this week only) and "This week" (their other turns).
+ * With nothing due, a calm card names their next turn. Then "Your groups": one card per Group
+ * with the viewer's next turn there.
  *
  * Pure TypeScript: no React, Supabase or clock reads (callers pass `now` and the viewer's
  * time zone), so it is unit-tested under Node. It builds on the schedule views
@@ -10,10 +12,11 @@
 import { assignmentActions, isOpenRequest } from '../coverage/actions';
 import { firstName, qualifiedToAsk } from '../coverage/sheets';
 import { replacementDutyHolder } from '../engine/status';
-import type { Assignment, Event, GroupState, Instant, MemberId } from '../engine/types';
+import type { Assignment, GroupState, Instant, MemberId } from '../engine/types';
 import { localTime } from '../schedule/expandSeries';
 import {
   dateIn,
+  daysBetween,
   formatDayLong,
   formatDayShort,
   formatMonthDay,
@@ -22,35 +25,23 @@ import {
   relativeDay,
 } from '../schedule/format';
 import { movedNotice, type HistoryContext, type HistoryRecord } from '../schedule/history';
-import { eventView, nextEvent, type DisplayStatus, type EventView, type ScheduleGroup, type SlotView } from '../schedule/views';
+import { eventView, type EventView, type ScheduleGroup, type SlotView } from '../schedule/views';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-/** "Pending in the next 3 weeks" on an Admin's group card. */
-export const PENDING_WINDOW_DAYS = 21;
-/** "Recent changes" on an Admin's group card: the last 7 days of schedule history. */
-export const RECENT_CHANGES_DAYS = 7;
+/** Home looks this many days ahead (today plus the next 7, like the prototype's `WEEK`). */
+export const HOME_DAYS = 7;
 
 // ---------------------------------------------------------------------------
 // Inputs
 
 /** One of the person's Groups as Home sees it: the schedule plus recent history. */
 export type HomeGroup = ScheduleGroup & {
-  /**
-   * Recent schedule history (any order), for "moved" notices and the Admin's "recent
-   * changes". Routine entries (the schedule filled, Events added by the daily job) may be
-   * left out by the caller.
-   */
+  /** Recent schedule history (any order), for "moved" items in "Needs you". */
   history: HistoryRecord[];
 };
 
 export type HomeContext = {
   now: Instant;
   viewerTimeZone: string;
-  /**
-   * The person's reminder settings as a sentence (notificationPrefs' reminderSummary), for the
-   * hero's "You're all set." line. Defaults to "We'll remind you before the Event."
-   */
-  reminderText?: string;
 };
 
 function me(group: ScheduleGroup) {
@@ -79,18 +70,19 @@ export function timeText(startsAt: Instant, groupTimeZone: string, viewerTimeZon
   return `${formatTimeIn(startsAt, viewerTimeZone)}${note ? ` (${note})` : ''}`;
 }
 
-/** "AR" for "Alex Rivera", "B" for "Ben". */
-export function initialsOf(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return '?';
-  const first = words[0][0] ?? '';
-  const last = words.length > 1 ? (words[words.length - 1][0] ?? '') : '';
-  return `${first}${last}`.toUpperCase();
+const todayOf = (ctx: HomeContext) => dateIn(ctx.now, ctx.viewerTimeZone);
+
+/** The date (in the viewer's zone) falls in Home's window: today through 7 days from now. */
+export function inHomeWindow(date: string, today: string): boolean {
+  const n = daysBetween(today, date);
+  return n >= 0 && n <= HOME_DAYS;
 }
 
-/** Every upcoming Assignment seat of the Group, with its Event, soonest first. */
-function upcomingSlots(group: ScheduleGroup, ctx: HomeContext): { event: EventView; slot: SlotView; assignment: Assignment }[] {
-  const out: { event: EventView; slot: SlotView; assignment: Assignment }[] = [];
+type Slot = { event: EventView; slot: SlotView; assignment: Assignment };
+
+/** Every upcoming seat of the Group, with its Event, soonest first. */
+function upcomingSlots(group: ScheduleGroup, ctx: HomeContext): Slot[] {
+  const out: Slot[] = [];
   const byId = new Map(group.state.assignments.map((a) => [a.id, a]));
   for (const e of group.state.events) {
     if (e.skipDate || started(e.startsAt, ctx.now)) continue;
@@ -107,8 +99,8 @@ function historyContext(group: HomeGroup, ctx: HomeContext): HistoryContext {
   return { state: group.state, myMemberId: group.myMemberId, timeZone: ctx.viewerTimeZone };
 }
 
-/** The Make-up Turn an Assignment pays: who covered the viewer, and on which date. */
-function makeUpTurnPaid(state: GroupState, assignment: Assignment, viewerTimeZone: string) {
+/** The swap a turn pays back: who covered the viewer, and on which date. */
+function swapPaid(state: GroupState, assignment: Assignment, viewerTimeZone: string) {
   const turn = assignment.makeUpTurnId ? state.makeUpTurns.find((t) => t.id === assignment.makeUpTurnId) : undefined;
   if (!turn) return null;
   const creditor = state.members.find((m) => m.id === turn.creditorId)?.name ?? 'Someone';
@@ -118,13 +110,13 @@ function makeUpTurnPaid(state: GroupState, assignment: Assignment, viewerTimeZon
 }
 
 /** "Ben covered you on Nov 22, so you're taking Ben's turn." */
-function makeUpSentence(paid: { creditor: string; coverDate: string | null }, tail: string): string {
+function swapSentence(paid: { creditor: string; coverDate: string | null }, tail: string): string {
   const on = paid.coverDate ? ` on ${formatMonthDay(paid.coverDate)}` : '';
   return `${paid.creditor} covered you${on}, so ${tail}`;
 }
 
 // ---------------------------------------------------------------------------
-// Greeting
+// Header
 
 /** "Good morning, Alex" (by the viewer's clock), or without a name when there is none. */
 export function greeting(name: string | null | undefined, ctx: HomeContext): string {
@@ -136,68 +128,70 @@ export function greeting(name: string | null | undefined, ctx: HomeContext): str
 
 /** "Monday, November 16": today in the viewer's time zone. */
 export function todayLabel(ctx: HomeContext): string {
-  return formatDayLong(dateIn(ctx.now, ctx.viewerTimeZone));
+  return formatDayLong(todayOf(ctx));
 }
 
 // ---------------------------------------------------------------------------
-// Hero: "Your next Assignment"
+// The viewer's turns
 
-export type HeroMode =
-  /** Pending (or Unconfirmed): Confirm / Can't make it. */
-  | 'confirm'
-  /** Confirmed, covering, or no confirmation needed: "You're all set". */
-  | 'allSet'
-  /** Needs confirmation later: "Nothing to do yet". */
-  | 'later';
-
-export type HeroView = {
+/** One of the viewer's turns, as the big card and the "This week" rows show it. */
+export type TurnView = {
+  /** `${groupId}/${assignmentId}`. */
   key: string;
   groupId: string;
   groupName: string;
   assignmentId: string;
+  /** The Job's name. */
   responsibilityName: string;
+  /** The civil date in the viewer's zone. */
   date: string;
-  /** "Sunday, November 22". */
-  dateLabel: string;
+  startsAt: Instant;
+  /** "Sun, Nov 22". */
+  dayLabel: string;
   /** "9:00 AM", with the Group's time when it differs. */
   timeLabel: string;
-  /** "In 6 days". */
+  /** "Today", "Tomorrow", "In 4 days". */
   relative: string;
-  status: DisplayStatus;
-  /** "You're covering" instead of the status label. */
-  pillLabel: string | null;
-  /** Everyone else serving at that Event (first names), for the "With …" line. */
-  with: { name: string; initials: string }[];
-  /** "With Ben, Cal & 1 more", or null. */
-  withLabel: string | null;
-  /** Moved and Make-up Turn notes. */
-  notes: string[];
-  makeUpTurn: boolean;
-  mode: HeroMode;
-  /** The line next to the check mark when there's nothing to answer. */
-  doneText: string;
+  /** The viewer asked for cover and nobody has taken it yet. */
+  needsCover: boolean;
+  /** The viewer is covering someone else's turn. */
+  covering: boolean;
 };
 
-/** "With Ben", "With Ben, Cal", "With Ben, Cal & 2 more". */
-export function withLabel(names: string[]): string | null {
-  if (names.length === 0) return null;
-  const shown = names.slice(0, 2).join(', ');
-  return names.length > 2 ? `With ${shown} & ${names.length - 2} more` : `With ${shown}`;
-}
+export type HeroMode =
+  /** The usual: one red "Can't make it". */
+  | 'cantMakeIt'
+  /** A Job that still asks for confirmation (older groups): Confirm / Can't make it. */
+  | 'confirm'
+  /** The viewer asked for cover: "Needs cover. We'll tell you when someone takes it." */
+  | 'needsCover'
+  /** A headcount date (ticket 09): green Yes / red No. Not produced until headcount Jobs exist. */
+  | 'headcount';
 
-type Candidate = { group: HomeGroup; event: EventView; slot: SlotView; assignment: Assignment };
+export type HeadcountAnswer = 'yes' | 'no';
+
+export type HeroNote = { tone: 'ok' | 'warn'; strong?: string; text: string };
+
+/** The big navy card: the viewer's first turn in the next 7 days. */
+export type HeroView = TurnView & {
+  mode: HeroMode;
+  /** One short line under the date ("You're covering for Ben. Thank you!"), or null. */
+  note: HeroNote | null;
+  /** Headcount dates only: the viewer's answer and how many are coming so far. */
+  headcount?: { answer: HeadcountAnswer | null; coming: number };
+};
+
+type Mine = Slot & { group: HomeGroup };
 
 /**
- * The viewer's own upcoming Assignments (including ones they cover), soonest first. Their
- * open Coverage Requests are left out: they aren't serving those unless someone covers.
+ * The viewer's own upcoming turns across their Groups (including ones they cover and ones
+ * they asked cover for), soonest first.
  */
-function myUpcoming(groups: HomeGroup[], ctx: HomeContext): Candidate[] {
-  const out: Candidate[] = [];
+function myTurns(groups: HomeGroup[], ctx: HomeContext): Mine[] {
+  const out: Mine[] = [];
   for (const group of groups) {
-    if (!group.myMemberId) continue;
-    for (const s of upcomingSlots(group, ctx)) {
-      if (s.slot.mine && !isOpenRequest(s.assignment)) out.push({ group, ...s });
-    }
+    if (!group.myMemberId || !me(group)) continue;
+    for (const s of upcomingSlots(group, ctx)) if (s.slot.mine) out.push({ group, ...s });
   }
   return out.sort(
     (a, b) =>
@@ -207,52 +201,8 @@ function myUpcoming(groups: HomeGroup[], ctx: HomeContext): Candidate[] {
   );
 }
 
-function awaitingConfirmation(c: Candidate, ctx: HomeContext): boolean {
-  return (
-    assignmentActions({
-      assignment: c.assignment,
-      eventStartsAt: c.event.startsAt,
-      requiresConfirmation: requiresConfirmation(c.group.state, c.assignment.responsibilityId),
-      qualified: qualifiedFor(c.group.state, c.group.myMemberId, c.assignment.responsibilityId),
-      me: c.group.myMemberId,
-      isAdmin: isAdminOf(c.group),
-      settings: c.group.state.settings,
-      now: ctx.now,
-    }).state === 'minePending'
-  );
-}
-
-/** The viewer's next Assignment across all their Groups, or null when nothing is coming up. */
-export function selectHero(groups: HomeGroup[], ctx: HomeContext): HeroView | null {
-  const next = myUpcoming(groups, ctx)[0];
-  if (!next) return null;
-  const { group, event, slot, assignment } = next;
-  const today = dateIn(ctx.now, ctx.viewerTimeZone);
-  const others = event.slots
-    .filter((s) => s.assignmentId !== slot.assignmentId)
-    .flatMap((s) => {
-      if (s.who.kind === 'member' && !s.who.isMe) return [s.who.name];
-      if (s.who.kind === 'guest') return [s.who.name];
-      return [];
-    });
-  const unique = [...new Set(others)];
-
-  const notes: string[] = [];
-  const moved = movedNotice(group.history, slot.assignmentId, historyContext(group, ctx));
-  if (moved) notes.push(moved);
-  const paid = makeUpTurnPaid(group.state, assignment, ctx.viewerTimeZone);
-  if (paid) notes.push(`Make-up Turn: ${makeUpSentence(paid, `you're taking ${paid.creditor}'s turn.`)}`);
-
-  const mode: HeroMode = awaitingConfirmation(next, ctx)
-    ? 'confirm'
-    : slot.status === 'scheduled' && requiresConfirmation(group.state, assignment.responsibilityId) && assignment.confirmation === 'notYetRequested'
-      ? 'later'
-      : 'allSet';
-  const doneText =
-    mode === 'later'
-      ? "Nothing to do yet. We'll ask you to confirm closer to the Event."
-      : `You're all set. ${ctx.reminderText ?? "We'll remind you before the Event."}`;
-
+function turnView(m: Mine, ctx: HomeContext): TurnView {
+  const { group, event, slot, assignment } = m;
   return {
     key: slot.key,
     groupId: group.id,
@@ -260,35 +210,60 @@ export function selectHero(groups: HomeGroup[], ctx: HomeContext): HeroView | nu
     assignmentId: slot.assignmentId,
     responsibilityName: slot.responsibilityName,
     date: event.date,
-    dateLabel: formatDayLong(event.date),
+    startsAt: event.startsAt,
+    dayLabel: formatDayShort(event.date),
     timeLabel: timeText(event.startsAt, group.timeZone, ctx.viewerTimeZone),
-    relative: relativeDay(event.date, today),
-    status: slot.status,
-    pillLabel: slot.covering ? "You're covering" : null,
-    with: unique.map((name) => ({ name: firstName(name), initials: initialsOf(name) })),
-    withLabel: withLabel(unique.map(firstName)),
-    notes,
-    makeUpTurn: slot.makeUpTurn,
-    mode,
-    doneText,
+    relative: relativeDay(event.date, todayOf(ctx)),
+    needsCover: isOpenRequest(assignment),
+    covering: slot.covering,
   };
 }
 
+function awaitingConfirmation(m: Mine, ctx: HomeContext): boolean {
+  return (
+    assignmentActions({
+      assignment: m.assignment,
+      eventStartsAt: m.event.startsAt,
+      requiresConfirmation: requiresConfirmation(m.group.state, m.assignment.responsibilityId),
+      qualified: qualifiedFor(m.group.state, m.group.myMemberId, m.assignment.responsibilityId),
+      me: m.group.myMemberId,
+      isAdmin: isAdminOf(m.group),
+      settings: m.group.state.settings,
+      now: ctx.now,
+    }).state === 'minePending'
+  );
+}
+
+function heroView(m: Mine, ctx: HomeContext): HeroView {
+  const turn = turnView(m, ctx);
+  if (turn.needsCover) {
+    return { ...turn, mode: 'needsCover', note: { tone: 'warn', strong: 'Needs cover.', text: "We'll tell you when someone takes it." } };
+  }
+  let note: HeroNote | null = null;
+  const paid = swapPaid(m.group.state, m.assignment, ctx.viewerTimeZone);
+  if (m.slot.covering && m.slot.coveredFor) {
+    note = { tone: 'ok', text: `You're covering for ${firstName(m.slot.coveredFor)}. Thank you!` };
+  } else if (paid) {
+    note = { tone: 'ok', text: swapSentence(paid, `you're taking ${paid.creditor}'s turn.`) };
+  }
+  return { ...turn, mode: awaitingConfirmation(m, ctx) ? 'confirm' : 'cantMakeIt', note };
+}
+
 // ---------------------------------------------------------------------------
-// Needs your attention
+// Needs you
 
 export type AttentionKind =
-  /** Replacement Duty is mine: nobody covered by the deadline. */
+  /** Nobody took a cover in time and finding someone is now on me. */
   | 'replacementDuty'
-  /** Someone's Coverage Request I'm Qualified to cover. */
+  /** Someone's cover request I can take. */
   | 'cover'
-  /** My own open Coverage Request. */
+  /** My own open cover request. */
   | 'myRequest'
-  /** A Make-up Turn waiting for my confirmation. */
+  /** A swapped turn waiting for my confirmation. */
   | 'makeUp'
-  /** My Assignment moved and needs confirming again. */
+  /** My turn moved and needs confirming again. */
   | 'moved'
-  /** Any other Assignment waiting for my confirmation. */
+  /** Any other turn waiting for my confirmation. */
   | 'confirm';
 
 export type AttentionActionKind = 'cover' | 'markCovered' | 'confirm' | 'decline' | 'details' | 'viewRequest' | 'withdraw';
@@ -330,7 +305,7 @@ const KIND_RANK: Record<AttentionKind, number> = {
 
 const A = {
   details: { kind: 'details', label: 'Details', variant: 'secondary' },
-  cover: { kind: 'cover', label: 'I can cover', variant: 'primary' },
+  cover: { kind: 'cover', label: "I'll cover", variant: 'primary' },
   markCovered: { kind: 'markCovered', label: 'Mark covered', variant: 'primary' },
   confirm: { kind: 'confirm', label: 'Confirm', variant: 'positive' },
   decline: { kind: 'decline', label: "Can't make it", variant: 'secondary' },
@@ -339,32 +314,32 @@ const A = {
 } as const satisfies Record<string, AttentionAction>;
 
 export type AttentionOptions = {
-  /** The hero's key: its Confirm is on the hero, so it isn't repeated here. */
+  /** The big card's key: its turn is on the card, so it isn't repeated here. */
   heroKey?: string | null;
-  /** The server can take back a Decline (`withdrawDecline`): offer "I can make it after all" on my own Declines. */
+  /** The server can take back a "Can't make it" (`withdrawDecline`): offer "I can make it after all". */
   canWithdraw?: boolean;
 };
 
 /**
- * Everything waiting on the viewer, soonest Event first: Replacement Duty they hold, Coverage
- * Requests they can cover, their own open requests, and their Assignments awaiting
- * confirmation (Make-up Turns and moved ones called out). One item per Assignment.
+ * Everything waiting on the viewer, soonest date first (all dates; `homeWeek` keeps the next
+ * 7 days): covers nobody took that are now on them, covers they can take, their own open
+ * requests, and their turns awaiting confirmation. One item per turn.
  */
 export function attentionItems(groups: HomeGroup[], ctx: HomeContext, options: AttentionOptions = {}): AttentionItem[] {
   const items: (AttentionItem & { order: number })[] = [];
   let order = 0;
+  const today = todayOf(ctx);
   for (const group of groups) {
     const meId = group.myMemberId;
     if (!meId || !me(group)) continue;
     const admin = isAdminOf(group);
     const hctx = historyContext(group, ctx);
-    const today = dateIn(ctx.now, ctx.viewerTimeZone);
     const slots = upcomingSlots(group, ctx);
     const mySeatAt = new Set(slots.filter((s) => s.slot.mine && !isOpenRequest(s.assignment)).map((s) => s.event.eventId));
 
     for (const { event, slot, assignment } of slots) {
       const base = {
-        key: `${slot.key}`,
+        key: slot.key,
         groupId: group.id,
         groupName: group.name,
         assignmentId: slot.assignmentId,
@@ -384,14 +359,19 @@ export function attentionItems(groups: HomeGroup[], ctx: HomeContext, options: A
         const holder = replacementDutyHolder(assignment, event.startsAt, group.state.settings, ctx.now);
         const iHoldDuty = (holder === 'assignedMember' && iAsked) || (holder === 'admins' && admin);
         const withdraw = options.canWithdraw && iAsked && request.reason === 'declined' ? [A.withdraw] : [];
-        const requesterName = firstName(group.state.members.find((m) => m.id === requester)?.name ?? 'Someone');
+        const requesterMember = group.state.members.find((m) => m.id === requester);
+        const requesterName = firstName(requesterMember?.name ?? 'Someone');
         if (iHoldDuty) {
           push({
             kind: 'replacementDuty',
             tone: 'bad',
             icon: 'alert',
-            title: iAsked ? `Nobody's free for your ${r} turn` : `Nobody's free for ${r} (${requesterName})`,
-            sub: `${group.name} · ${day} · ${rel}. No one volunteered in time, so please find a replacement.`,
+            title: iAsked
+              ? `Nobody's free for your ${r} turn`
+              : requesterMember
+                ? `Nobody's free for ${r} (${requesterName})`
+                : `${r} needs cover`,
+            sub: `${group.name} · ${day} · ${rel}. No one offered in time, so please find someone.`,
             actions: [A.markCovered, A.details, ...withdraw],
           });
         } else if (iAsked) {
@@ -411,9 +391,9 @@ export function attentionItems(groups: HomeGroup[], ctx: HomeContext, options: A
           push({
             kind: 'cover',
             tone: 'bad',
-            icon: 'repeat',
-            title: `${requesterName} needs someone for ${r}`,
-            sub: `${group.name} · ${day}`,
+            icon: 'alert',
+            title: `${requesterName} can't make it`,
+            sub: `${r} · ${day} · ${group.name}`,
             actions: [A.cover, A.details],
           });
         }
@@ -421,25 +401,25 @@ export function attentionItems(groups: HomeGroup[], ctx: HomeContext, options: A
       }
 
       if (!slot.mine || slot.key === options.heroKey) continue;
-      if (!awaitingConfirmation({ group, event, slot, assignment }, ctx)) continue;
-      const paid = makeUpTurnPaid(group.state, assignment, ctx.viewerTimeZone);
-      const moved = movedNotice(group.history, slot.assignmentId, hctx);
+      const m: Mine = { group, event, slot, assignment };
+      if (!awaitingConfirmation(m, ctx)) continue;
+      const paid = swapPaid(group.state, assignment, ctx.viewerTimeZone);
       if (paid) {
         push({
           kind: 'makeUp',
           tone: 'warn',
           icon: 'handshake',
-          title: 'Confirm your Make-up Turn',
-          sub: `${group.name} · ${makeUpSentence(paid, `you'll take ${paid.creditor}'s ${r} turn on ${day}.`)}`,
+          title: 'Confirm your swapped turn',
+          sub: `${group.name} · ${swapSentence(paid, `you'll take ${paid.creditor}'s ${r} turn on ${day}.`)}`,
           actions: [A.confirm, A.decline],
         });
-      } else if (moved) {
+      } else if (movedNotice(group.history, slot.assignmentId, hctx)) {
         push({
           kind: 'moved',
           tone: 'warn',
           icon: 'calendar',
           title: `Your ${r} turn moved`,
-          sub: `${group.name} · ${moved} Please confirm again.`,
+          sub: `${group.name} · Now ${day}. Please confirm again.`,
           actions: [A.confirm, A.decline],
         });
       } else {
@@ -463,134 +443,65 @@ export function attentionItems(groups: HomeGroup[], ctx: HomeContext, options: A
 }
 
 // ---------------------------------------------------------------------------
-// Your groups
+// The week
 
-export type GroupHealth = {
-  /** Open Coverage Requests on upcoming Events (including ones past the deadline). */
-  openCoverage: number;
-  /** Of those, the ones past the "find a replacement by" deadline. */
-  findingReplacement: number;
-  /** Assignments awaiting confirmation at Events in the next 3 weeks. */
-  pendingSoon: number;
-  /** Schedule history entries in the last 7 days (routine ones left out). */
-  recentChanges: number;
-  /** Upcoming Skip Dates (civil dates in the viewer's zone), soonest first. */
-  skipDates: string[];
-  /** Something for an Admin to look at: open coverage or pending confirmations. */
-  needsAttention: boolean;
+export type HomeWeek = {
+  /** The big card: the viewer's first turn in the next 7 days, or null ("Nothing this week"). */
+  hero: HeroView | null;
+  /** "Needs you": only items dated in the next 7 days; empty means the section is hidden. */
+  needsYou: AttentionItem[];
+  /** "This week": the viewer's other turns in the next 7 days (not repeated from "Needs you"). */
+  thisWeek: TurnView[];
+  /** "Greeter · Welcome team · Sun, Nov 29": the viewer's next turn anywhere, or null. */
+  nextTurn: string | null;
 };
 
-/** History entries that don't count as "changes": the schedule filling itself in. */
-export function isRoutineHistory(entry: Pick<HistoryRecord, 'cause' | 'actorId'>): boolean {
-  return entry.cause.type === 'fillSchedule' || (entry.cause.type === 'addEvents' && entry.actorId === null);
-}
+export type HomeWeekOptions = Pick<AttentionOptions, 'canWithdraw'>;
 
-/** An Admin's health stats for one Group. */
-export function groupHealth(group: HomeGroup, ctx: HomeContext): GroupHealth {
-  const t = Date.parse(ctx.now);
-  let openCoverage = 0;
-  let findingReplacement = 0;
-  let pendingSoon = 0;
-  for (const { event, slot } of upcomingSlots(group, ctx)) {
-    if (slot.status === 'needsCoverage' || slot.status === 'findReplacement') openCoverage++;
-    if (slot.status === 'findReplacement') findingReplacement++;
-    if (slot.status === 'pending' && Date.parse(event.startsAt) - t <= PENDING_WINDOW_DAYS * DAY_MS) pendingSoon++;
-  }
-  const since = t - RECENT_CHANGES_DAYS * DAY_MS;
-  const recentChanges = group.history.filter((h) => {
-    const at = Date.parse(h.at);
-    return at >= since && at <= t && !isRoutineHistory(h);
-  }).length;
-  const skipDates = group.state.events
-    .filter((e: Event) => e.skipDate && !started(e.startsAt, ctx.now))
-    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))
-    .map((e) => dateIn(e.startsAt, ctx.viewerTimeZone));
+/** Everything above "Your groups" on Home. */
+export function homeWeek(groups: HomeGroup[], ctx: HomeContext, options: HomeWeekOptions = {}): HomeWeek {
+  const today = todayOf(ctx);
+  const mine = myTurns(groups, ctx);
+  const week = mine.filter((m) => inHomeWindow(m.event.date, today));
+  const hero = week.length ? heroView(week[0], ctx) : null;
+  const needsYou = attentionItems(groups, ctx, { heroKey: hero?.key ?? null, canWithdraw: options.canWithdraw }).filter(
+    // My own open requests show as "Needs cover" on the card or in "This week" instead.
+    (item) => item.kind !== 'myRequest' && item.key !== hero?.key && inHomeWindow(item.date, today),
+  );
+  const listed = new Set(needsYou.map((i) => i.key));
+  const thisWeek = week
+    .slice(1)
+    .filter((m) => !listed.has(m.slot.key))
+    .map((m) => turnView(m, ctx));
+  const next = mine.find((m) => !isOpenRequest(m.assignment));
   return {
-    openCoverage,
-    findingReplacement,
-    pendingSoon,
-    recentChanges,
-    skipDates,
-    needsAttention: openCoverage + pendingSoon > 0,
+    hero,
+    needsYou,
+    thisWeek,
+    nextTurn: next ? `${next.slot.responsibilityName} · ${next.group.name} · ${formatDayShort(next.event.date)}` : null,
   };
 }
 
-/** "Skip Nov 26, Dec 27" (at most `max` dates, then "+N"), or "No Skip Dates". */
-export function skipDatesLabel(dates: string[], max = 2): string {
-  if (dates.length === 0) return 'No Skip Dates';
-  const shown = dates.slice(0, max).map((d) => formatMonthDay(d));
-  return `Skip ${shown.join(', ')}${dates.length > max ? ` +${dates.length - max}` : ''}`;
-}
+// ---------------------------------------------------------------------------
+// Your groups
 
 export type GroupCardView = {
   groupId: string;
   name: string;
-  isAdmin: boolean;
-  /** "Sun, Nov 22 · Worship Lead: Ben", "Sun, Nov 22", or "No upcoming Events". */
-  nextLine: string;
-  /** The viewer's next turn here, or null ("No turns soon"). */
-  myNext: { label: string; status: DisplayStatus; pillLabel: string | null } | null;
-  /** Admins only; null for a regular Member (Members never see group health). */
-  health: GroupHealth | null;
+  /** "Your next turn: Greeter · Sun, Nov 29" or "No turns coming up". */
+  line: string;
 };
 
-/** One card per Group, by name. */
+/** One card per Group, by name, with the viewer's next turn there. */
 export function groupCards(groups: HomeGroup[], ctx: HomeContext): GroupCardView[] {
   return [...groups]
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.id.localeCompare(b.id))
     .map((group) => {
-      const admin = isAdminOf(group);
-      const next = nextEvent(group, ctx.now, ctx.viewerTimeZone);
-      let nextLine = 'No upcoming Events';
-      if (next) {
-        const primaryId = group.state.primaryResponsibilityId;
-        const primary = group.state.responsibilities.find((r) => r.id === primaryId && r.removedAt === null);
-        const holders = primary ? next.slots.filter((s) => s.responsibilityId === primary.id).map((s) => s.whoLabel) : [];
-        nextLine = primary && holders.length
-          ? `${formatDayShort(next.date)} · ${primary.name}: ${holders.join(', ')}`
-          : formatDayShort(next.date);
-      }
-      const mine = upcomingSlots(group, ctx).find((s) => s.slot.mine);
+      const next = me(group) ? upcomingSlots(group, ctx).find((s) => s.slot.mine && !isOpenRequest(s.assignment)) : undefined;
       return {
         groupId: group.id,
         name: group.name,
-        isAdmin: admin,
-        nextLine,
-        myNext: mine
-          ? {
-              label: `You · ${formatMonthDay(mine.event.date)}`,
-              status: mine.slot.status,
-              pillLabel: mine.slot.covering ? 'Covering' : null,
-            }
-          : null,
-        health: admin ? groupHealth(group, ctx) : null,
+        line: next ? `Your next turn: ${next.slot.responsibilityName} · ${formatDayShort(next.event.date)}` : 'No turns coming up',
       };
     });
-}
-
-export type GroupFilter = 'all' | 'managed' | 'attention';
-
-/** The filter chips show only to someone who administers at least one Group. */
-export function showGroupFilters(cards: GroupCardView[]): boolean {
-  return cards.some((c) => c.isAdmin);
-}
-
-export function filterGroupCards(cards: GroupCardView[], filter: GroupFilter): GroupCardView[] {
-  if (filter === 'managed') return cards.filter((c) => c.isAdmin);
-  if (filter === 'attention') return cards.filter((c) => c.isAdmin && c.health?.needsAttention);
-  return cards;
-}
-
-export function groupFilterCounts(cards: GroupCardView[]): Record<GroupFilter, number> {
-  return {
-    all: cards.length,
-    managed: filterGroupCards(cards, 'managed').length,
-    attention: filterGroupCards(cards, 'attention').length,
-  };
-}
-
-/** A filter from the URL, falling back to All (and to All for someone who manages nothing). */
-export function parseGroupFilter(value: string | undefined, cards: GroupCardView[]): GroupFilter {
-  if (!showGroupFilters(cards)) return 'all';
-  return value === 'managed' || value === 'attention' ? value : 'all';
 }
