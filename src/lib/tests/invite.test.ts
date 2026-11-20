@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_WEB_URL, WEB_URL } from '../../config/app';
-import { inviteAppUrl, inviteTokenFromUrl, inviteUrl, parseInviteToken, resumeInviteRoute } from '../invite';
+import { inviteAppUrl, inviteTokenFromUrl, inviteUrl, parseInviteToken, resumeInviteRoute, standInsByMatch } from '../invite';
 
 const token = 'a'.repeat(32) + '0123456789abcdef0123456789abcdef';
 const other = 'b'.repeat(64);
@@ -79,5 +79,21 @@ describe('resumeInviteRoute', () => {
   it('does nothing on the join screen or without a pending invite', () => {
     expect(resumeInviteRoute('app', token, 'join')).toBeNull();
     expect(resumeInviteRoute('app', null, '(tabs)')).toBeNull();
+  });
+});
+
+describe('standInsByMatch ("Are you one of these?")', () => {
+  const people = [{ name: 'Pat Morgan' }, { name: 'ruth' }, { name: 'Ruthie' }, { name: 'Ruth Smith' }, { name: 'Sam' }];
+  const names = (myName: string) => standInsByMatch(people, myName).map((p) => p.name);
+
+  it('puts the same full name, then the same first name, then a prefix match first', () => {
+    expect(names('Ruth Smith')).toEqual(['Ruth Smith', 'ruth', 'Ruthie', 'Pat Morgan', 'Sam']);
+    expect(names('  RUTH ')).toEqual(['ruth', 'Ruth Smith', 'Ruthie', 'Pat Morgan', 'Sam']);
+    expect(names('Pat')).toEqual(['Pat Morgan', 'ruth', 'Ruthie', 'Ruth Smith', 'Sam']);
+  });
+
+  it('keeps join order when nothing matches or there is no name', () => {
+    expect(names('Zed')).toEqual(people.map((p) => p.name));
+    expect(names('')).toEqual(people.map((p) => p.name));
   });
 });

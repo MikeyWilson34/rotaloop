@@ -13,7 +13,7 @@ A person who belongs to a Group. Every Member can do everything in their Group; 
 _Avoid_: Volunteer, user, Admin, Qualified Member
 
 **Stand-in**:
-A Member who isn't on the app, added by name by anyone in the Group. They take Turns like anyone else, any Member can answer for them, and they can claim their place later through their own invite link.
+A Member who isn't on the app, added by name by anyone in the Group. They take Turns like anyone else, any Member can answer for them, and they can claim their place later through their own invite link or by picking their name ("Are you one of these?") when they join with the Group's link. If they joined as someone new anyway, any Member can say "This is someone in the group" to give the Stand-in's Turns to them.
 _Avoid_: Placeholder, guest, offline member
 
 **Job**:
@@ -80,6 +80,9 @@ The engine's names for a Turn someone can't make and their saying so.
 
 **Make-up Turn** (Swap):
 The record that one Member owes another a Turn after a Cover.
+
+**Merge** ("This is someone in the group"):
+Handing a Stand-in's future Turns, Covers, Swaps and Dates off to the real Member they turned out to be, after which the Stand-in leaves (`mergeStandIn`, ADR 0008).
 
 **Guest Cover** (Outside cover), **Placeholder Member** (Stand-in), **Time Off** and **Skip Date** (Dates off: mine and the Group's).
 

@@ -2,7 +2,7 @@ import { ChevronRight, UserPlus } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { Badge, Button, Notice, SettingsList, Sheet, showToast, Text, TextField } from '@/components/ui';
+import { Badge, Button, ChoiceSheet, ConfirmSheet, Notice, SettingsList, Sheet, showToast, Text, TextField } from '@/components/ui';
 import { NAME_MAX } from '@/lib/groupSetup';
 import { firstName, memberItems, type MemberItem } from '@/lib/groupPage';
 import type { GroupDetails } from '@/lib/groups';
@@ -19,7 +19,9 @@ const FIRST = 6;
 /**
  * The group's members (prototype `PAGES.group` → Members), in join order. A stand-in (someone
  * not on the app) has a dashed avatar and a "Stand-in" pill; tapping one shares their own link
- * so they can take over their spot. "Add stand-in" is the last row.
+ * so they can take over their spot, or, if they already joined separately, "This is someone in
+ * the group" hands the stand-in's turns to them (feedback-2 ticket 05). "Add stand-in" is the
+ * last row.
  */
 export function MembersSection({
   group,
@@ -38,7 +40,9 @@ export function MembersSection({
   const [showAll, setShowAll] = useState(false);
   const [adding, setAdding] = useState(false);
   const [claimFor, setClaimFor] = useState<MemberItem | null>(null);
+  const [mergeFor, setMergeFor] = useState<MemberItem | null>(null);
   const shown = showAll ? members : members.slice(0, FIRST);
+  const onApp = members.filter((m) => !m.isStandIn);
 
   return (
     <View style={{ gap: space.md }}>
@@ -84,7 +88,20 @@ export function MembersSection({
         message={`This link is just for ${claimFor?.name ?? 'them'}. Joining with it keeps their place and their turns. It works once.`}
         loadToken={() => fetchClaimToken(group.id, claimFor?.id ?? '')}
         shareMessage={`${claimFor?.name ?? ''}, join ${group.name}:`}
+        moreAction={
+          onApp.length > 0
+            ? {
+                label: 'This is someone in the group',
+                hint: 'Gives their turns to someone already on the app',
+                onPress: () => {
+                  setMergeFor(claimFor);
+                  setClaimFor(null);
+                },
+              }
+            : undefined
+        }
       />
+      {mergeFor ? <MergeStandInSheets standIn={mergeFor} people={onApp} run={run} onClose={() => setMergeFor(null)} /> : null}
     </View>
   );
 }
@@ -232,5 +249,73 @@ function AddStandInSheet({
       />
       {error ? <Notice>{error}</Notice> : null}
     </Sheet>
+  );
+}
+
+/**
+ * "This is someone in the group": pick who the stand-in really is (someone on the app), then
+ * confirm. Their turns from now on go to that person and the stand-in is removed.
+ */
+export function MergeStandInSheets({
+  standIn,
+  people,
+  run,
+  onClose,
+  initialPick = null,
+}: {
+  standIn: MemberItem;
+  /** Members on the app, in join order. */
+  people: MemberItem[];
+  run: RunCommand;
+  onClose: () => void;
+  /** Opens straight on the confirm sheet (screenshots). */
+  initialPick?: MemberItem | null;
+}) {
+  const [into, setInto] = useState<MemberItem | null>(initialPick);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const standInName = standIn.name;
+  const real = into ? (into.isMe ? 'you' : into.name) : '';
+
+  async function merge() {
+    if (!into) return;
+    setBusy(true);
+    setError(null);
+    const failed = await run({ type: 'mergeStandIn', standInId: standIn.id, intoMemberId: into.id }, 'mergeStandIn');
+    setBusy(false);
+    if (failed) {
+      setError(failed);
+      return;
+    }
+    onClose();
+    showToast(`${standInName}'s turns now belong to ${real}.`);
+  }
+
+  return (
+    <>
+      <ChoiceSheet
+        visible={into === null}
+        title={`Who is ${standInName}?`}
+        message={`Pick ${standInName} from the people on the app. Their turns from now on go to that person.`}
+        options={people.map((m) => ({ value: m.id, label: m.isMe ? `${m.name} (you)` : m.name }))}
+        value=""
+        onPick={(id) => setInto(people.find((m) => m.id === id) ?? null)}
+        onClose={onClose}
+      />
+      <ConfirmSheet
+        visible={into !== null}
+        title={into?.isMe ? `Is ${standInName} you?` : `Is ${standInName} really ${real}?`}
+        message={`${standInName}'s turns from now on go to ${into?.isMe ? 'you' : `${real} (on the app)`}. Past turns keep the name ${standInName}. The stand-in is removed.`}
+        confirmLabel="Yes, same person"
+        cancelLabel="Back"
+        loading={busy}
+        error={error}
+        onConfirm={merge}
+        onCancel={() => {
+          setError(null);
+          setInto(null);
+        }}
+      />
+    </>
   );
 }

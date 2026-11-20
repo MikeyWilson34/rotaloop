@@ -382,6 +382,12 @@ export type Command =
   | { type: 'unqualifyMember'; memberId: MemberId; responsibilityId: ResponsibilityId }
   | { type: 'removeMember'; memberId: MemberId }
   | { type: 'claimPlaceholder'; memberId: MemberId; accountId: string }
+  /**
+   * "This is someone in the group": a Stand-in turns out to be a Member who joined separately.
+   * Their future turns, open requests, covers, swaps and dates off go to `intoMemberId`; past
+   * history keeps the Stand-in, who then leaves. See docs/adr/0008-merging-a-stand-in.md.
+   */
+  | { type: 'mergeStandIn'; standInId: MemberId; intoMemberId: MemberId }
   | { type: 'renameMember'; memberId: MemberId; name: string }
   | { type: 'setAdmin'; memberId: MemberId; isAdmin: boolean }
   | { type: 'addResponsibility'; responsibility: NewResponsibility; qualifiedMemberIds?: MemberId[] }

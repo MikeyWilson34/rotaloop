@@ -144,6 +144,35 @@ describe('join', () => {
     const visible = await t.asUser(DEE, () => t.db.query('select id from public.groups where id = $1', [groupId]));
     expect(visible.rows).toHaveLength(1);
   });
+
+  it('“Are you one of these?”: the join link claims a picked Stand-in, once; a second pick is told to pick again', async () => {
+    const { groupId } = await crewGroup();
+    expectOk(
+      await send(ANA, { action: 'command', groupId, command: { type: 'addMember', member: { name: 'Dee' }, qualifiedFor: ['sound'] } }),
+    );
+    const before = await loadState(groupId);
+    const dee = before.members.find((m) => m.name === 'Dee')!;
+    const deeTurns = before.assignments.filter((a) => a.memberId === dee.id).map((a) => a.id);
+    const token = await inviteToken(groupId);
+
+    const claimed = expectOk(await send(DEE, { action: 'join', token, memberName: 'Dee Smith', standInId: dee.id }));
+    expect(claimed.memberId).toBe(dee.id);
+    expect(claimed.history.map((h) => h.cause.type)).toEqual(['claimPlaceholder']);
+    const after = await loadState(groupId);
+    expect(after.members.find((m) => m.id === dee.id)).toMatchObject({ accountId: DEE, name: 'Dee' });
+    expect(after.members.filter((m) => m.leftAt === null)).toHaveLength(before.members.filter((m) => m.leftAt === null).length);
+    expect(after.assignments.filter((a) => a.memberId === dee.id).map((a) => a.id)).toEqual(deeTurns);
+
+    // Someone else picking the same Stand-in afterwards (the race's loser).
+    expect(await send(uuid(5), { action: 'join', token, memberName: 'Dee', standInId: dee.id })).toMatchObject({
+      ok: false,
+      reason: 'standInTaken',
+    });
+    // Not a Member of this Group at all.
+    expect(await send(uuid(5), { action: 'join', token, memberName: 'Eve', standInId: 'nobody' })).toMatchObject({
+      reason: 'standInTaken',
+    });
+  });
 });
 
 describe('command', () => {

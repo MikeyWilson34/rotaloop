@@ -56,7 +56,10 @@ export function createGroup(
   return invokeGroupCommand({ action: 'createGroup', ...group });
 }
 
-/** Joins through a Group's invite link, or claims a Placeholder through a personal claim link. */
-export function joinGroup(token: string, memberName: string): Promise<GroupCommandResponse> {
-  return invokeGroupCommand({ action: 'join', token, memberName });
+/**
+ * Joins through a Group's invite link, or claims a Placeholder through a personal claim link.
+ * `standInId` ("Are you one of these?" on the join link) claims that Stand-in instead.
+ */
+export function joinGroup(token: string, memberName: string, standInId?: string): Promise<GroupCommandResponse> {
+  return invokeGroupCommand(standInId ? { action: 'join', token, memberName, standInId } : { action: 'join', token, memberName });
 }

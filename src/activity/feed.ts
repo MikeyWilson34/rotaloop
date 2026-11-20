@@ -65,6 +65,7 @@ const ICONS: Record<string, ActivityIcon> = {
   removeTimeOff: 'calOff',
   addMember: 'userPlus',
   claimPlaceholder: 'userPlus',
+  mergeStandIn: 'userCheck',
   removeMember: 'userMinus',
   setAdmin: 'shield',
   addResponsibility: 'settings',

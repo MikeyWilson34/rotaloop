@@ -42,6 +42,8 @@ export type GroupAction =
   | 'removeSkipDate'
   /** "Coming?" Yes / No for a headcount job (simplify ticket 09). */
   | 'answerHeadcount'
+  /** "This is someone in the group": merge a stand-in into a real member (feedback-2 ticket 05). */
+  | 'mergeStandIn'
   | 'other';
 
 /**
@@ -112,6 +114,10 @@ const ASSIGNMENT: Partial<Record<GroupAction, Partial<Record<string, string>>>> 
     notFound: "That date or job isn't in the group anymore. Pull down to refresh.",
     invalid: "That date doesn't need this job anymore. Pull down to refresh.",
   },
+  mergeStandIn: {
+    notFound: 'They already joined or left the group. Pull down to refresh.',
+    invalid: 'Pick someone who is on the app.',
+  },
   markCovered: {
     notPermitted: 'Only people in this group can say who is covering.',
     noCoverageRequest: "This doesn't need cover anymore. Pull down to refresh.",
@@ -156,6 +162,8 @@ export function groupCommandMessage(reason: GroupCommandFailure | string, action
       return "That invite link isn't working. It may have been reset or already used: ask for a new one.";
     case 'alreadyMember':
       return "You're already in this group.";
+    case 'standInTaken':
+      return 'Someone else just joined as that person. Pick again, or join as someone new.';
     case 'conflict':
       return 'Others were changing the group at the same moment. Please try again.';
     case 'serverError':

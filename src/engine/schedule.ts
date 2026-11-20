@@ -208,6 +208,8 @@ function servers(seats: (Assignment | PlannedSeat)[]): Set<MemberId> {
 /**
  * Who served the latest past Event of each Responsibility (Covers count for the
  * coverer): they just had the previous date, so they rest at the next one if they can.
+ * A former Member counts as the same person as the active Member with their account: a
+ * Stand-in merged into a real Member (`mergeStandIn`, ADR 0008) or someone who rejoined.
  */
 function previousServers(state: GroupState, now: number): Map<ResponsibilityId, Set<MemberId>> {
   const result = new Map<ResponsibilityId, Set<MemberId>>();
@@ -215,10 +217,27 @@ function previousServers(state: GroupState, now: number): Map<ResponsibilityId, 
   for (const event of past) {
     const seats = state.assignments.filter((a) => a.eventId === event.id);
     for (const responsibilityId of new Set(seats.map((a) => a.responsibilityId))) {
-      result.set(responsibilityId, servers(seats.filter((a) => a.responsibilityId === responsibilityId)));
+      result.set(responsibilityId, samePeople(state, servers(seats.filter((a) => a.responsibilityId === responsibilityId))));
     }
   }
   return result;
+}
+
+/** The Members plus the active Members who are the same person (same account) as a former one. */
+function samePeople(state: GroupState, memberIds: Set<MemberId>): Set<MemberId> {
+  const result = new Set(memberIds);
+  for (const id of memberIds) {
+    const former = state.members.find((m) => m.id === id && m.leftAt !== null && m.accountId !== null);
+    if (!former) continue;
+    for (const m of state.members) if (m.leftAt === null && m.accountId === former.accountId) result.add(m.id);
+  }
+  return result;
+}
+
+/** Whether two Events fall on the same calendar day in the Group's time zone (rule 3). */
+export function onSameDay(state: GroupState, a: Event, b: Event): boolean {
+  const zone = groupTimeZone(state);
+  return localDay(a, zone) === localDay(b, zone);
 }
 
 /** The time zone a Group's calendar days are counted in: its Event Series', else UTC. */

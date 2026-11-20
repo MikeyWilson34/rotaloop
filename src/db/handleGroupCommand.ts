@@ -303,6 +303,7 @@ async function join(
   context: HandlerContext,
 ): Promise<GroupCommandResponse> {
   const invalid = () => failure('invalidInvite', 'This invite link is no longer valid');
+  const standInTaken = () => failure('standInTaken', 'That Stand-in has already joined or left the Group');
   const invite = await store.findInvite(request.token);
   if (!invite) return invalid();
 
@@ -328,6 +329,16 @@ async function join(
           actorId: invite.memberId,
         };
       }
+      if (request.standInId) {
+        // The join link, "Are you one of these?": become that Stand-in, if still one of this Group's.
+        const standIn = state.members.find((m) => m.id === request.standInId);
+        if (!standIn || standIn.leftAt !== null || standIn.accountId !== null) return { done: standInTaken() };
+        return {
+          state,
+          command: { type: 'claimPlaceholder', memberId: standIn.id, accountId: context.accountId },
+          actorId: standIn.id,
+        };
+      }
       const memberId = context.newId();
       return {
         state,
@@ -340,8 +351,13 @@ async function join(
       };
     },
     invalid,
-    // A Placeholder that was claimed or removed in the meantime makes the link invalid.
-    (reason, message) => (invite.memberId && (reason === 'notFound' || reason === 'invalid') ? invalid() : failure(reason, message)),
+    // A Placeholder that was claimed or removed in the meantime makes the link invalid, or (on
+    // the join link) asks the person to pick again.
+    (reason, message) => {
+      if (reason !== 'notFound' && reason !== 'invalid') return failure(reason, message);
+      if (invite.memberId) return invalid();
+      return request.standInId ? standInTaken() : failure(reason, message);
+    },
   );
 }
 

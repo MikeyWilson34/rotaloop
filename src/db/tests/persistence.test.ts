@@ -121,6 +121,11 @@ describe('apply_group_command_result round trip', () => {
     );
     await step(run(state, { type: 'claimPlaceholder', memberId: 'eve', accountId: uuid(5) }, 'eve', afterWeek(2)));
     await step(run(state, { type: 'removeMember', memberId: 'cal' }, 'cal', afterWeek(2)));
+    // A Stand-in merged into Eve ("This is someone in the group"): it leaves with Eve's account.
+    await step(
+      run(state, { type: 'addMember', member: { id: 'fay', name: 'Fay' }, qualifiedFor: ['sound'] }, 'ana', afterWeek(2)),
+    );
+    await step(run(state, { type: 'mergeStandIn', standInId: 'fay', intoMemberId: 'eve' }, 'ana', afterWeek(2)));
 
     // Every mapped field was exercised.
     expect(state.timeOff[0].removedAt).not.toBeNull();
@@ -136,7 +141,8 @@ describe('apply_group_command_result round trip', () => {
     const count = async (table: string) =>
       Number((await t.db.query<{ n: number }>(`select count(*)::int n from public.${table} where group_id = $1`, [groupId])).rows[0].n);
     expect(await count('assignments')).toBe(state.assignments.length);
-    expect(await count('members')).toBe(5);
+    expect(state.members.find((m) => m.id === 'fay')).toMatchObject({ leftAt: afterWeek(2), accountId: uuid(5) });
+    expect(await count('members')).toBe(6);
     expect(await count('schedule_history')).toBe(historyCount);
   });
 

@@ -322,6 +322,12 @@ export function parseClientCommand(value: unknown): ClientCommand {
       };
     case 'removeMember':
       return { type: 'removeMember', memberId: id(o.memberId, f('memberId')) };
+    case 'mergeStandIn':
+      return {
+        type: 'mergeStandIn',
+        standInId: id(o.standInId, f('standInId')),
+        intoMemberId: id(o.intoMemberId, f('intoMemberId')),
+      };
     case 'renameMember':
       return { type: 'renameMember', memberId: id(o.memberId, f('memberId')), name: name(o.name, f('name')) };
     case 'setAdmin':
@@ -419,8 +425,16 @@ export function parseRequest(value: unknown): GroupCommandRequest {
       }
       return request;
     }
-    case 'join':
-      return { action: 'join', token: text(o.token, 'token', 200), memberName: name(o.memberName, 'memberName') };
+    case 'join': {
+      const request: Extract<GroupCommandRequest, { action: 'join' }> = {
+        action: 'join',
+        token: text(o.token, 'token', 200),
+        memberName: name(o.memberName, 'memberName'),
+      };
+      const standInId = optional(o.standInId, (v) => id(v, 'standInId'));
+      if (standInId) request.standInId = standInId;
+      return request;
+    }
     default:
       return fail(`Unknown action ${String(o.action)}`);
   }
