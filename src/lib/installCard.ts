@@ -1,6 +1,6 @@
 /**
- * The "Get Rotaloop on your phone" card (feedback-2 ticket 06): whether to show it and which
- * variant. Pure, so it is unit-tested under Node. The browser facts are read in
+ * The "Get Rotaloop on your phone" header icon (feedback-2 tickets 06 and 07): whether to show
+ * it and which variant. Pure, so it is unit-tested under Node. The browser facts are read in
  * installEvent.web.ts and useInstallCard.web.ts.
  */
 
@@ -22,29 +22,15 @@ export type InstallFacts = {
   standalone: boolean;
   /** A `beforeinstallprompt` event is saved and can still be used. */
   promptAvailable: boolean;
-  /** When "Not now" was tapped (ms since epoch), or null. */
-  dismissedAt: number | null;
-  /** Now, in ms since epoch. */
-  now: number;
 };
 
-/** "Not now" brings the card back after this long. */
-export const INSTALL_DISMISS_MS = 30 * 24 * 60 * 60 * 1000;
-
-
-/** Which variant to show, or null for no card (installed, a desktop, or dismissed lately). */
+/** Which variant to show, or null for no icon (installed, or a desktop). */
 export function installCardVariant(facts: InstallFacts): InstallVariant | null {
   if (facts.standalone) return null;
-  if (facts.dismissedAt !== null && facts.now - facts.dismissedAt < INSTALL_DISMISS_MS) return null;
   if (isIosDevice(facts.userAgent, facts.maxTouchPoints)) return 'ios';
-  // Only phones and tablets: a desktop browser can install too, but this card is for the phone.
+  // Only phones and tablets: a desktop browser can install too, but this icon is for the phone.
   if (!/Android/.test(facts.userAgent)) return null;
   return facts.promptAvailable ? 'prompt' : 'menu';
-}
-
-/** The card's second line. */
-export function installSubtitle(variant: InstallVariant): string {
-  return variant === 'ios' ? 'Add it to your Home Screen to get reminders' : 'Install it to open in one tap';
 }
 
 /** The numbered steps in the sheet (not used for the one-tap prompt). */

@@ -1,6 +1,7 @@
 /**
- * The website's "Get Rotaloop on your phone" card state: reads the browser facts, applies
- * installCardVariant (src/lib/installCard.ts) and remembers "Not now" in localStorage.
+ * The website's "Get Rotaloop on your phone" icon state: reads the browser facts, applies
+ * installCardVariant (src/lib/installCard.ts) and remembers the first tap (for the dot) in
+ * localStorage.
  */
 import { useCallback, useState, useSyncExternalStore } from 'react';
 
@@ -8,14 +9,13 @@ import { hasInstallPrompt, promptInstall, subscribeInstallEvent, wasInstalled } 
 import { installCardVariant } from './installCard';
 import type { InstallCardState } from './useInstallCard';
 
-const KEY = 'rotaloop.installDismissedAt';
+const KEY = 'rotaloop.installIconSeen';
 
-function readDismissedAt(): number | null {
+function readSeen(): boolean {
   try {
-    const value = Number(window.localStorage.getItem(KEY));
-    return Number.isFinite(value) && value > 0 ? value : null;
+    return window.localStorage.getItem(KEY) === '1';
   } catch {
-    return null; // storage unavailable: the card just shows again next time
+    return true; // storage unavailable: no dot is fine
   }
 }
 
@@ -30,16 +30,14 @@ export function useInstallCard(): InstallCardState {
   const promptAvailable = useSyncExternalStore(subscribeInstallEvent, hasInstallPrompt, () => false);
   const installed = useSyncExternalStore(subscribeInstallEvent, wasInstalled, () => false);
   // The site is a single-page export (no server render), so storage can be read right away.
-  const [dismissedAt, setDismissedAt] = useState<number | null>(readDismissedAt);
-  const [now] = useState(() => Date.now());
+  const [seen, setSeen] = useState<boolean>(readSeen);
 
-  const dismiss = useCallback(() => {
-    const at = Date.now();
-    setDismissedAt(at);
+  const markSeen = useCallback(() => {
+    setSeen(true);
     try {
-      window.localStorage.setItem(KEY, String(at));
+      window.localStorage.setItem(KEY, '1');
     } catch {
-      // ignore: hidden for this visit only
+      // ignore: the dot is gone for this visit only
     }
   }, []);
 
@@ -47,16 +45,13 @@ export function useInstallCard(): InstallCardState {
     await promptInstall();
   }, []);
 
-  const variant =
-    installed
-      ? null
-      : installCardVariant({
-          userAgent: navigator.userAgent,
-          maxTouchPoints: navigator.maxTouchPoints ?? 0,
-          standalone: isStandalone(),
-          promptAvailable,
-          dismissedAt,
-          now,
-        });
-  return { variant, install, dismiss };
+  const variant = installed
+    ? null
+    : installCardVariant({
+        userAgent: navigator.userAgent,
+        maxTouchPoints: navigator.maxTouchPoints ?? 0,
+        standalone: isStandalone(),
+        promptAvailable,
+      });
+  return { variant, fresh: variant !== null && !seen, install, markSeen };
 }
