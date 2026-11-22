@@ -15,7 +15,7 @@ import { SectionHeading } from '@/components/schedule/parts';
 import { Button, Notice, Text } from '@/components/ui';
 import type { TurnRow } from '@/lib/groupPage';
 import { activeMemberCount, memberCountLabel, myMember } from '@/lib/groupViews';
-import { GROUP_GONE, useGroup, useRunCommand } from '@/lib/groups';
+import { GROUP_GONE, useGroup, useRunCommand, useSendBackIfDeleted } from '@/lib/groups';
 import { useSession } from '@/lib/session';
 import { useTheme } from '@/theme';
 
@@ -28,7 +28,9 @@ export default function GroupScreen() {
   const { colors, space, minTapTarget } = useTheme();
   const { session } = useSession();
   const accountId = session?.user.id ?? null;
-  const { data, loading, error, refresh, reload, refreshing } = useGroup(groupId);
+  const { data, loading, error, refresh, reload, refreshing, deleted } = useGroup(groupId);
+  // Someone else deleted it while this page was open: back to Groups with a plain message.
+  useSendBackIfDeleted(groupId, deleted);
   const [open, setOpen] = useState<TurnRow | null>(null);
   const run: RunCommand = useRunCommand(groupId, reload);
 
@@ -73,10 +75,10 @@ export default function GroupScreen() {
       </View>
     );
   } else if (error || !data || !me) {
-    const gone = error === GROUP_GONE || (data && !me);
+    const gone = error === GROUP_GONE || !!deleted || (data && !me);
     body = (
       <View style={{ padding: space.lg, gap: space.md }}>
-        <Notice>{gone ? GROUP_GONE : (error ?? GROUP_GONE)}</Notice>
+        <Notice>{deleted ? (error ?? GROUP_GONE) : gone ? GROUP_GONE : (error ?? GROUP_GONE)}</Notice>
         {gone ? (
           <Button label="Back to Groups" variant="secondary" onPress={() => router.replace('/groups')} />
         ) : (

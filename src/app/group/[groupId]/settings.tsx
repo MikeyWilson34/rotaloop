@@ -31,9 +31,20 @@ import {
   type JobView,
   type TurnOrderJob,
 } from '@/lib/groupPage';
+import { deleteGroupConfirm, realMemberCount, youDeletedMessage } from '@/lib/deleteGroup';
+import { deleteGroup } from '@/lib/groupCommand';
+import { groupCommandMessage } from '@/lib/groupErrors';
 import { NAME_MAX, validateGroupName } from '@/lib/groupSetup';
 import { activeMemberCount, myMember, timeZoneLabel } from '@/lib/groupViews';
-import { GROUP_GONE, updateGroupDetails, useGroup, useRunCommand, type GroupDetails } from '@/lib/groups';
+import {
+  GROUP_GONE,
+  markDeletedHere,
+  updateGroupDetails,
+  useGroup,
+  useRunCommand,
+  useSendBackIfDeleted,
+  type GroupDetails,
+} from '@/lib/groups';
 import { inviteUrl } from '@/lib/invite';
 import { fetchGroupInviteToken, resetGroupInviteToken } from '@/lib/inviteLinks';
 import { useSession } from '@/lib/session';
@@ -44,15 +55,18 @@ import { useTheme } from '@/theme';
 /**
  * Group settings (simplify ticket 06, prototype `PAGES.settings`): jobs (tap to edit the same
  * sentence row as setup), the group's dates off, the invite link, more options (name, time
- * zone) and leaving. Every member may change all of it (there are no admins for now).
+ * zone), leaving and deleting the group (feedback-2 ticket 08). Every member may change all of
+ * it (there are no admins for now).
  */
 export default function GroupSettingsScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const { colors, space, minTapTarget } = useTheme();
   const { session } = useSession();
   const accountId = session?.user.id ?? null;
-  const { data, loading, error, refresh, reload } = useGroup(groupId);
+  const { data, loading, error, refresh, reload, deleted } = useGroup(groupId);
   const run: RunCommand = useRunCommand(groupId, reload);
+  // Someone else deleted it while this page was open: back to Groups with a plain message.
+  useSendBackIfDeleted(groupId, deleted);
   const me = data ? myMember(data.state, accountId) : undefined;
 
   function back() {
@@ -65,10 +79,10 @@ export default function GroupSettingsScreen() {
   if (loading) {
     body = <ActivityIndicator color={colors.primary} style={{ paddingVertical: space.huge }} />;
   } else if (error || !data || !me) {
-    const gone = error === GROUP_GONE || (data && !me);
+    const gone = error === GROUP_GONE || !!deleted || (data && !me);
     body = (
       <View style={{ gap: space.md }}>
-        <Notice>{gone ? GROUP_GONE : (error ?? GROUP_GONE)}</Notice>
+        <Notice>{deleted ? (error ?? GROUP_GONE) : gone ? GROUP_GONE : (error ?? GROUP_GONE)}</Notice>
         {gone ? (
           <Button label="Back to Groups" variant="secondary" onPress={() => router.replace('/groups')} />
         ) : (
@@ -123,7 +137,8 @@ function SettingsBody({
   const [editing, setEditing] = useState<JobView | 'new' | null>(null);
   const [addingOff, setAddingOff] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [sheet, setSheet] = useState<'name' | 'timeZone' | 'qr' | 'leave' | null>(null);
+  const [sheet, setSheet] = useState<'name' | 'timeZone' | 'qr' | 'leave' | 'delete' | null>(null);
+  const confirmDelete = deleteGroupConfirm(group.name, realMemberCount(group.state));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -158,6 +173,22 @@ function SettingsBody({
     router.dismissAll();
     router.replace('/groups');
     showToast(`You left ${group.name}`);
+  }
+
+  async function deleteForEveryone() {
+    setBusy(true);
+    setError(null);
+    const result = await deleteGroup(group.id);
+    setBusy(false);
+    if (!result.ok) {
+      setError(groupCommandMessage(result.reason, 'deleteGroup'));
+      return;
+    }
+    markDeletedHere(group.id);
+    setSheet(null);
+    router.dismissAll();
+    router.replace('/groups');
+    showToast(youDeletedMessage(group.name));
   }
 
   return (
@@ -232,6 +263,16 @@ function SettingsBody({
           style={({ pressed }) => ({ minHeight: 48, paddingHorizontal: space.lg, justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
           <Text style={{ fontFamily: fonts.extrabold, color: colors.dangerText, fontSize: 15 }}>Leave group</Text>
         </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Delete group"
+          onPress={() => {
+            setError(null);
+            setSheet('delete');
+          }}
+          style={({ pressed }) => ({ minHeight: 48, paddingHorizontal: space.lg, justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
+          <Text style={{ fontFamily: fonts.extrabold, color: colors.dangerText, fontSize: 15 }}>Delete group</Text>
+        </Pressable>
       </View>
 
       {editing ? (
@@ -271,6 +312,17 @@ function SettingsBody({
         loading={busy}
         error={error}
         onConfirm={leave}
+        onCancel={() => setSheet(null)}
+      />
+      <ConfirmSheet
+        visible={sheet === 'delete'}
+        title={confirmDelete.title}
+        message={confirmDelete.message}
+        confirmLabel="Delete group"
+        tone="destructive"
+        loading={busy}
+        error={error}
+        onConfirm={deleteForEveryone}
         onCancel={() => setSheet(null)}
       />
     </>

@@ -44,6 +44,8 @@ export type GroupAction =
   | 'answerHeadcount'
   /** "This is someone in the group": merge a stand-in into a real member (feedback-2 ticket 05). */
   | 'mergeStandIn'
+  /** Deleting the whole group (feedback-2 ticket 08). */
+  | 'deleteGroup'
   | 'other';
 
 /**
@@ -67,6 +69,8 @@ const INVALID: Partial<Record<GroupAction, string>> = {
   addTimeOff: 'Check the days you picked, then try again.',
   decline: 'Keep the reason under 300 characters, then try again.',
   addSkipDate: "That date is already off, or the reason is too long. Pull down to refresh, then try again.",
+  // The server doesn't know how to delete a group yet (an older version is running).
+  deleteGroup: "Couldn't delete the group right now. Please try again later.",
 };
 
 const NOT_FOUND: Partial<Record<GroupAction, string>> = {

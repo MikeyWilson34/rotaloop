@@ -8,7 +8,8 @@
 // presents the project's service role key.
 //
 // After each successful command (or join) it asks the notify function, in the background,
-// to send the push notifications the command caused (ticket 11).
+// to send the push notifications the command caused (ticket 11). `deleteGroup` (feedback-2
+// ticket 08) soft-deletes the Group and asks notify to tell everyone else.
 //
 // _shared/engine, _shared/db and _shared/schedule are generated copies of src/:
 // run `npm run functions:sync` (functions:deploy does it for you).
@@ -42,17 +43,27 @@ declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void } | unde
  * Hands a successful command's history to the notify function without delaying the reply.
  * A failure here never fails the command (notifications are best effort).
  */
-function notifyInBackground(response: GroupCommandResponse): void {
-  if (!response.ok || response.history.length === 0) return;
+function notifyInBackground(response: GroupCommandResponse, action: unknown): void {
+  if (!response.ok) return;
+  // A deleted Group: "Sam deleted Sunday Team" to everyone else (feedback-2 ticket 08).
+  if (action === 'deleteGroup') {
+    postToNotify({ action: 'groupDeleted', groupId: response.groupId });
+    return;
+  }
+  if (response.history.length === 0) return;
+  postToNotify({
+    action: 'afterCommand',
+    groupId: response.groupId,
+    stateVersion: response.stateVersion,
+    history: response.history,
+  });
+}
+
+function postToNotify(body: Record<string, unknown>): void {
   const task = fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/notify`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      action: 'afterCommand',
-      groupId: response.groupId,
-      stateVersion: response.stateVersion,
-      history: response.history,
-    }),
+    body: JSON.stringify(body),
   })
     .then(async (r) => {
       if (!r.ok) console.error('notify failed', r.status, await r.text());
@@ -128,6 +139,11 @@ const store: GroupStore = {
     if (error) throw error;
     return [...new Set((data ?? []).map((r) => r.group_id as string))];
   },
+  async markDeleted(groupId, accountId) {
+    const { data, error } = await admin.rpc('mark_group_deleted', { p_group_id: groupId, p_account_id: accountId });
+    if (error) throw error;
+    return data === true;
+  },
 };
 
 Deno.serve(async (req) => {
@@ -172,7 +188,8 @@ Deno.serve(async (req) => {
       newId: () => crypto.randomUUID(),
     });
     // A new Group has no one else to tell.
-    if ((body as { action?: unknown }).action !== 'createGroup') notifyInBackground(response);
+    const action = (body as { action?: unknown }).action;
+    if (action !== 'createGroup') notifyInBackground(response, action);
     return json(response);
   } catch (error) {
     console.error('group-command failed', error);

@@ -105,6 +105,11 @@ export async function createTestDb(): Promise<TestDb> {
         );
         return rows.map((r) => r.group_id);
       }),
+    markDeleted: (groupId, accountId) =>
+      as('service_role', null, async () => {
+        const { rows } = await db.query<{ ok: boolean }>('select public.mark_group_deleted($1, $2) as ok', [groupId, accountId]);
+        return rows[0].ok;
+      }),
   };
 
   return {

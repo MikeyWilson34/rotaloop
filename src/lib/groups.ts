@@ -4,14 +4,17 @@
  * The open Group follows Realtime changes on `groups` and `members`, so membership changes
  * made elsewhere show up live.
  */
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { showToast } from '@/components/ui/Toast';
 
 import type { GroupRow, GroupRows } from '../db/groupRows';
 import { stateFromRows } from '../db/groupRows';
 import type { GroupState } from '../engine';
 import { runGroupCommand, type ClientCommand } from './groupCommand';
 import { groupCommandMessage, groupDetailsMessage, type GroupAction } from './groupErrors';
+import { groupDeletedMessage } from './deleteGroup';
 import { groupCards, type GroupCardView } from './groupViews';
 import { useRealtimeChanges } from './realtime';
 import { useSession } from './session';
@@ -29,6 +32,8 @@ export type Loadable<T> = {
   reload: () => Promise<void>;
   /** True while a refresh (not the first load) is running. */
   refreshing: boolean;
+  /** The Group's name when the last load found it deleted (feedback-2 ticket 08), else null. */
+  deleted?: string | null;
 };
 
 export const LOAD_FAILED = "Couldn't load your groups. Check your connection and try again.";
@@ -43,6 +48,7 @@ export function useLoader<T>(key: string | null, load: () => Promise<T>, failedM
   const [data, setData] = useState<T | null>(null);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleted, setDeleted] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const run = useRef(0);
   const loadRef = useRef(load);
@@ -58,10 +64,12 @@ export function useLoader<T>(key: string | null, load: () => Promise<T>, failedM
       if (id !== run.current) return;
       setData(next);
       setError(null);
+      setDeleted(null);
     } catch (e) {
-      console.warn('Loading failed', e);
+      if (!(e instanceof GoneError)) console.warn('Loading failed', e);
       if (id !== run.current) return;
       setError(e instanceof GoneError ? e.message : failedMessage);
+      setDeleted(e instanceof GoneError ? e.deletedName : null);
     } finally {
       if (id === run.current) {
         setLoadedKey(key);
@@ -90,10 +98,19 @@ export function useLoader<T>(key: string | null, load: () => Promise<T>, failedM
     refresh: refreshVisibly,
     reload: refresh,
     refreshing,
+    deleted: current ? deleted : null,
   };
 }
 
-export class GoneError extends Error {}
+export class GoneError extends Error {
+  constructor(
+    message: string,
+    /** Set when the Group was deleted (rather than left or never joined). */
+    readonly deletedName: string | null = null,
+  ) {
+    super(message);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // The person's Groups
@@ -170,7 +187,10 @@ export async function fetchGroup(groupId: string): Promise<GroupDetails> {
   const { data, error } = await supabase.rpc('group_state_rows', { p_group_id: groupId });
   if (error) throw error;
   const rows = data as unknown as GroupStateRowsResult;
-  if (!rows?.group) throw new GoneError(GROUP_GONE);
+  if (!rows?.group) {
+    const deleted = await deletedGroupName(groupId);
+    throw deleted ? new GoneError(groupDeletedMessage(deleted), deleted) : new GoneError(GROUP_GONE);
+  }
   return {
     id: rows.group.id,
     name: rows.group.name,
@@ -180,6 +200,43 @@ export async function fetchGroup(groupId: string): Promise<GroupDetails> {
   };
 }
 
+/**
+ * The name of a Group the caller was in when it was deleted, or null. The `groups` row stays
+ * readable to them (and only it). Null on any error, e.g. before the server has `deleted_at`.
+ */
+async function deletedGroupName(groupId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.from('groups').select('name, deleted_at').eq('id', groupId).maybeSingle();
+    if (error || !data?.deleted_at) return null;
+    return data.name;
+  } catch {
+    return null;
+  }
+}
+
+/** Groups this device just deleted: their open screens don't announce it a second time. */
+const handledDeletes = new Set<string>();
+
+/** Call before navigating away after deleting `groupId` here. */
+export function markDeletedHere(groupId: string): void {
+  handledDeletes.add(groupId);
+}
+
+/**
+ * When the open Group turns out to be deleted (by someone else, live through Realtime or on
+ * the next load), goes back to the Groups tab with a plain message instead of a broken page.
+ * Once per Group, however many of its screens are open.
+ */
+export function useSendBackIfDeleted(groupId: string | undefined, deleted: string | null | undefined): void {
+  useEffect(() => {
+    if (!groupId || !deleted || handledDeletes.has(groupId)) return;
+    handledDeletes.add(groupId);
+    if (router.canDismiss()) router.dismissAll();
+    router.replace('/groups');
+    showToast(groupDeletedMessage(deleted));
+  }, [groupId, deleted]);
+}
+
 /** A Group's full state, kept current through Realtime while the screen is open. */
 export function useGroup(groupId: string | undefined): Loadable<GroupDetails> {
   const id = groupId ?? null;
@@ -187,7 +244,8 @@ export function useGroup(groupId: string | undefined): Loadable<GroupDetails> {
   const result = useLoader(id, load, GROUP_LOAD_FAILED);
   const { reload } = result;
 
-  // Shared with any other mounted screen for the same Group (see realtimeHub.ts).
+  // Shared with any other mounted screen for the same Group (see realtimeHub.ts). A deleted
+  // Group's `groups` row change still reaches the people who were in it, so they hear at once.
   useRealtimeChanges(
     'group',
     id

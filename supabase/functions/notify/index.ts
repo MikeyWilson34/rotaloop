@@ -3,6 +3,8 @@
 // Actions:
 // - { "action": "afterCommand", groupId, stateVersion, history }: group-command calls this
 //   (in the background) after each successful command, with the command's history entries.
+// - { "action": "groupDeleted", groupId }: group-command calls this after someone deletes a
+//   Group (feedback-2 ticket 08): "Sam deleted Sunday Team" to everyone else who was in it.
 // - { "action": "scheduled" }: the 15-minute pg_cron job (migration 20261121000000): asks to
 //   confirm Assignments entering the confirmation window, then reminders, the Coverage
 //   Request follow-up, Replacement Duty and Admin alerts; then Expo receipts.
@@ -24,6 +26,7 @@ import { fetchExpoReceipts, sendExpoMessages } from '../_shared/notify/expo.ts';
 import type { NotifyProfile } from '../_shared/notify/plan.ts';
 import {
   notifyAfterCommand,
+  notifyGroupDeleted,
   runScheduled,
   type Device,
   type NotifyStore,
@@ -157,6 +160,22 @@ const store: NotifyStore = {
   async deleteExpoTickets(ids) {
     for (const part of chunks(ids)) check(await admin.from('expo_push_tickets').delete().in('id', part));
   },
+  async deletedGroup(groupId) {
+    const group = check(
+      await admin.from('groups').select('id, name, deleted_at, deleted_by').eq('id', groupId).not('deleted_at', 'is', null).maybeSingle(),
+    ) as { id: string; name: string; deleted_at: string; deleted_by: string | null } | null;
+    if (!group) return null;
+    const members = check(
+      await admin.from('members').select('display_name, account_id, left_at').eq('group_id', groupId).order('position'),
+    ) as { display_name: string; account_id: string | null; left_at: string | null }[] | null;
+    return {
+      id: group.id,
+      name: group.name,
+      deletedAt: new Date(group.deleted_at).toISOString(),
+      deletedBy: group.deleted_by,
+      members: (members ?? []).map((m) => ({ name: m.display_name, accountId: m.account_id, leftAt: m.left_at })),
+    };
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -237,6 +256,12 @@ Deno.serve(async (req) => {
         now,
       });
       console.log('afterCommand', report);
+      return json({ ok: true, ...report });
+    }
+    if (body.action === 'groupDeleted') {
+      if (typeof body.groupId !== 'string') return json({ ok: false, message: 'groupId is required' }, 400);
+      const report = await notifyGroupDeleted(deps, { groupId: body.groupId, now });
+      console.log('groupDeleted', report);
       return json({ ok: true, ...report });
     }
     return json({ ok: false, message: 'Unknown action' }, 400);

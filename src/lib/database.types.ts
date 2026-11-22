@@ -239,6 +239,8 @@ export type Database = {
           coverage_policy: Database["public"]["Enums"]["coverage_policy"]
           created_at: string
           created_by: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           id: string
           id_sequence: number
           name: string
@@ -256,6 +258,8 @@ export type Database = {
           coverage_policy?: Database["public"]["Enums"]["coverage_policy"]
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           id_sequence?: number
           name: string
@@ -273,6 +277,8 @@ export type Database = {
           coverage_policy?: Database["public"]["Enums"]["coverage_policy"]
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           id_sequence?: number
           name?: string
@@ -853,6 +859,7 @@ export type Database = {
         Returns: string
       }
       claim_notifications: { Args: { p_items: Json }; Returns: string[] }
+      deleted_group_for_invite: { Args: { p_token: string }; Returns: string }
       group_invite_link: { Args: { p_group_id: string }; Returns: string }
       group_state_rows: { Args: { p_group_id: string }; Returns: Json }
       invite_link_preview: {
@@ -874,6 +881,10 @@ export type Database = {
       is_group_member: { Args: { p_group_id: string }; Returns: boolean }
       is_repeat_pattern: { Args: { p: Json }; Returns: boolean }
       is_service_role_caller: { Args: never; Returns: boolean }
+      mark_group_deleted: {
+        Args: { p_account_id: string; p_group_id: string }
+        Returns: boolean
+      }
       new_token: { Args: never; Returns: string }
       register_push_token: {
         Args: {
@@ -891,6 +902,7 @@ export type Database = {
         Args: { p_group_id: string; p_name: string; p_time_zone: string }
         Returns: undefined
       }
+      was_in_deleted_group: { Args: { p_group_id: string }; Returns: boolean }
     }
     Enums: {
       confirmation:
@@ -925,6 +937,7 @@ export type Database = {
         | "reminder"
         | "replacementDuty"
         | "adminAlert"
+        | "groupDeleted"
       push_kind: "expo" | "web"
       push_platform: "ios" | "android" | "web"
       replacement_duty: "assignedMember" | "admins"
@@ -1090,6 +1103,7 @@ export const Constants = {
         "reminder",
         "replacementDuty",
         "adminAlert",
+        "groupDeleted",
       ],
       push_kind: ["expo", "web"],
       push_platform: ["ios", "android", "web"],

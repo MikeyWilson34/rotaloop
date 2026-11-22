@@ -56,6 +56,11 @@ export function createGroup(
   return invokeGroupCommand({ action: 'createGroup', ...group });
 }
 
+/** Deletes the Group for everyone (any Member; feedback-2 ticket 08). */
+export function deleteGroup(groupId: string): Promise<GroupCommandResponse> {
+  return invokeGroupCommand({ action: 'deleteGroup', groupId });
+}
+
 /**
  * Joins through a Group's invite link, or claims a Placeholder through a personal claim link.
  * `standInId` ("Are you one of these?" on the join link) claims that Stand-in instead.
