@@ -425,6 +425,9 @@ export function parseRequest(value: unknown): GroupCommandRequest {
       }
       return request;
     }
+    case 'deleteGroup':
+      if (typeof o.groupId !== 'string' || !UUID.test(o.groupId)) fail('groupId must be a UUID');
+      return { action: 'deleteGroup', groupId: o.groupId.toLowerCase() };
     case 'join': {
       const request: Extract<GroupCommandRequest, { action: 'join' }> = {
         action: 'join',

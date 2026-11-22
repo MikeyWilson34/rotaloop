@@ -43,6 +43,11 @@ export interface GroupStore {
   findInvite(token: string): Promise<{ groupId: string; memberId: string | null } | null>;
   /** Ids of Groups with at least one active Event Series that has a repeat pattern. */
   groupsWithRepeatingSeries(): Promise<string[]>;
+  /**
+   * Marks the Group deleted by `accountId` (who must be an active Member). False when it is
+   * unknown, already deleted, or they aren't in it.
+   */
+  markDeleted(groupId: string, accountId: string): Promise<boolean>;
 }
 
 export interface HandlerContext {
@@ -83,6 +88,8 @@ export async function handleGroupCommand(
       return createGroup(store, request, context);
     case 'join':
       return join(store, request, context);
+    case 'deleteGroup':
+      return deleteGroup(store, request, context);
   }
 }
 
@@ -371,6 +378,28 @@ async function join(
       return request.standInId ? standInTaken() : failure(reason, message);
     },
   );
+}
+
+// ---------------------------------------------------------------------------
+// Deleting a Group (feedback-2 ticket 08, docs/adr/0009-deleting-a-group.md)
+
+/**
+ * Any active Member may delete the Group. It is soft: the database hides the Group from
+ * everyone (and from every later load here) and keeps it 30 days. No engine state changes, so
+ * the reply has no changes or history; group-command tells the others separately.
+ */
+async function deleteGroup(
+  store: GroupStore,
+  request: Extract<GroupCommandRequest, { action: 'deleteGroup' }>,
+  context: HandlerContext,
+): Promise<GroupCommandResponse> {
+  const notMember = () => failure('notMember', 'You are not a Member of this Group');
+  const loaded = await store.load(request.groupId);
+  if (!loaded) return notMember();
+  const me = activeMemberFor(stateFromRows(loaded.rows), context.accountId);
+  if (!me) return notMember();
+  if (!(await store.markDeleted(request.groupId, context.accountId))) return notMember();
+  return { ok: true, groupId: request.groupId, memberId: me.id, stateVersion: loaded.version, changes: [], history: [] };
 }
 
 // ---------------------------------------------------------------------------

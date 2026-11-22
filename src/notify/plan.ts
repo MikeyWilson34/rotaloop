@@ -91,7 +91,9 @@ export type NotificationKind =
   | 'scheduleChange'
   | 'reminder'
   | 'replacementDuty'
-  | 'adminAlert';
+  | 'adminAlert'
+  /** Someone deleted the Group (feedback-2 ticket 08). */
+  | 'groupDeleted';
 
 /** One planned notification for one person (a row of `notification_log`). */
 export interface NotificationItem {
@@ -571,6 +573,57 @@ export function planScheduledNotifications(input: ScheduledInput): NotificationI
 }
 
 // ---------------------------------------------------------------------------
+// A deleted Group (feedback-2 ticket 08)
+
+/** A deleted Group as the notify function reads it (its engine state is hidden by then). */
+export interface DeletedGroup {
+  id: string;
+  name: string;
+  deletedAt: Instant;
+  /** The account that deleted it. */
+  deletedBy: string | null;
+  members: { name: string; accountId: string | null; leftAt: Instant | null }[];
+}
+
+/** Where a "deleted" push opens: the Groups tab (the Group itself is gone). */
+export const GROUPS_URL = '/groups';
+
+/**
+ * "Sam deleted Sunday Team", to everyone who was in the Group with an account and push on,
+ * except whoever deleted it. Not gated by a topic toggle: it is about the whole Group, not one
+ * turn. The dedupe key includes the deletion time, so a Group restored by hand and deleted
+ * again tells people again.
+ */
+export function planGroupDeletedNotifications(group: DeletedGroup, profiles: ProfileLookup): NotificationItem[] {
+  const active = group.members.filter((m) => m.leftAt === null);
+  const deleter = active.find((m) => m.accountId !== null && m.accountId === group.deletedBy);
+  const who = deleter?.name.trim().split(/\s+/)[0];
+  const title = who ? `${who} deleted ${group.name}` : `${group.name} was deleted`;
+  const body = 'The group and its schedule are gone for everyone.';
+  const items: NotificationItem[] = [];
+  const seen = new Set<string>();
+  for (const m of active) {
+    if (!m.accountId || m.accountId === group.deletedBy || seen.has(m.accountId)) continue;
+    seen.add(m.accountId);
+    if (!profiles.get(m.accountId)?.pushEnabled) continue;
+    items.push({
+      dedupeKey: `groupDeleted:${group.id}:${group.deletedAt}:${m.accountId}`,
+      accountId: m.accountId,
+      kind: 'groupDeleted',
+      groupId: group.id,
+      groupName: group.name,
+      assignmentId: null,
+      eventId: null,
+      offsetKey: '',
+      title,
+      body,
+      url: GROUPS_URL,
+    });
+  }
+  return items;
+}
+
+// ---------------------------------------------------------------------------
 // Batching
 
 /** One push message for one person: their items of a run, batched. */
@@ -584,6 +637,7 @@ export interface PushMessage {
 }
 
 const PRIORITY: NotificationKind[] = [
+  'groupDeleted',
   'replacementDuty',
   'coverageRequest',
   'coverageFollowUp',

@@ -2,6 +2,7 @@
  * Invite link RPCs and reads. Each throws an Error with a plain-language message, so screens
  * can show `error.message` as is.
  */
+import { deletedInviteMessage } from './deleteGroup';
 import { supabase } from './supabase';
 
 const OFFLINE = "Couldn't load the invite link. Check your connection and try again.";
@@ -68,12 +69,28 @@ export class InvitePreviewError extends Error {
 
 export const INVITE_INVALID = "That invite link isn't working. It may have been reset or already used: ask for a new one.";
 
+/**
+ * The name of the deleted Group an invite link led to (feedback-2 ticket 08), or null. Null
+ * on any error too, e.g. before the server has the RPC: the link is then just "not working".
+ */
+async function deletedGroupForInvite(token: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.rpc('deleted_group_for_invite', { p_token: token });
+    return error || !data ? null : data;
+  } catch {
+    return null;
+  }
+}
+
 /** What an invite link leads to. Throws InvitePreviewError. */
 export async function previewInvite(token: string): Promise<InvitePreview> {
   const { data, error } = await supabase.rpc('invite_link_preview', { p_token: token });
   if (error) throw new InvitePreviewError("Couldn't check that link. Check your connection and try again.", 'offline');
   const row = data?.[0];
-  if (!row) throw new InvitePreviewError(INVITE_INVALID, 'invalid');
+  if (!row) {
+    const deleted = await deletedGroupForInvite(token);
+    throw new InvitePreviewError(deleted ? deletedInviteMessage(deleted) : INVITE_INVALID, 'invalid');
+  }
   // Under RLS a Group's row is readable only by its active Members (signed out: no one).
   const { data: session } = await supabase.auth.getSession();
   const { data: mine } = session.session

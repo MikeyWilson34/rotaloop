@@ -15,6 +15,8 @@
 // and a stand-in is handed to someone in the group ("This is someone in the group"). Those steps
 // need the 20261125000000 migration and the new group-command; until both are deployed they are
 // skipped with a "needs server deploy" note (the sheets that need no server still run).
+// Last, it creates a throwaway group and deletes it (feedback-2 ticket 08; skipped with a note
+// while the server can't delete groups).
 //
 // Browser: Microsoft Edge on Windows, Chrome elsewhere (via playwright-core, no download).
 // Set E2E_BROWSER=<path to a Chromium-based browser> to use another one, E2E_HEADED=1 to watch.
@@ -151,6 +153,39 @@ function skip(note) {
 
 const results = [];
 let current = 'start';
+
+/** The Supabase project the build points at, from the environment or .env (as Expo reads it). */
+function supabaseConfig() {
+  let url = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  let key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  if ((!url || !key) && existsSync('.env')) {
+    for (const line of readFileSync('.env', 'utf8').split(/\r?\n/)) {
+      const m = line.match(/^\s*(EXPO_PUBLIC_SUPABASE_URL|EXPO_PUBLIC_SUPABASE_ANON_KEY)\s*=\s*"?([^"#\s]+)"?/);
+      if (m && m[1] === 'EXPO_PUBLIC_SUPABASE_URL') url ??= m[2];
+      if (m && m[1] === 'EXPO_PUBLIC_SUPABASE_ANON_KEY') key ??= m[2];
+    }
+  }
+  return url && key ? { url: url.replace(/\/$/, ''), key } : null;
+}
+
+/**
+ * Whether the server can delete groups (feedback-2 ticket 08): its migration adds the
+ * deleted_group_for_invite RPC. Asked from Node, so a 404 never shows up as a page error.
+ */
+async function serverCanDeleteGroups() {
+  const config = supabaseConfig();
+  if (!config) return false;
+  try {
+    const r = await fetch(`${config.url}/rest/v1/rpc/deleted_group_for_invite`, {
+      method: 'POST',
+      headers: { apikey: config.key, Authorization: `Bearer ${config.key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_token: 'e2e-probe' }),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
 
 const rootText = () => page.evaluate(() => document.getElementById('root')?.innerText ?? '');
 // Sheets (React Native Web modals) render outside #root.
@@ -758,6 +793,89 @@ try {
     await p.getByRole('button', { name: ICON, exact: true }).click();
     await waitText(p, /browser menu[\s\S]*Install app[\s\S]*Got it/, 'Firefox on Android: the steps use the browser menu');
     await ctx.close();
+  }
+
+  // Deleting a group (feedback-2 ticket 08): a throwaway group, deleted from its settings. The
+  // Delete row and its confirm sheet are checked always; deleting itself needs the
+  // 20261126000000_delete_group migration and the new group-command and notify functions, so
+  // it's skipped (with a note) while the server doesn't have them.
+  current = 'delete group';
+  const gonerName = `E2E Gone ${stamp}`;
+  await page.goto(`${BASE}/groups`);
+  await expectScreen('delete: Groups tab', /Create a group/);
+  await click('Create a group');
+  await expectScreen('delete: name your group', /Name your group/);
+  await fill('Group name', gonerName);
+  await click('Next');
+  await expectScreen('delete: jobs', /What needs doing, and when\?/);
+  await fill('Job 1 name', `E2E Gone job ${stamp}`);
+  await click('Next');
+  await expectScreen("delete: who's in", /\/join\/[0-9a-f]{64}/);
+  const gonerToken = (await bodyText()).match(/\/join\/([0-9a-f]{64})/)[1];
+  await click('Done');
+  await expectScreen('delete: the throwaway group', /Coming up/);
+  const gonerId = page.url().match(/\/group\/([0-9a-f-]{36})/)?.[1];
+  if (!gonerId) throw new Error(`delete: no group id in ${page.url()}`);
+  await click('Group settings');
+  await expectScreen('delete: settings has Leave group then Delete group', /Leave group\s*Delete group/);
+  if (process.env.E2E_SHOTS) {
+    await sleep(4500); // let the 'schedule is ready' toast go
+    await page.getByRole('button', { name: 'Delete group', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+    await shoot('settings-delete-row');
+  }
+  await click('Delete group');
+  await expectScreen(
+    'delete: confirm sheet (only you in it)',
+    new RegExp(`Delete ${gonerName}\\?[\\s\\S]*This removes the group and its schedule for you\\. It can't be undone\\.[\\s\\S]*Delete group[\\s\\S]*Cancel`),
+  );
+  if (process.env.E2E_SHOTS) await shoot('delete-confirm-sheet');
+  if (!(await serverCanDeleteGroups())) {
+    await click('Cancel');
+    await sleep(600);
+    skip('delete group steps (delete, gone from Groups/Home, open page sent back, join link says deleted): needs server deploy (20261126000000_delete_group migration, group-command, notify)');
+  } else {
+    // A second tab with the group open, as someone else would have it: it's sent back when the
+    // group is deleted (live through Realtime, or on its next load).
+    const other = await context.newPage();
+    other.on('pageerror', (e) => problems.push(`pageerror (other tab): ${e.message.slice(0, 400)}`));
+    other.on('console', (m) => {
+      if (m.type() === 'error') problems.push(`console.error (other tab): ${m.text().slice(0, 400)}`);
+    });
+    await other.goto(`${BASE}/group/${gonerId}`);
+    const otherText = () => other.evaluate(() => document.body.innerText);
+    for (let i = 0; i < 80 && !/Coming up/.test(await otherText()); i++) await sleep(250);
+    if (!/Coming up/.test(await otherText())) throw new Error('delete: the other tab did not open the group');
+    await sleep(1500); // let its realtime subscription join
+    await page.bringToFront();
+    await page.getByRole('button', { name: 'Delete group', exact: true }).last().click();
+    await expectScreen('delete: back on Groups after deleting', new RegExp(`You deleted ${gonerName}`));
+    if (!page.url().endsWith('/groups')) throw new Error(`delete: expected the Groups tab, at ${page.url()}`);
+    await sleep(1000);
+    if ((await page.getByRole('button', { name: new RegExp(`^${gonerName}`) }).count()) > 0) throw new Error('delete: the group is still on the Groups tab');
+    results.push('ok  delete: the group is gone from Groups');
+    console.log('ok  delete: the group is gone from Groups');
+    await page.goto(`${BASE}/`);
+    await expectScreen('delete: Home', /Your groups/);
+    if ((await bodyText()).includes(gonerName)) throw new Error('delete: the group is still on Home');
+    results.push('ok  delete: the group is gone from Home');
+    console.log('ok  delete: the group is gone from Home');
+    // The other tab: sent back to Groups with "<name> was deleted." (live, or after a reload).
+    const sentBack = async () => other.url().endsWith('/groups') && new RegExp(`${gonerName} was deleted`).test(await otherText());
+    let live = false;
+    for (let i = 0; i < 40 && !(live = await sentBack()); i++) await sleep(250);
+    if (!live) {
+      await other.reload();
+      let reloaded = false;
+      for (let i = 0; i < 60 && !(reloaded = await sentBack()); i++) await sleep(250);
+      if (!reloaded) throw new Error(`delete: the other tab was not sent back (at ${other.url()})`);
+    }
+    const tag = `delete: a tab with the group open is sent back with "${gonerName} was deleted." (${live ? 'live' : 'on reload'})`;
+    results.push(`ok  ${tag}`);
+    console.log(`ok  ${tag}`);
+    await other.close();
+    // Its invite link says, in plain words, that the group was deleted.
+    await page.goto(`${BASE}/join/${gonerToken}`);
+    await expectScreen('delete: its join link says the group was deleted', new RegExp(`${gonerName} was deleted, so this invite link doesn't work anymore`));
   }
 
   console.log(`\nPASS: ${results.length} checks against ${BASE} (cold load ${coldRequests} requests)`);

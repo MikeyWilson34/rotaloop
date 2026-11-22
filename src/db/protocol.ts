@@ -48,7 +48,12 @@ export type GroupCommandRequest =
    * (Placeholder Member) of the link's Group; a personal claim link claims its own Stand-in
    * and ignores `standInId`. A claimed Stand-in keeps the name they were added with.
    */
-  | { action: 'join'; token: string; memberName: string; standInId?: string };
+  | { action: 'join'; token: string; memberName: string; standInId?: string }
+  /**
+   * Delete the Group (feedback-2 ticket 08): any active Member. Soft: the Group is hidden from
+   * everyone and kept 30 days (docs/adr/0009-deleting-a-group.md). Succeeds with no changes.
+   */
+  | { action: 'deleteGroup'; groupId: string };
 
 export type GroupCommandFailure =
   | RejectionReason

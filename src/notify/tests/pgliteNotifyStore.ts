@@ -83,5 +83,28 @@ export function pgliteNotifyStore(t: TestDb): NotifyStore {
       svc(async () => {
         await t.db.query('delete from public.expo_push_tickets where id = any($1::text[])', [ids]);
       }),
+    deletedGroup: (groupId) =>
+      svc(async () => {
+        const { rows } = await t.db.query<{ id: string; name: string; deleted_at: Date; deleted_by: string | null }>(
+          'select id, name, deleted_at, deleted_by from public.groups where id = $1 and deleted_at is not null',
+          [groupId],
+        );
+        if (!rows[0]) return null;
+        const members = await t.db.query<{ display_name: string; account_id: string | null; left_at: Date | null }>(
+          'select display_name, account_id, left_at from public.members where group_id = $1 order by position',
+          [groupId],
+        );
+        return {
+          id: rows[0].id,
+          name: rows[0].name,
+          deletedAt: new Date(rows[0].deleted_at).toISOString(),
+          deletedBy: rows[0].deleted_by,
+          members: members.rows.map((m) => ({
+            name: m.display_name,
+            accountId: m.account_id,
+            leftAt: m.left_at ? new Date(m.left_at).toISOString() : null,
+          })),
+        };
+      }),
   };
 }

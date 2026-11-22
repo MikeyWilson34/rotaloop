@@ -15,7 +15,9 @@ import {
   confirmationRequestsDue,
   lookaheadEnd,
   planCommandNotifications,
+  planGroupDeletedNotifications,
   planScheduledNotifications,
+  type DeletedGroup,
   type NotificationItem,
   type NotifyGroup,
   type NotifyProfile,
@@ -57,6 +59,8 @@ export interface NotifyStore extends Pick<GroupStore, 'load' | 'persist'> {
   /** Tickets created at or before `before`. */
   expoTickets(before: Instant): Promise<{ id: string; token: string; createdAt: Instant }[]>;
   deleteExpoTickets(ids: string[]): Promise<void>;
+  /** A deleted Group's name, who deleted it and its Members; null if it isn't deleted. */
+  deletedGroup(groupId: string): Promise<DeletedGroup | null>;
 }
 
 export interface Senders {
@@ -221,6 +225,19 @@ export async function notifyAfterCommand(deps: NotifyDeps, input: AfterCommandIn
     profiles,
     now: input.now,
   });
+  return deliver(deps, items, input.now);
+}
+
+// ---------------------------------------------------------------------------
+// Right after someone deletes a Group (feedback-2 ticket 08)
+
+/** Tells everyone else who was in the Group that it was deleted. Nothing if it isn't deleted. */
+export async function notifyGroupDeleted(deps: NotifyDeps, input: { groupId: string; now: Instant }): Promise<DeliveryReport> {
+  const group = await deps.store.deletedGroup(input.groupId);
+  if (!group) return deliver(deps, [], input.now);
+  const accounts = [...new Set(group.members.flatMap((m) => (m.accountId && m.leftAt === null ? [m.accountId] : [])))];
+  const profiles = accounts.length ? await deps.store.profiles(accounts) : [];
+  const items = planGroupDeletedNotifications(group, new Map(profiles.map((p) => [p.accountId, p])));
   return deliver(deps, items, input.now);
 }
 

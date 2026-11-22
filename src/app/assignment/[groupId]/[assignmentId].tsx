@@ -11,7 +11,7 @@ import { Timeline } from '@/components/schedule/history';
 import { openAssignment } from '@/components/schedule/parts';
 import { Button, Notice, StatusPill, Text } from '@/components/ui';
 import { deviceTimeZone, myMember } from '@/lib/groupViews';
-import { GROUP_GONE, useGroup } from '@/lib/groups';
+import { GROUP_GONE, useGroup, useSendBackIfDeleted } from '@/lib/groups';
 import { useHistory } from '@/lib/schedule';
 import { useSession } from '@/lib/session';
 import { initials } from '@/lib/validation';
@@ -32,7 +32,9 @@ export default function AssignmentScreen() {
   const { colors, space, minTapTarget, fonts } = useTheme();
   const { session } = useSession();
   const accountId = session?.user.id ?? null;
-  const { data, loading, error, refresh, refreshing, reload } = useGroup(groupId);
+  const { data, loading, error, refresh, refreshing, reload, deleted } = useGroup(groupId);
+  // The group was deleted (feedback-2 ticket 08): back to Groups with a plain message.
+  useSendBackIfDeleted(groupId, deleted);
   const viewerTimeZone = deviceTimeZone();
   const now = useMemo(() => new Date().toISOString(), [data]); // eslint-disable-line react-hooks/exhaustive-deps
   const today = dateIn(now, viewerTimeZone);
