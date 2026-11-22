@@ -22,7 +22,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve } from 'node:path';
 
-import { chromium } from 'playwright-core';
+import { chromium, devices } from 'playwright-core';
 
 const target = process.argv[2] ?? 'dist';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -459,6 +459,8 @@ try {
   // Home is the next 7 days (big card, or "Nothing this week"), then Your groups.
   await expectScreen('Home: this week', /Your next turn|Coming\?|Nothing this week|You're all set/);
   await expectScreen('Home: your groups', /Your groups/);
+  // The install icon (feedback-2 tickets 06 and 07) is for phones in a browser tab: not on this desktop run.
+  if ((await page.getByRole('button', { name: 'Get Rotaloop on your phone', exact: true }).count()) > 0) throw new Error('Home: the install icon shows on a desktop browser');
   if (/Couldn't load/.test(await bodyText())) throw new Error("Home: shows a \"Couldn't load\" message instead of the schedule");
   // Home's "Can't make it" opens the same "Can't make it?" sheet (when a turn of mine is this week).
   const homeCant = page.getByRole('button', { name: "Can't make it", exact: true }).filter({ visible: true }).first();
@@ -648,6 +650,114 @@ try {
     await click('Cancel');
     await sleep(600);
     skip('handing a stand-in\'s turns over: needs server deploy (group-command with mergeStandIn)');
+  }
+
+  // The install icon (feedback-2 tickets 06 and 07): other browser contexts, signed in as the same
+  // guest (its stored session), with a phone's user agent and touch.
+  current = 'install icon';
+  const signedIn = await context.storageState();
+  const ICON = 'Get Rotaloop on your phone';
+  const phone = async (name, userAgent) => {
+    const { defaultBrowserType, ...phoneDevice } = devices['iPhone 13'];
+    const ctx = await browser.newContext({ ...phoneDevice, userAgent, storageState: signedIn, viewport: { width: 375, height: 812 } });
+    const p = await ctx.newPage();
+    p.setDefaultTimeout(15_000);
+    p.on('pageerror', (e) => problems.push(`pageerror (${name}): ${e.message.slice(0, 400)}`));
+    p.on('console', (m) => {
+      if (m.type() === 'error') problems.push(`console.error (${name}): ${m.text().slice(0, 400)}`);
+    });
+    await p.goto(`${BASE}/`);
+    return { ctx, p };
+  };
+  const pass = (tag) => {
+    results.push(`ok  ${tag}`);
+    console.log(`ok  ${tag}`);
+  };
+  const waitText = async (p, pattern, tag) => {
+    const deadline = Date.now() + 20_000;
+    while (Date.now() < deadline && !problems.length) {
+      if (pattern.test(await p.evaluate(() => document.body.innerText))) break;
+      await sleep(250);
+    }
+    await sleep(300);
+    if (problems.length) throw new Error(`${tag}: ${problems.join(' | ')}`);
+    if (!pattern.test(await p.evaluate(() => document.body.innerText))) throw new Error(`${tag}: expected ${pattern}`);
+    pass(tag);
+  };
+  const sees = async (p, tag) => {
+    await p.getByRole('button', { name: ICON, exact: true }).waitFor({ state: 'visible', timeout: 15_000 });
+    pass(tag);
+  };
+  const dot = async (p, expected, tag) => {
+    await sleep(400);
+    const has = (await p.getByTestId('install-dot').count()) > 0;
+    if (has !== expected) throw new Error(`${tag}: the dot is ${has ? 'there' : 'missing'}`);
+    pass(tag);
+  };
+  const gone = async (p, tag) => {
+    await sleep(600);
+    if ((await p.getByRole('button', { name: ICON, exact: true }).count()) > 0) throw new Error(`${tag}: the icon is still on screen`);
+    pass(tag);
+  };
+  const shotPhone = async (p, name) => {
+    for (const scheme of ['light', 'dark']) {
+      await p.emulateMedia({ colorScheme: scheme });
+      await sleep(500);
+      await p.screenshot({ path: join(process.env.E2E_SHOTS, `${name}-375-${scheme}.png`) });
+    }
+    await p.emulateMedia({ colorScheme: 'light' });
+  };
+  const IPHONE_UA = devices['iPhone 13'].userAgent;
+  const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36';
+  {
+    const { ctx, p } = await phone('iPhone', IPHONE_UA);
+    await waitText(p, /Your groups/, 'iPhone: Home');
+    await sees(p, 'iPhone: the header icon shows');
+    await dot(p, true, 'iPhone: the icon has the new dot');
+    if (process.env.E2E_SHOTS) await shotPhone(p, 'install-icon-iphone');
+    await p.getByRole('button', { name: ICON, exact: true }).click();
+    await waitText(p, /Tap Share[\s\S]*Add to Home Screen[\s\S]*Open Rotaloop from your Home Screen[\s\S]*Got it/, 'iPhone: tapping the icon opens the 3 steps');
+    if (process.env.E2E_SHOTS) await shotPhone(p, 'install-steps-iphone');
+    await p.getByRole('button', { name: 'Got it', exact: true }).click();
+    await sleep(600);
+    if (/Got it/.test(await p.evaluate(() => document.body.innerText))) throw new Error('iPhone: "Got it" did not close the steps');
+    pass('iPhone: "Got it" closes the steps');
+    await sees(p, 'iPhone: the icon is still there after Got it');
+    await p.reload();
+    await waitText(p, /Your groups/, 'iPhone: Home again after a reload');
+    await sees(p, 'iPhone: the icon is still there after a reload');
+    await dot(p, false, 'iPhone: the dot is gone after a reload');
+    await ctx.close();
+  }
+  {
+    // Android Chrome: the browser's prompt, faked (a headless browser never offers one).
+    const { ctx, p } = await phone('Android', ANDROID_UA);
+    await waitText(p, /Your groups/, 'Android: Home');
+    await p.evaluate(() => {
+      const event = new Event('beforeinstallprompt', { cancelable: true });
+      window.__installPrompted = false;
+      event.prompt = async () => {
+        window.__installPrompted = true;
+      };
+      event.userChoice = Promise.resolve({ outcome: 'accepted' });
+      window.dispatchEvent(event);
+    });
+    await sees(p, 'Android: the icon shows with the install prompt');
+    await p.getByRole('button', { name: ICON, exact: true }).click();
+    await sleep(800);
+    if (!(await p.evaluate(() => window.__installPrompted))) throw new Error("Android: tapping the icon did not call the browser's install prompt");
+    pass("Android: tapping the icon calls the browser's install prompt");
+    await gone(p, 'Android: the icon hides after the install is accepted');
+    await ctx.close();
+  }
+  {
+    // A phone browser without the prompt (Firefox): menu steps.
+    const { ctx, p } = await phone('Android Firefox', 'Mozilla/5.0 (Android 14; Mobile; rv:125.0) Gecko/125.0 Firefox/125.0');
+    await waitText(p, /Your groups/, 'Firefox on Android: Home');
+    await sees(p, 'Firefox on Android: the icon shows');
+    await p.getByRole('button', { name: ICON, exact: true }).click();
+    await waitText(p, /browser menu[\s\S]*Install app[\s\S]*Got it/, 'Firefox on Android: the steps use the browser menu');
+    await ctx.close();
   }
 
   console.log(`\nPASS: ${results.length} checks against ${BASE} (cold load ${coldRequests} requests)`);

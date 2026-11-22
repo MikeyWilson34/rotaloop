@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useActivityUnreadCount } from '@/activity/data';
 import { AttentionCard } from '@/components/home/AttentionCard';
+import { InstallIcon } from '@/components/home/InstallIcon';
 import { HeadcountSheet } from '@/components/home/HeadcountSheet';
 import { Hero } from '@/components/home/Hero';
 import { HomeSkeleton, SectionHead } from '@/components/home/parts';
@@ -149,6 +150,7 @@ export default function HomeScreen() {
           {greeting(name, ctx)}
         </Text>
       </View>
+      <InstallIcon />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={unread > 0 ? `Activity, ${unread} new` : 'Activity'}

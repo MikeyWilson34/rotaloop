@@ -37,7 +37,10 @@ const manifest = {
   icons: [
     { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
     { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-    { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    // Maskable: the logo sits inside the central safe zone on the light background, so Android
+    // can crop it to a circle or a squircle without cutting it.
+    { src: '/icons/icon-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+    { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
   ],
 };
 writeFileSync(join(dist, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);

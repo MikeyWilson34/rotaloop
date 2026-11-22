@@ -17,6 +17,8 @@ import { AppErrorBoundary } from '@/components/AppErrorBoundary';
 import { SignOutButton } from '@/components/SignOutButton';
 import { AppColumn, Button, FormScreen, Notice, ToastHost } from '@/components/ui';
 import { redirectFor } from '@/lib/gate';
+// Catches the browser's install prompt early (website only; a no-op on the native apps).
+import '@/lib/installEvent';
 import { inviteTokenFromUrl, resumeInviteRoute } from '@/lib/invite';
 import { useNotificationTaps } from '@/lib/notificationTaps';
 import { loadPendingInvite, setPendingInvite, usePendingInvite } from '@/lib/pendingInvite';
