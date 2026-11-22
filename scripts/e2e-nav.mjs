@@ -133,6 +133,16 @@ async function serverMergesStandIns(groupId) {
   return body.reason !== 'invalidRequest';
 }
 
+/** Taps "Show more dates" until the job's turn is listed: its next date can be past the first rows, depending on the day and time. */
+async function revealJob() {
+  for (let i = 0; i < 8 && (await page.locator(`[aria-label^="${jobName},"]`).filter({ visible: true }).count()) === 0; i++) {
+    const more = page.getByRole('button', { name: 'Show more dates', exact: true }).filter({ visible: true }).first();
+    if (!(await more.count())) break;
+    await more.click();
+    await sleep(300);
+  }
+}
+
 function skip(note) {
   const line = `skip  ${note}`;
   results.push(line);
@@ -277,6 +287,7 @@ try {
   await expectScreen('the new group: coming up', /Coming up/);
   const groupPath = page.url().replace(BASE, '');
   const groupId = groupPath.match(/\/group\/([^/?#]+)/)?.[1];
+  await revealJob();
   await expectScreen('the new group: schedule filled', new RegExp(jobName));
   // Several weekdays: the multi-day job's dates fall on Tue, Thu and Sat only.
   {
@@ -352,6 +363,7 @@ try {
   await expectScreen('Turn order saved', /Turn order saved/);
   await expectScreen('settings: next is the moved person', new RegExp(`Next: ${second} · Change the order`));
   await backToGroup('turn order');
+  await revealJob();
   const nextTurn = page.locator(`[aria-label^="${jobName},"]`).filter({ visible: true }).first();
   await nextTurn.waitFor();
   const nextLabel = (await nextTurn.getAttribute('aria-label')) ?? '';
@@ -363,6 +375,7 @@ try {
 
   // A turn → its details sheet → the full details page → back.
   current = 'turn';
+  await revealJob();
   await page.locator(`[aria-label^="${jobName}"]`).filter({ visible: true }).first().click();
   await expectScreen('turn details sheet', /See details/);
   await click('See details');
@@ -585,7 +598,14 @@ try {
         await click(`Join as ${second}`);
         await expectScreen('joined as the stand-in: the group page', /Coming up/);
         await page.goto(`${BASE}/activity`);
-        await expectScreen('Activity: joined and took over the turns', /joined and took over (your|their) turns/);
+        await expectScreen('Activity: joined and took over the turns', /joined and took over [^.]*turns/);
+        // The new server's claim line names the stand-in's old name ("You joined and took over Zoe Standin's turns").
+        if (new RegExp(`joined and took over ${second} Standin ${stamp}'s turns`).test(await bodyText())) {
+          results.push("ok  joined as the stand-in: the claim line names the old stand-in name");
+          console.log(results.at(-1));
+        } else {
+          skip("stand-in takes the joiner's name: needs server deploy (group-command with the claim rename)");
+        }
       } else {
         await click('Not now');
         await sleep(600);

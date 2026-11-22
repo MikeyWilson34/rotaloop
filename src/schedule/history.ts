@@ -243,9 +243,11 @@ function causeText(entry: HistoryEntry, ctx: HistoryContext): { text: string; to
         ? { text: `${actor} left the group. Their future turns moved to others.`, tone: 'warn' }
         : { text: `${actor} removed ${object(nameOf(ctx, cause.memberId))} from the group. Their future turns moved to others.`, tone: 'warn' };
     case 'claimPlaceholder': {
-      // "Ruth joined and took over their turns."
+      // "Ruth Smith joined and took over Ruth's turns." (new name, then the stand-in's old one)
       const who = nameOf(ctx, cause.memberId);
-      return { text: `${who} joined and took over ${who === 'You' ? 'your' : 'their'} turns.`, tone: 'neutral' };
+      const was = cause.standInName && cause.standInName !== ctx.state.members.find((m) => m.id === cause.memberId)?.name ? cause.standInName : null;
+      const turns = was ? `${was}'s` : who === 'You' ? 'your' : 'their';
+      return { text: `${who} joined and took over ${turns} turns.`, tone: 'neutral' };
     }
     case 'mergeStandIn': {
       // "Ruth's stand-in turns now belong to Ruth." The stand-in has left, so name them as added.

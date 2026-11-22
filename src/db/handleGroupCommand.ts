@@ -325,7 +325,13 @@ async function join(
         // A personal claim link: become that Placeholder Member.
         return {
           state,
-          command: { type: 'claimPlaceholder', memberId: invite.memberId, accountId: context.accountId },
+          command: {
+            type: 'claimPlaceholder',
+            memberId: invite.memberId,
+            accountId: context.accountId,
+            name: request.memberName,
+            standInName: state.members.find((m) => m.id === invite.memberId)?.name,
+          },
           actorId: invite.memberId,
         };
       }
@@ -335,7 +341,13 @@ async function join(
         if (!standIn || standIn.leftAt !== null || standIn.accountId !== null) return { done: standInTaken() };
         return {
           state,
-          command: { type: 'claimPlaceholder', memberId: standIn.id, accountId: context.accountId },
+          command: {
+            type: 'claimPlaceholder',
+            memberId: standIn.id,
+            accountId: context.accountId,
+            name: request.memberName,
+            standInName: standIn.name,
+          },
           actorId: standIn.id,
         };
       }

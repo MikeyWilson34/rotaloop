@@ -381,7 +381,11 @@ export type Command =
   | { type: 'qualifyMember'; memberId: MemberId; responsibilityId: ResponsibilityId }
   | { type: 'unqualifyMember'; memberId: MemberId; responsibilityId: ResponsibilityId }
   | { type: 'removeMember'; memberId: MemberId }
-  | { type: 'claimPlaceholder'; memberId: MemberId; accountId: string }
+  /**
+   * `name`: the joiner's own name, which replaces the Stand-in's typed name (left as is when
+   * empty or missing). `standInName`: the name the Stand-in had, kept for the Activity line.
+   */
+  | { type: 'claimPlaceholder'; memberId: MemberId; accountId: string; name?: string; standInName?: string }
   /**
    * "This is someone in the group": a Stand-in turns out to be a Member who joined separately.
    * Their future turns, open requests, covers, swaps and dates off go to `intoMemberId`; past

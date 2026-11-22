@@ -220,7 +220,7 @@ function handle(state: GroupState, command: Command, ctx: Context): Outcome {
     case 'removeMember':
       return removeMember(state, command.memberId, ctx);
     case 'claimPlaceholder':
-      return claimPlaceholder(state, command.memberId, command.accountId);
+      return claimPlaceholder(state, command.memberId, command.accountId, command.name);
     case 'mergeStandIn':
       return mergeStandIn(state, command.standInId, command.intoMemberId, ctx);
     case 'renameMember':
@@ -909,11 +909,16 @@ function removeMember(state: GroupState, memberId: string, ctx: Context): Outcom
   return done(next);
 }
 
-function claimPlaceholder(state: GroupState, memberId: string, accountId: string): Outcome {
+function claimPlaceholder(state: GroupState, memberId: string, accountId: string, name?: string): Outcome {
   const member = findMember(state, memberId);
   if (!member || member.leftAt) return reject('notFound', 'No such Member');
   if (member.accountId !== null) return reject('invalid', 'This Member is not a Placeholder Member');
-  return done({ ...state, members: state.members.map((m) => (m.id === memberId ? { ...m, accountId } : m)) });
+  // The person's own name replaces the typed one, like a rename (past turns show it too).
+  const ownName = name?.trim();
+  return done({
+    ...state,
+    members: state.members.map((m) => (m.id === memberId ? { ...m, accountId, name: ownName ? ownName : m.name } : m)),
+  });
 }
 
 /**

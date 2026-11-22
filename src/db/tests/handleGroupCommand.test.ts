@@ -159,7 +159,7 @@ describe('join', () => {
     expect(claimed.memberId).toBe(dee.id);
     expect(claimed.history.map((h) => h.cause.type)).toEqual(['claimPlaceholder']);
     const after = await loadState(groupId);
-    expect(after.members.find((m) => m.id === dee.id)).toMatchObject({ accountId: DEE, name: 'Dee' });
+    expect(after.members.find((m) => m.id === dee.id)).toMatchObject({ accountId: DEE, name: 'Dee Smith' });
     expect(after.members.filter((m) => m.leftAt === null)).toHaveLength(before.members.filter((m) => m.leftAt === null).length);
     expect(after.assignments.filter((a) => a.memberId === dee.id).map((a) => a.id)).toEqual(deeTurns);
 

@@ -22,3 +22,6 @@ From now on, everything the Stand-in had belongs to the real Member; the past is
 - A left Member row can now hold an account (`members_one_active_per_account` only covers active rows, so this is allowed). Every query for "my membership" already filters `left_at is null`.
 - Workload counts (hidden, used by Rebalance) still count the Stand-in's past turns under the Stand-in.
 - The UI says "This is someone in the group", and Activity says "Pat's stand-in turns now belong to Ruth." "Merge" stays an engine word.
+
+## Addendum (2026-11-22): claiming a stand-in renames it
+When a person joins as a stand-in (the "Are you one of these?" pick or a personal claim link), `claimPlaceholder` also sets the member's name to the joiner's own name (kept as is if they have none), and records the stand-in's old name for the Activity line. Merging already ends with the real member's name.

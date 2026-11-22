@@ -1,6 +1,6 @@
 # 05 Stand-ins become real people smoothly when they join
 
-Status: needs-triage (parked by the product owner, 2026-11-19: "make a note of that and handle that later")
+Status: resolved
 Blocked by: none
 
 From the product owner (2026-11-19): "we need to plan how to replace stand-ins with real people smoothly if they accept an invite."
@@ -15,3 +15,9 @@ From the product owner (2026-11-19): "we need to plan how to replace stand-ins w
 - Undo / fix-up: let a member merge a duplicate (real person + stand-in) afterwards, moving the stand-in's future turns, covers and dates off onto the real person.
 - Notify the group: "Ruth joined and took over her turns."
 - Engine: claiming is a membership change only (same member id), so the rotation is untouched; a merge of two ids is not, and needs engine design (ADR).
+
+## Follow-up (product owner, 2026-11-22): the joiner's name replaces the stand-in's name
+"If someone replaced a stand in, then the username they have should replace the stand in name."
+- `claimPlaceholder` now takes the joiner's own name (`name`, the same one they'd get joining as new) and renames the member like `renameMember`, so past turns and activity show the new name. An empty name keeps the stand-in's. It also carries `standInName` (set by the server) for the Activity line: "Ruth Smith joined and took over Ruth's turns."
+- Done in the server's join path (`handleGroupCommand`) for both "Join as <name>" and a personal claim link, so it needs only a `group-command` deploy. No migration; old clients already send `memberName` and get it too. The merge path is unchanged (it already ends with the real member's name).
+- e2e: the name step skips with "needs server deploy" while the deployed `group-command` is the old one.

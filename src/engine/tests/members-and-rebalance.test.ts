@@ -99,6 +99,16 @@ describe('Members joining and leaving', () => {
     expect(result.state.members.find((m) => m.id === 'eve')?.accountId).toBe('acct-eve');
     expect(rejected(result.state, { type: 'claimPlaceholder', memberId: 'eve', accountId: 'x' })).toBe('invalid');
   });
+
+  it("Claiming takes the joiner's own name; an empty name keeps the Stand-in's", () => {
+    let state = setup();
+    state = act(state, { type: 'addMember', member: { id: 'eve', name: 'Eve' }, qualifiedFor: ['sound'] }).state;
+    state = act(state, { type: 'addMember', member: { id: 'fay', name: 'Fay' }, qualifiedFor: ['sound'] }).state;
+    const named = act(state, { type: 'claimPlaceholder', memberId: 'eve', accountId: 'a1', name: '  Eve Smith ' }).state;
+    expect(named.members.find((m) => m.id === 'eve')?.name).toBe('Eve Smith');
+    const unnamed = act(named, { type: 'claimPlaceholder', memberId: 'fay', accountId: 'a2', name: '   ' }).state;
+    expect(unnamed.members.find((m) => m.id === 'fay')?.name).toBe('Fay');
+  });
 });
 
 describe('Change tracking', () => {

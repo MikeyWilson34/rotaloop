@@ -51,7 +51,7 @@ function story(): Built {
   run(b, { type: 'renameMember', memberId: 'eve', name: 'Evie' }, 'eve');
   run(b, { type: 'setAdmin', memberId: 'ben', isAdmin: true }, 'ana');
   run(b, { type: 'setAdmin', memberId: 'ben', isAdmin: false }, 'ben');
-  run(b, { type: 'claimPlaceholder', memberId: 'dee', accountId: 'acct-dee' }, null);
+  run(b, { type: 'claimPlaceholder', memberId: 'dee', accountId: 'acct-dee', name: 'Deb', standInName: 'Dee' }, null);
   run(b, { type: 'removeMember', memberId: 'dee' }, 'dee');
   run(b, { type: 'removeMember', memberId: 'eve' }, 'eve');
   run(b, { type: 'addMember', member: { id: 'fay', name: 'Fay', accountId: null } }, 'ana');
@@ -147,7 +147,7 @@ describe('describeHistoryEntry', () => {
     expect(texts('unqualifyMember')).toEqual(['You took Deb out of the Sound Rotation.']);
     expect(texts('renameMember')).toEqual(['You renamed a Member to Deb.', 'Evie changed their name.']);
     expect(texts('setAdmin')).toEqual(["You changed Ben's group permissions.", 'Ben changed their group permissions.']);
-    expect(texts('claimPlaceholder')).toEqual(['Deb joined and took over their turns.']);
+    expect(texts('claimPlaceholder')).toEqual(["Deb joined and took over Dee's turns."]);
     expect(texts('removeMember')).toEqual([
       'Deb left the group. Their future turns moved to others.',
       'Evie left the group. Their future turns moved to others.',
