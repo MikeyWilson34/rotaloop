@@ -22,6 +22,8 @@ export type InviteSheetProps = {
   shareMessage: string;
   /** One more quiet option under the link, e.g. a Stand-in's "This is someone in the group". */
   moreAction?: { label: string; hint?: string; onPress: () => void };
+  /** A last, red quiet option, e.g. "Remove from group" (feedback-2 ticket 09). */
+  dangerAction?: { label: string; onPress: () => void };
 };
 
 /**
@@ -43,6 +45,7 @@ function InviteSheetBody({
   resetToken,
   shareMessage,
   moreAction,
+  dangerAction,
 }: InviteSheetProps) {
   const { colors, radii, space, fonts } = useTheme();
   const [token, setToken] = useState<string | null>(null);
@@ -131,6 +134,7 @@ function InviteSheetBody({
           {moreAction ? (
             <Button label={moreAction.label} variant="quiet" accessibilityHint={moreAction.hint} onPress={moreAction.onPress} />
           ) : null}
+          {dangerAction ? <Button label={dangerAction.label} variant="quietDanger" onPress={dangerAction.onPress} /> : null}
           <Button label="Done" variant="quiet" onPress={onClose} />
         </>
       }>

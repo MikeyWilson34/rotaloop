@@ -139,9 +139,12 @@ describe('The Admin flag (kept, but hidden)', () => {
     expect(left.members.find((m) => m.id === 'ana')?.leftAt).not.toBeNull();
   });
 
-  it('Members remove Stand-ins, but not other app users', () => {
+  it('Any active Member removes any other Member, app user or Stand-in', () => {
     let state = twoResponsibilities();
-    expect(rejected(state, { type: 'removeMember', memberId: 'cal' }, { by: 'ben' })).toBe('notPermitted');
+    const afterBen = act(state, { type: 'removeMember', memberId: 'cal' }, { by: 'ben' }).state;
+    expect(afterBen.members.find((m) => m.id === 'cal')?.leftAt).not.toBeNull();
+    // Someone who has already left can't remove anyone.
+    expect(rejected(afterBen, { type: 'removeMember', memberId: 'ben' }, { by: 'cal' })).toBe('notPermitted');
     state = act(state, { type: 'addMember', member: { id: 'gus', name: 'Gus' } }, { by: 'ben' }).state;
     state = act(state, { type: 'removeMember', memberId: 'gus' }, { by: 'cal' }).state;
     expect(state.members.find((m) => m.id === 'gus')?.leftAt).not.toBeNull();

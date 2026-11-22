@@ -15,6 +15,8 @@
 // and a stand-in is handed to someone in the group ("This is someone in the group"). Those steps
 // need the 20261125000000 migration and the new group-command; until both are deployed they are
 // skipped with a "needs server deploy" note (the sheets that need no server still run).
+// Feedback-2 ticket 09: removes a stand-in and a real person (who joined in a second browser context)
+// from Members; the real-person part is skipped with a "needs server deploy" note until group-command allows it.
 // Last, it creates a throwaway group and deletes it (feedback-2 ticket 08; skipped with a note
 // while the server can't delete groups).
 //
@@ -686,6 +688,105 @@ try {
     await sleep(600);
     skip('handing a stand-in\'s turns over: needs server deploy (group-command with mergeStandIn)');
   }
+
+  // Feedback-2 ticket 09: remove someone from the group. A stand-in first (works on any server),
+  // then a real person who joins through the link in a second browser context. Removing a real
+  // person needs the new group-command, so that part is skipped with a note until it's deployed.
+  current = 'remove from group';
+  const pal = `E2E Pal ${stamp}`;
+  await page.goto(`${BASE}${groupPath}`);
+  await expectScreen('remove: group page', /Coming up/);
+  await page.getByRole('button', { name: 'Add a stand-in', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+  await click('Add a stand-in');
+  await fill('Name', pal);
+  await click('Add');
+  await expectScreen('remove: stand-in added', new RegExp(`${pal} is in`));
+  await sleep(4500);
+  await click('Invite E2E');
+  await expectScreen('remove: stand-in sheet has Remove from group last', /This is someone in the group[\s\S]*Remove from group[\s\S]*Done/);
+  await click('Remove from group');
+  await expectScreen('remove: confirm (stand-in)', new RegExp(`Remove ${pal}[?][\\s\\S]*Their upcoming turns go to the next people in the rotation[.][\\s\\S]*Remove`));
+  if ((await bodyText()).includes('They can join again')) throw new Error('remove: a stand-in is told they can join again');
+  await click('Remove');
+  await expectScreen('remove: stand-in toast', new RegExp(`${pal} removed`));
+  await sleep(4500);
+  if ((await bodyText()).includes(pal)) throw new Error('remove: the stand-in is still in Members');
+  results.push('ok  remove: the stand-in is gone from Members');
+  console.log(results.at(-1));
+
+  const thirdName = `Quinn Gone ${stamp}`;
+  const thirdContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const mainPage = page;
+  page = await thirdContext.newPage();
+  watch(page);
+  try {
+    await page.goto(`${BASE}/join/${joinToken}`);
+    await expectScreen('remove: third person invite preview', /You're invited to/i);
+    await click('Get started');
+    await click('Get started');
+    await expectScreen('remove: third person name step', /First name/);
+    await fill('First name', 'Quinn');
+    await fill('Last name', `Gone ${stamp}`);
+    await click('Continue');
+    await expectScreen('remove: third person join step', /Join or start a group/);
+    if (!(await page.getByLabel('Invite link', { exact: true }).last().inputValue())) await fill('Invite link', `${BASE}/join/${joinToken}`);
+    await click('Join');
+    await sleep(1500);
+    // With stand-ins left in the group they ask "Are you one of these?" first; otherwise Join is right there.
+    if (/Are you one of these[?]/.test(await bodyText())) await page.getByRole('radio', { name: /^No, I'm new/ }).click();
+    await page.getByRole('button', { name: /^Join\b/ }).last().click();
+    await expectScreen('remove: third person is in the group', /Coming up/);
+  } finally {
+    page = mainPage;
+  }
+  try {
+    await page.goto(`${BASE}${groupPath}`);
+    await expectScreen('remove: group page with the new member', /Coming up/);
+    await page.getByRole('button', { name: thirdName, exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+    await click(thirdName);
+    await expectScreen('remove: member sheet', new RegExp(`${thirdName}[\\s\\S]*Remove from group[\\s\\S]*Close`));
+    if (process.env.E2E_SHOTS) await shoot('remove-member-sheet');
+    await click('Remove from group');
+    await expectScreen(
+      'remove: confirm sheet',
+      new RegExp(`Remove ${thirdName}[?][\\s\\S]*Their upcoming turns go to the next people in the rotation[.] They can join again with the invite link[.][\\s\\S]*Remove`),
+    );
+    if (process.env.E2E_SHOTS) await shoot('remove-member-confirm');
+    await click('Remove');
+    let outcome = null;
+    for (let i = 0; i < 40 && !outcome; i++) {
+      await sleep(250);
+      const t = await bodyText();
+      if (new RegExp(`${thirdName} removed`).test(t)) outcome = 'removed';
+    }
+    // Still on the confirm sheet after a few seconds: the server refused (it isn't deployed yet).
+    outcome ??= 'refused';
+    if (outcome === 'removed') {
+      await sleep(4500);
+      if ((await bodyText()).includes(thirdName)) throw new Error('remove: the person is still in Members');
+      results.push('ok  remove: the real member is gone from Members');
+      console.log(results.at(-1));
+      await page.goto(`${BASE}/activity`);
+      await expectScreen('remove: Activity line', new RegExp(`You removed ${thirdName} from the group`));
+      // Their side: the group is gone for them.
+      const gone = await thirdContext.newPage();
+      watch(gone);
+      await gone.goto(`${BASE}/groups`);
+      await sleep(3000);
+      if ((await gone.evaluate(() => document.body.innerText)).includes(`E2E Group ${stamp}`)) throw new Error('remove: the removed person still sees the group');
+      results.push('ok  remove: the group is gone for the removed person');
+      console.log(results.at(-1));
+    } else {
+      await click('Cancel');
+      await sleep(600);
+      skip('removing a real member: needs server deploy (group-command lets any member remove another)');
+    }
+  } finally {
+    await thirdContext.close();
+  }
+
+  await page.goto(`${BASE}${groupPath}`);
+  await expectScreen('remove: back on the group page', /Coming up/);
 
   // The install icon (feedback-2 tickets 06 and 07): other browser contexts, signed in as the same
   // guest (its stored session), with a phone's user agent and touch.

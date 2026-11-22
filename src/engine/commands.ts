@@ -169,7 +169,8 @@ function permissionError(state: GroupState, command: Command, ctx: Context): Rej
     case 'renameMember':
       return forMember(command.memberId, 'rename themselves');
     case 'removeMember':
-      return forMember(command.memberId, 'leave the Group themselves');
+      // Anyone active may remove anyone (someone who stopped using the app and never left).
+      return null;
     case 'claimPlaceholder':
       return command.memberId === actor ? null : reject('notPermitted', 'Members can only claim their own Stand-in');
     case 'answerHeadcount':

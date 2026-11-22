@@ -246,8 +246,10 @@ describe('command', () => {
 
     expect(await asBen({ type: 'renameMember', memberId: ana, name: 'Annie' })).toMatchObject({ reason: 'notPermitted' });
     expectOk(await asBen({ type: 'renameMember', memberId: dee, name: 'Deb' }));
-    expect(await asBen({ type: 'removeMember', memberId: ana })).toMatchObject({ reason: 'notPermitted' });
     expectOk(await asBen({ type: 'removeMember', memberId: dee }));
+    // Anyone active may remove an app user too; they're then out of the group.
+    expectOk(await asBen({ type: 'removeMember', memberId: ana }));
+    expect(await send(ANA, { action: 'command', groupId, command: { type: 'fillSchedule' } })).toMatchObject({ reason: 'notMember' });
   });
 
   it('lets anyone leave, including the Group’s creator (no last-Admin guard)', async () => {
