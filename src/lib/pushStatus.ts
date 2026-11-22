@@ -40,14 +40,18 @@ export function canTogglePush(status: PushChannelStatus): boolean {
   return status === 'on' || status === 'off';
 }
 
+/** An iPhone or iPad (iPadOS reports a Mac user agent, so touch support tells them apart). */
+export function isIosDevice(userAgent: string, maxTouchPoints: number): boolean {
+  return /iPhone|iPad|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && maxTouchPoints > 1);
+}
+
 /**
  * An iPhone or iPad browser tab, not the installed web app: Web Push only works once the site
  * is added to the Home Screen and opened from there (iOS 16.4+). iPadOS reports a Mac user
  * agent, so touch support tells them apart.
  */
 export function isIosBrowserTab(input: { userAgent: string; maxTouchPoints: number; standalone: boolean }): boolean {
-  const ios = /iPhone|iPad|iPod/.test(input.userAgent) || (/Macintosh/.test(input.userAgent) && input.maxTouchPoints > 1);
-  return ios && !input.standalone;
+  return isIosDevice(input.userAgent, input.maxTouchPoints) && !input.standalone;
 }
 
 /** The VAPID public key (base64url) as the bytes `pushManager.subscribe` wants. */
