@@ -53,7 +53,7 @@ function story(): Built {
   run(b, { type: 'setAdmin', memberId: 'ben', isAdmin: false }, 'ben');
   run(b, { type: 'claimPlaceholder', memberId: 'dee', accountId: 'acct-dee', name: 'Deb', standInName: 'Dee' }, null);
   run(b, { type: 'removeMember', memberId: 'dee' }, 'dee');
-  run(b, { type: 'removeMember', memberId: 'eve' }, 'eve');
+  run(b, { type: 'removeMember', memberId: 'eve' }, 'ana');
   run(b, { type: 'addMember', member: { id: 'fay', name: 'Fay', accountId: null } }, 'ana');
   run(b, { type: 'mergeStandIn', standInId: 'fay', intoMemberId: 'ben' }, 'cal');
   // Responsibilities.
@@ -150,7 +150,7 @@ describe('describeHistoryEntry', () => {
     expect(texts('claimPlaceholder')).toEqual(["Deb joined and took over Dee's turns."]);
     expect(texts('removeMember')).toEqual([
       'Deb left the group. Their future turns moved to others.',
-      'Evie left the group. Their future turns moved to others.',
+      'You removed Evie from the group. Their future turns moved to others.',
     ]);
   });
 

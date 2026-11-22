@@ -7,6 +7,7 @@ import { NAME_MAX } from '@/lib/groupSetup';
 import { firstName, memberItems, type MemberItem } from '@/lib/groupPage';
 import type { GroupDetails } from '@/lib/groups';
 import { fetchClaimToken } from '@/lib/inviteLinks';
+import { removeMemberConfirm } from '@/lib/removeMember';
 import { useTheme } from '@/theme';
 
 import { InviteCard } from './InviteCard';
@@ -41,6 +42,8 @@ export function MembersSection({
   const [adding, setAdding] = useState(false);
   const [claimFor, setClaimFor] = useState<MemberItem | null>(null);
   const [mergeFor, setMergeFor] = useState<MemberItem | null>(null);
+  const [personFor, setPersonFor] = useState<MemberItem | null>(null);
+  const [removeFor, setRemoveFor] = useState<MemberItem | null>(null);
   const shown = showAll ? members : members.slice(0, FIRST);
   const onApp = members.filter((m) => !m.isStandIn);
 
@@ -51,7 +54,7 @@ export function MembersSection({
           <MemberRow
             key={m.id}
             member={m}
-            onPress={m.isStandIn ? () => setClaimFor(m) : undefined}
+            onPress={m.isStandIn ? () => setClaimFor(m) : m.isMe ? undefined : () => setPersonFor(m)}
             onInvite={m.isStandIn ? () => setClaimFor(m) : undefined}
           />
         ))}
@@ -88,6 +91,13 @@ export function MembersSection({
         message={`This link is just for ${claimFor?.name ?? 'them'}. Joining with it keeps their place and their turns. It works once.`}
         loadToken={() => fetchClaimToken(group.id, claimFor?.id ?? '')}
         shareMessage={`${claimFor?.name ?? ''}, join ${group.name}:`}
+        dangerAction={{
+          label: 'Remove from group',
+          onPress: () => {
+            setRemoveFor(claimFor);
+            setClaimFor(null);
+          },
+        }}
         moreAction={
           onApp.length > 0
             ? {
@@ -101,6 +111,25 @@ export function MembersSection({
             : undefined
         }
       />
+      <Sheet
+        visible={personFor !== null}
+        onClose={() => setPersonFor(null)}
+        title={personFor?.name ?? ''}
+        footer={
+          <>
+            <Button
+              label="Remove from group"
+              variant="quietDanger"
+              onPress={() => {
+                setRemoveFor(personFor);
+                setPersonFor(null);
+              }}
+            />
+            <Button label="Close" variant="quiet" onPress={() => setPersonFor(null)} />
+          </>
+        }
+      />
+      {removeFor ? <RemoveMemberSheet person={removeFor} run={run} onClose={() => setRemoveFor(null)} /> : null}
       {mergeFor ? <MergeStandInSheets standIn={mergeFor} people={onApp} run={run} onClose={() => setMergeFor(null)} /> : null}
     </View>
   );
@@ -114,7 +143,7 @@ function MemberRow({ member, onPress, onInvite }: { member: MemberItem; onPress?
     <Pressable
       accessibilityRole={onPress ? 'button' : undefined}
       accessibilityLabel={label}
-      accessibilityHint={onPress ? 'Shares a link so they can join the app' : undefined}
+      accessibilityHint={onPress ? (member.isStandIn ? 'Shares a link so they can join the app' : 'Opens options for them') : undefined}
       disabled={!onPress}
       onPress={onPress}
       style={({ pressed }) => ({
@@ -181,6 +210,40 @@ function AddRow({ label, icon, onPress }: { label: string; icon?: boolean; onPre
       {icon ? <UserPlus size={22} color={colors.primary} strokeWidth={1.75} /> : null}
       <Text style={{ fontFamily: fonts.extrabold, color: colors.primary, fontSize: 15 }}>{label}</Text>
     </Pressable>
+  );
+}
+
+/** "Remove from group" (feedback-2 ticket 09): any member may remove another, a stand-in too. */
+export function RemoveMemberSheet({ person, run, onClose }: { person: MemberItem; run: RunCommand; onClose: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const words = removeMemberConfirm(person.name, person.isStandIn);
+
+  async function remove() {
+    setBusy(true);
+    setError(null);
+    const failed = await run({ type: 'removeMember', memberId: person.id }, 'removeMember');
+    setBusy(false);
+    if (failed) {
+      setError(failed);
+      return;
+    }
+    onClose();
+    showToast(words.toast);
+  }
+
+  return (
+    <ConfirmSheet
+      visible
+      title={words.title}
+      message={words.message}
+      confirmLabel="Remove"
+      tone="destructive"
+      loading={busy}
+      error={error}
+      onConfirm={remove}
+      onCancel={onClose}
+    />
   );
 }
 

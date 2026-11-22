@@ -11,7 +11,7 @@ import { useTheme, type ColorTokens } from '@/theme';
 
 import { Text } from './Text';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'positive' | 'quiet' | 'destructive';
+export type ButtonVariant = 'primary' | 'secondary' | 'positive' | 'quiet' | 'quietDanger' | 'destructive';
 export type ButtonSize = 'md' | 'lg';
 
 export type ButtonProps = Omit<PressableProps, 'children' | 'style'> & {
@@ -32,6 +32,7 @@ const variantColors: Record<
   positive: { bg: 'success', fg: 'onPrimary' },
   secondary: { bg: 'surface', fg: 'text', border: 'borderStrong' },
   quiet: { fg: 'primary' },
+  quietDanger: { fg: 'danger' },
   destructive: { bg: 'danger', fg: 'onPrimary' },
 };
 
