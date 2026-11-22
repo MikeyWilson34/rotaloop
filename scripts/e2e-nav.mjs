@@ -18,7 +18,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve } from 'node:path';
 
-import { chromium } from 'playwright-core';
+import { chromium, devices } from 'playwright-core';
 
 const target = process.argv[2] ?? 'dist';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -389,6 +389,8 @@ try {
   // Home is the next 7 days (big card, or "Nothing this week"), then Your groups.
   await expectScreen('Home: this week', /Your next turn|Coming\?|Nothing this week|You're all set/);
   await expectScreen('Home: your groups', /Your groups/);
+  // The install card (feedback-2 ticket 06) is for phones in a browser tab: not on this desktop run.
+  if (/Get Rotaloop on your phone/.test(await bodyText())) throw new Error('Home: the install card shows on a desktop browser');
   if (/Couldn't load/.test(await bodyText())) throw new Error("Home: shows a \"Couldn't load\" message instead of the schedule");
   // Home's "Can't make it" opens the same "Can't make it?" sheet (when a turn of mine is this week).
   const homeCant = page.getByRole('button', { name: "Can't make it", exact: true }).filter({ visible: true }).first();
@@ -477,6 +479,103 @@ try {
   await expectScreen('Groups → the Group', /Coming up/);
   await page.getByRole('button', { name: 'Back', exact: true }).first().click();
   await expectScreen('back to Groups', /Groups/);
+
+  // The install card (feedback-2 ticket 06): other browser contexts, signed in as the same
+  // guest (its stored session), with a phone's user agent and touch.
+  current = 'install card';
+  const signedIn = await context.storageState();
+  const CARD = 'Get Rotaloop on your phone';
+  const phone = async (name, userAgent) => {
+    const { defaultBrowserType, ...phoneDevice } = devices['iPhone 13'];
+    const ctx = await browser.newContext({ ...phoneDevice, userAgent, storageState: signedIn, viewport: { width: 375, height: 812 } });
+    const p = await ctx.newPage();
+    p.setDefaultTimeout(15_000);
+    p.on('pageerror', (e) => problems.push(`pageerror (${name}): ${e.message.slice(0, 400)}`));
+    p.on('console', (m) => {
+      if (m.type() === 'error') problems.push(`console.error (${name}): ${m.text().slice(0, 400)}`);
+    });
+    await p.goto(`${BASE}/`);
+    return { ctx, p };
+  };
+  const pass = (tag) => {
+    results.push(`ok  ${tag}`);
+    console.log(`ok  ${tag}`);
+  };
+  const waitText = async (p, pattern, tag) => {
+    const deadline = Date.now() + 20_000;
+    while (Date.now() < deadline && !problems.length) {
+      if (pattern.test(await p.evaluate(() => document.body.innerText))) break;
+      await sleep(250);
+    }
+    await sleep(300);
+    if (problems.length) throw new Error(`${tag}: ${problems.join(' | ')}`);
+    if (!pattern.test(await p.evaluate(() => document.body.innerText))) throw new Error(`${tag}: expected ${pattern}`);
+    pass(tag);
+  };
+  const gone = async (p, tag) => {
+    await sleep(600);
+    if (new RegExp(CARD).test(await p.evaluate(() => document.body.innerText))) throw new Error(`${tag}: the card is still on screen`);
+    pass(tag);
+  };
+  const shotPhone = async (p, name) => {
+    for (const scheme of ['light', 'dark']) {
+      await p.emulateMedia({ colorScheme: scheme });
+      await sleep(500);
+      await p.screenshot({ path: join(process.env.E2E_SHOTS, `${name}-375-${scheme}.png`) });
+    }
+    await p.emulateMedia({ colorScheme: 'light' });
+  };
+  const IPHONE_UA = devices['iPhone 13'].userAgent;
+  const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36';
+  {
+    const { ctx, p } = await phone('iPhone', IPHONE_UA);
+    await waitText(p, /Get Rotaloop on your phone[\s\S]*Add it to your Home Screen to get reminders/, 'iPhone: the install card shows on Home');
+    if (process.env.E2E_SHOTS) await shotPhone(p, 'install-card-iphone');
+    await p.getByRole('button', { name: CARD, exact: true }).click();
+    await waitText(p, /Tap Share[\s\S]*Add to Home Screen[\s\S]*Open Rotaloop from your Home Screen[\s\S]*Got it/, 'iPhone: tapping the card opens the 3 steps');
+    if (process.env.E2E_SHOTS) await shotPhone(p, 'install-steps-iphone');
+    await p.getByRole('button', { name: 'Got it', exact: true }).click();
+    await sleep(600);
+    if (/Got it/.test(await p.evaluate(() => document.body.innerText))) throw new Error('iPhone: "Got it" did not close the steps');
+    pass('iPhone: "Got it" closes the steps');
+    await waitText(p, new RegExp(CARD), 'iPhone: the card is still there after Got it');
+    await p.getByRole('button', { name: 'Not now', exact: true }).click();
+    await gone(p, 'iPhone: "Not now" hides the card');
+    await p.reload();
+    await waitText(p, /Your groups/, 'iPhone: Home again after a reload');
+    await gone(p, 'iPhone: the card stays hidden after a reload');
+    await ctx.close();
+  }
+  {
+    // Android Chrome: the browser's prompt, faked (a headless browser never offers one).
+    const { ctx, p } = await phone('Android', ANDROID_UA);
+    await waitText(p, /Your groups/, 'Android: Home');
+    await p.evaluate(() => {
+      const event = new Event('beforeinstallprompt', { cancelable: true });
+      window.__installPrompted = false;
+      event.prompt = async () => {
+        window.__installPrompted = true;
+      };
+      event.userChoice = Promise.resolve({ outcome: 'accepted' });
+      window.dispatchEvent(event);
+    });
+    await waitText(p, /Get Rotaloop on your phone[\s\S]*Install it to open in one tap/, 'Android: the card shows with the install prompt');
+    if (process.env.E2E_SHOTS) await shotPhone(p, 'install-card-android');
+    await p.getByRole('button', { name: CARD, exact: true }).click();
+    await sleep(800);
+    if (!(await p.evaluate(() => window.__installPrompted))) throw new Error("Android: tapping the card did not call the browser's install prompt");
+    pass("Android: tapping the card calls the browser's install prompt");
+    await gone(p, 'Android: the card hides after the install is accepted');
+    await ctx.close();
+  }
+  {
+    // A phone browser without the prompt (Firefox): menu steps.
+    const { ctx, p } = await phone('Android Firefox', 'Mozilla/5.0 (Android 14; Mobile; rv:125.0) Gecko/125.0 Firefox/125.0');
+    await waitText(p, /Get Rotaloop on your phone[\s\S]*Install it to open in one tap/, 'Firefox on Android: the card shows');
+    await p.getByRole('button', { name: CARD, exact: true }).click();
+    await waitText(p, /browser menu[\s\S]*Install app[\s\S]*Got it/, 'Firefox on Android: the steps use the browser menu');
+    await ctx.close();
+  }
 
   console.log(`\nPASS: ${results.length} checks against ${BASE} (cold load ${coldRequests} requests)`);
 } catch (error) {

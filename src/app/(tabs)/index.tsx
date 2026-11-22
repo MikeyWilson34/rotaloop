@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useActivityUnreadCount } from '@/activity/data';
 import { AttentionCard } from '@/components/home/AttentionCard';
+import { InstallCard } from '@/components/home/InstallCard';
 import { HeadcountSheet } from '@/components/home/HeadcountSheet';
 import { Hero } from '@/components/home/Hero';
 import { HomeSkeleton, SectionHead } from '@/components/home/parts';
@@ -254,6 +255,7 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.xxxl, gap: space.md }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}>
         {header}
+        <InstallCard />
         {body}
       </ScrollView>
     </SafeAreaView>
