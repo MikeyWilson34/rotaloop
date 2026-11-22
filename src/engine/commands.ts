@@ -1,6 +1,6 @@
 import { diffAssignments, diffMakeUpTurns, reconcile } from './reconcile';
 import { appendToQueue, removeFromQueue, reorderQueue, withQueueOrder } from './rotation';
-import { advanceTo, planSchedule } from './schedule';
+import { advanceTo, onSameDay, planSchedule } from './schedule';
 import {
   activeAdmins,
   findActiveResponsibility,
@@ -220,7 +220,9 @@ function handle(state: GroupState, command: Command, ctx: Context): Outcome {
     case 'removeMember':
       return removeMember(state, command.memberId, ctx);
     case 'claimPlaceholder':
-      return claimPlaceholder(state, command.memberId, command.accountId);
+      return claimPlaceholder(state, command.memberId, command.accountId, command.name);
+    case 'mergeStandIn':
+      return mergeStandIn(state, command.standInId, command.intoMemberId, ctx);
     case 'renameMember':
       return renameMember(state, command.memberId, command.name);
     case 'setAdmin':
@@ -907,11 +909,145 @@ function removeMember(state: GroupState, memberId: string, ctx: Context): Outcom
   return done(next);
 }
 
-function claimPlaceholder(state: GroupState, memberId: string, accountId: string): Outcome {
+function claimPlaceholder(state: GroupState, memberId: string, accountId: string, name?: string): Outcome {
   const member = findMember(state, memberId);
   if (!member || member.leftAt) return reject('notFound', 'No such Member');
   if (member.accountId !== null) return reject('invalid', 'This Member is not a Placeholder Member');
-  return done({ ...state, members: state.members.map((m) => (m.id === memberId ? { ...m, accountId } : m)) });
+  // The person's own name replaces the typed one, like a rename (past turns show it too).
+  const ownName = name?.trim();
+  return done({
+    ...state,
+    members: state.members.map((m) => (m.id === memberId ? { ...m, accountId, name: ownName ? ownName : m.name } : m)),
+  });
+}
+
+/**
+ * "This is someone in the group" (ADR 0008): the Stand-in `standInId` is really `intoId`, a
+ * Member on the app who joined separately. From now on, everything the Stand-in had is theirs:
+ *
+ * - Rotations: `intoId` takes the earlier of the two places in each queue and the other place
+ *   is dropped (a Stand-in-only place simply becomes theirs).
+ * - Future Covers the Stand-in gives, Can't-make-its they asked, and swaps (Make-up Turns) owed
+ *   either way. A Cover between the two of them makes no sense for one person: if the real
+ *   Member couldn't make it and the Stand-in covered, the turn needs cover again; if the real
+ *   Member covered the Stand-in, the turn just goes back to the Rotation. A moved Cover that
+ *   lands on the real Member's dates off, or on a day they already have a fixed turn, is
+ *   withdrawn (the group is asked again).
+ * - Dates off and future "Coming?" answers (the real Member's own answer wins).
+ *
+ * Past history keeps the Stand-in's name. The Stand-in then leaves, keeping the real Member's
+ * account so the planner knows they are one person (no back-to-back with the Stand-in's last
+ * turn). The schedule step then re-plans the future, which applies every rotation rule.
+ */
+function mergeStandIn(state: GroupState, standInId: MemberId, intoId: MemberId, ctx: Context): Outcome {
+  if (standInId === intoId) return reject('invalid', 'Pick someone else');
+  if (!isStandIn(state, standInId)) return reject('notFound', 'No such Stand-in');
+  const into = findMember(state, intoId);
+  if (!into || into.leftAt !== null) return reject('notFound', 'No such Member');
+  if (into.accountId === null) return reject('invalid', 'Pick someone who is on the app');
+  const swap = (id: MemberId | null) => (id === standInId ? intoId : id);
+  const future = (a: Assignment) => {
+    const event = findEvent(state, a.eventId);
+    return event !== undefined && !isPast(event, ctx.now);
+  };
+
+  let next: GroupState = {
+    ...state,
+    rotations: state.rotations.map((r) => mergeQueuePlace(r, standInId, intoId)),
+    timeOff: state.timeOff.map((t) => (t.memberId === standInId ? { ...t, memberId: intoId } : t)),
+  };
+
+  // Future seats. Covers the Stand-in gave are checked once everything has moved.
+  const movedCovers: string[] = [];
+  for (const a of state.assignments) {
+    if (!future(a)) continue;
+    const request = a.coverageRequest;
+    const cover = request?.cover;
+    if (cover?.kind === 'member' && cover.memberId === standInId && request?.requestedBy === intoId) {
+      next = withdrawCover(next, a.id, ctx.now);
+    } else if (cover?.kind === 'member' && cover.memberId === intoId && request?.requestedBy === standInId) {
+      next = closeMakeUpTurns(next, (t) => t.coverAssignmentId === a.id, 'cancelled', 'memberLeft', ctx.now);
+      next = updateAssignment(next, a.id, (x) => ({ ...x, turnOf: intoId, coverageRequest: null }));
+    } else {
+      if (cover?.kind === 'member' && cover.memberId === standInId) movedCovers.push(a.id);
+      next = updateAssignment(next, a.id, (x) => ({
+        ...x,
+        memberId: swap(x.memberId),
+        turnOf: swap(x.turnOf),
+        coverageRequest: x.coverageRequest && {
+          ...x.coverageRequest,
+          requestedBy: swap(x.coverageRequest.requestedBy),
+          cover:
+            x.coverageRequest.cover?.kind === 'member'
+              ? { ...x.coverageRequest.cover, memberId: swap(x.coverageRequest.cover.memberId) as MemberId }
+              : x.coverageRequest.cover,
+        },
+      }));
+    }
+  }
+  for (const id of movedCovers) {
+    const a = next.assignments.find((x) => x.id === id);
+    const event = a && findEvent(next, a.eventId);
+    if (!a || !event) continue;
+    const away = next.timeOff.some((t) => t.memberId === intoId && timeOffCovers(t, event, a.responsibilityId));
+    const busy = next.assignments.some((other) => {
+      const at = other.id !== id && other.memberId === intoId && isPinned(other) && !!other.coverageRequest?.cover;
+      const otherEvent = at ? findEvent(next, other.eventId) : undefined;
+      return otherEvent !== undefined && onSameDay(next, otherEvent, event);
+    });
+    if (away || busy) next = withdrawCover(next, id, ctx.now);
+  }
+
+  // Swaps still owed: the real Member owes or is owed instead. One owed to themselves goes.
+  next = closeMakeUpTurns(
+    next,
+    (t) => (t.debtorId === standInId && t.creditorId === intoId) || (t.debtorId === intoId && t.creditorId === standInId),
+    'cancelled',
+    'memberLeft',
+    ctx.now,
+  );
+  next = {
+    ...next,
+    makeUpTurns: next.makeUpTurns.map((t) =>
+      t.status === 'outstanding' ? { ...t, debtorId: swap(t.debtorId) as MemberId, creditorId: swap(t.creditorId) as MemberId } : t,
+    ),
+  };
+
+  // Future "Coming?" answers.
+  const answeredByInto = new Set(
+    next.headcountAnswers.filter((h) => h.memberId === intoId).map((h) => `${h.eventId}|${h.responsibilityId}`),
+  );
+  next = {
+    ...next,
+    headcountAnswers: next.headcountAnswers.flatMap((h) => {
+      const event = findEvent(next, h.eventId);
+      if (h.memberId !== standInId || !event || isPast(event, ctx.now)) return [h];
+      return answeredByInto.has(`${h.eventId}|${h.responsibilityId}`) ? [] : [{ ...h, memberId: intoId }];
+    }),
+  };
+
+  return done({
+    ...next,
+    members: next.members.map((m) => (m.id === standInId ? { ...m, leftAt: ctx.now, accountId: into.accountId } : m)),
+  });
+}
+
+/** One queue place for the merged person: the earlier of the two, keeping that place's early turns. */
+function mergeQueuePlace(rotation: Rotation, standInId: MemberId, intoId: MemberId): Rotation {
+  const s = rotation.queue.indexOf(standInId);
+  if (s < 0) return rotation;
+  const i = rotation.queue.indexOf(intoId);
+  const kept = i < 0 ? s : Math.min(s, i);
+  const early: Record<MemberId, number> = { ...rotation.turnsTakenEarly };
+  const keptEarly = early[rotation.queue[kept]] ?? 0;
+  delete early[standInId];
+  delete early[intoId];
+  if (keptEarly > 0) early[intoId] = keptEarly;
+  const queue = rotation.queue.flatMap((m, index) => {
+    if (index === kept) return [intoId];
+    return m === standInId || m === intoId ? [] : [m];
+  });
+  return { ...rotation, queue, turnsTakenEarly: early };
 }
 
 function renameMember(state: GroupState, memberId: string, name: string): Outcome {

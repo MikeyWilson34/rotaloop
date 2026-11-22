@@ -44,6 +44,19 @@ export type InvitePreview = {
   alreadyMember: boolean;
 };
 
+export type JoinStandIn = { id: string; name: string };
+
+/**
+ * The Group's Stand-ins, for "Are you one of these?" on a join link (empty for a personal claim
+ * link). Returns null when they can't be listed (offline, or a server without this feature),
+ * so the screen just joins as someone new, as before.
+ */
+export async function fetchJoinStandIns(token: string): Promise<JoinStandIn[] | null> {
+  const { data, error } = await supabase.rpc('invite_link_stand_ins', { p_token: token });
+  if (error || !data) return null;
+  return data.map((row) => ({ id: row.member_id, name: row.name }));
+}
+
 export class InvitePreviewError extends Error {
   constructor(
     message: string,

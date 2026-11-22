@@ -20,6 +20,8 @@ export type InviteSheetProps = {
   resetToken?: () => Promise<string>;
   /** The text sent with the link by Share. */
   shareMessage: string;
+  /** One more quiet option under the link, e.g. a Stand-in's "This is someone in the group". */
+  moreAction?: { label: string; hint?: string; onPress: () => void };
 };
 
 /**
@@ -40,6 +42,7 @@ function InviteSheetBody({
   loadToken,
   resetToken,
   shareMessage,
+  moreAction,
 }: InviteSheetProps) {
   const { colors, radii, space, fonts } = useTheme();
   const [token, setToken] = useState<string | null>(null);
@@ -123,7 +126,14 @@ function InviteSheetBody({
       overline={groupName}
       title={title}
       message={message}
-      footer={<Button label="Done" variant="quiet" onPress={onClose} />}>
+      footer={
+        <>
+          {moreAction ? (
+            <Button label={moreAction.label} variant="quiet" accessibilityHint={moreAction.hint} onPress={moreAction.onPress} />
+          ) : null}
+          <Button label="Done" variant="quiet" onPress={onClose} />
+        </>
+      }>
       {error ? <Notice>{error}</Notice> : null}
       {!url && !error ? (
         <View style={{ height: 200, alignItems: 'center', justifyContent: 'center' }}>

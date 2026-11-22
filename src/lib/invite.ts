@@ -61,3 +61,26 @@ export function resumeInviteRoute(
 }
 
 export const NOT_AN_INVITE = "That doesn't look like an invite link. Paste the whole link you were sent.";
+
+/**
+ * Stand-ins in the order to ask "Are you one of these?": the closest name match to the
+ * joiner's name first (the same full name, then the same first name, then one name starting
+ * with the other, ignoring case), the rest in join order. Nothing is ever picked for them.
+ */
+export function standInsByMatch<T extends { name: string }>(standIns: readonly T[], myName: string): T[] {
+  const norm = (s: string) => s.trim().toLowerCase().replace(/s+/g, ' ');
+  const first = (s: string) => norm(s).split(' ')[0] ?? '';
+  const me = norm(myName);
+  const rank = (name: string): number => {
+    const n = norm(name);
+    if (!me || !n) return 3;
+    if (n === me) return 0;
+    if (first(n) === first(me)) return 1;
+    if (n.startsWith(first(me)) || me.startsWith(first(n))) return 2;
+    return 3;
+  };
+  return standIns
+    .map((s, index) => ({ s, index, rank: rank(s.name) }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map((x) => x.s);
+}

@@ -11,6 +11,10 @@
 // stand-in in Members), changes a job's turn order in group settings, opens a turn's sheet and its details page, runs the cover flow
 // (ask the group, pick who's covering, take it back, an outside cover by name), edits and adds a job in
 // group settings, and cycles the bottom tabs. It also reports how many requests the cold load made.
+// Feedback-2 ticket 05: a second person opens the join link and answers "Are you one of these?",
+// and a stand-in is handed to someone in the group ("This is someone in the group"). Those steps
+// need the 20261125000000 migration and the new group-command; until both are deployed they are
+// skipped with a "needs server deploy" note (the sheets that need no server still run).
 //
 // Browser: Microsoft Edge on Windows, Chrome elsewhere (via playwright-core, no download).
 // Set E2E_BROWSER=<path to a Chromium-based browser> to use another one, E2E_HEADED=1 to watch.
@@ -67,23 +71,83 @@ const launch = {
 };
 const browser = await chromium.launch(launch);
 const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
-const page = await context.newPage();
-page.setDefaultTimeout(15_000);
+// `let`: the ticket 05 steps briefly drive a second person's page with the same helpers.
+let page = await context.newPage();
 
 const problems = [];
 let requests = 0;
 let failed = 0;
-page.on('pageerror', (e) => problems.push(`pageerror: ${e.message.slice(0, 400)}`));
-page.on('console', (m) => {
-  if (m.type() === 'error') problems.push(`console.error: ${m.text().slice(0, 400)}`);
-});
-page.on('request', () => requests++);
-page.on('response', (r) => {
-  if (r.status() >= 400 && new URL(r.url()).origin === new URL(BASE).origin) {
-    failed++;
-    problems.push(`HTTP ${r.status()} ${r.url().slice(0, 200)}`);
+/** Fails the run on any page error, console error or failed request of the app itself. */
+function watch(p) {
+  p.setDefaultTimeout(15_000);
+  p.on('pageerror', (e) => problems.push(`pageerror: ${e.message.slice(0, 400)}`));
+  p.on('console', (m) => {
+    if (m.type() === 'error') problems.push(`console.error: ${m.text().slice(0, 400)}`);
+  });
+  p.on('request', () => requests++);
+  p.on('response', (r) => {
+    if (r.status() >= 400 && new URL(r.url()).origin === new URL(BASE).origin) {
+      failed++;
+      problems.push(`HTTP ${r.status()} ${r.url().slice(0, 200)}`);
+    }
+  });
+}
+watch(page);
+
+/** The Supabase project the build talks to (from .env), for the server feature probes. */
+function supabaseEnv() {
+  const env = Object.fromEntries(
+    (existsSync('.env') ? readFileSync('.env', 'utf8') : '')
+      .split(/\r?\n/)
+      .map((line) => line.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/))
+      .filter(Boolean)
+      .map((m) => [m[1], m[2].replace(/^['"]|['"]$/g, '')]),
+  );
+  return { url: (process.env.EXPO_PUBLIC_SUPABASE_URL ?? env.EXPO_PUBLIC_SUPABASE_URL ?? '').replace(/\/$/, ''), key: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '' };
+}
+
+/** Whether the server lists Stand-ins for a join link (migration 20261125000000). Asked from Node, so a 404 isn't a page error. */
+async function serverListsStandIns() {
+  const { url, key } = supabaseEnv();
+  const r = await fetch(`${url}/rest/v1/rpc/invite_link_stand_ins`, {
+    method: 'POST',
+    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_token: 'e2e-probe' }),
+  });
+  return r.status !== 404;
+}
+
+/** Whether group-command knows `mergeStandIn` (an old one refuses it as an invalid request). */
+async function serverMergesStandIns(groupId) {
+  const { url, key } = supabaseEnv();
+  const jwt = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('sb-') && x.endsWith('-auth-token'));
+    return k ? JSON.parse(localStorage.getItem(k)).access_token : null;
+  });
+  const r = await fetch(`${url}/functions/v1/group-command`, {
+    method: 'POST',
+    headers: { apikey: key, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'command', groupId, command: { type: 'mergeStandIn', standInId: 'e2e-probe', intoMemberId: 'e2e-probe' } }),
+  });
+  const body = await r.json().catch(() => ({}));
+  return body.reason !== 'invalidRequest';
+}
+
+/** Taps "Show more dates" until the job's turn is listed: its next date can be past the first rows, depending on the day and time. */
+async function revealJob() {
+  for (let i = 0; i < 8 && (await page.locator(`[aria-label^="${jobName},"]`).filter({ visible: true }).count()) === 0; i++) {
+    const more = page.getByRole('button', { name: 'Show more dates', exact: true }).filter({ visible: true }).first();
+    if (!(await more.count())) break;
+    await more.click();
+    await sleep(300);
   }
-});
+}
+
+function skip(note) {
+  const line = `skip  ${note}`;
+  results.push(line);
+  console.log(line);
+}
 
 const results = [];
 let current = 'start';
@@ -207,6 +271,7 @@ try {
   await click('Next');
   await expectScreen("setup 3: who's in", /Who's in\?/);
   await expectScreen('setup 3: invite link', /\/join\/[0-9a-f]{64}/);
+  const joinToken = (await bodyText()).match(/\/join\/([0-9a-f]{64})/)[1];
   await click('Show QR code');
   await expectScreen('setup 3: QR code sheet', /Scan to join/);
   await click('Done');
@@ -220,6 +285,9 @@ try {
   await click('Done');
   // One scrolling group page (simplify ticket 06): Coming up, then Members.
   await expectScreen('the new group: coming up', /Coming up/);
+  const groupPath = page.url().replace(BASE, '');
+  const groupId = groupPath.match(/\/group\/([^/?#]+)/)?.[1];
+  await revealJob();
   await expectScreen('the new group: schedule filled', new RegExp(jobName));
   // Several weekdays: the multi-day job's dates fall on Tue, Thu and Sat only.
   {
@@ -295,6 +363,7 @@ try {
   await expectScreen('Turn order saved', /Turn order saved/);
   await expectScreen('settings: next is the moved person', new RegExp(`Next: ${second} · Change the order`));
   await backToGroup('turn order');
+  await revealJob();
   const nextTurn = page.locator(`[aria-label^="${jobName},"]`).filter({ visible: true }).first();
   await nextTurn.waitFor();
   const nextLabel = (await nextTurn.getAttribute('aria-label')) ?? '';
@@ -306,6 +375,7 @@ try {
 
   // A turn → its details sheet → the full details page → back.
   current = 'turn';
+  await revealJob();
   await page.locator(`[aria-label^="${jobName}"]`).filter({ visible: true }).first().click();
   await expectScreen('turn details sheet', /See details/);
   await click('See details');
@@ -479,6 +549,108 @@ try {
   await expectScreen('Groups → the Group', /Coming up/);
   await page.getByRole('button', { name: 'Back', exact: true }).first().click();
   await expectScreen('back to Groups', /Groups/);
+
+  // Feedback-2 ticket 05, part A: a second person opens the group's join link. The group has two
+  // stand-ins, so they're asked "Are you one of these?", closest name first; picking Zoe's
+  // stand-in makes them that member (same turns). With E2E_SHOTS on a server without the feature,
+  // the stand-in list is served locally just for the screenshot, and they don't join.
+  current = 'join: are you one of these?';
+  const listsStandIns = await serverListsStandIns();
+  if (listsStandIns || process.env.E2E_SHOTS) {
+    const secondContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const main = page;
+    page = await secondContext.newPage();
+    watch(page);
+    if (!listsStandIns) {
+      await page.route('**/rest/v1/rpc/invite_link_stand_ins', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            { member_id: 'shot-1', name: `E2E Standin ${stamp}` },
+            { member_id: 'shot-2', name: `${second} Standin ${stamp}` },
+          ]),
+        }),
+      );
+    }
+    try {
+      await page.goto(`${BASE}/join/${joinToken}`);
+      await expectScreen('second person: invite preview', /You're invited to/i);
+      await click('Get started');
+      await expectScreen('second person: welcome', /Get started/);
+      await click('Get started');
+      await expectScreen('second person: name step', /First name/);
+      await fill('First name', second);
+      await fill('Last name', `Real ${stamp}`);
+      await click('Continue');
+      // Onboarding keeps the link: Join goes on to the join screen.
+      await expectScreen('second person: join or start, link kept', /Join or start a group/);
+      if (!(await page.getByLabel('Invite link', { exact: true }).last().inputValue())) await fill('Invite link', `${BASE}/join/${joinToken}`);
+      await click('Join');
+      await expectScreen('join link: Are you one of these?', /Are you one of these\?[\s\S]*No, I'm new/);
+      const text = await bodyText();
+      if (text.indexOf(`${second} Standin ${stamp}`) > text.indexOf(`E2E Standin ${stamp}`)) {
+        throw new Error('Are you one of these?: the closest name match is not first');
+      }
+      if (await button(`Join E2E Group ${stamp}`).isEnabled()) throw new Error('Are you one of these?: Join works before picking');
+      await page.getByRole('radio', { name: `${second} Standin ${stamp}`, exact: true }).click();
+      await expectScreen('join link: picked the stand-in', new RegExp(`Join as ${second}`));
+      if (process.env.E2E_SHOTS) await shoot('join-are-you-one-of-these');
+      if (listsStandIns) {
+        await click(`Join as ${second}`);
+        await expectScreen('joined as the stand-in: the group page', /Coming up/);
+        await page.goto(`${BASE}/activity`);
+        await expectScreen('Activity: joined and took over the turns', /joined and took over [^.]*turns/);
+        // The new server's claim line names the stand-in's old name ("You joined and took over Zoe Standin's turns").
+        if (new RegExp(`joined and took over ${second} Standin ${stamp}'s turns`).test(await bodyText())) {
+          results.push("ok  joined as the stand-in: the claim line names the old stand-in name");
+          console.log(results.at(-1));
+        } else {
+          skip("stand-in takes the joiner's name: needs server deploy (group-command with the claim rename)");
+        }
+      } else {
+        await click('Not now');
+        await sleep(600);
+        skip('join as a stand-in: needs server deploy (migration 20261125000000_stand_ins_on_join, group-command); screenshot used a local stand-in list');
+      }
+    } finally {
+      page = main;
+      await secondContext.close();
+    }
+  } else {
+    skip('"Are you one of these?" on joining: needs server deploy (migration 20261125000000_stand_ins_on_join, group-command)');
+  }
+
+  // Part B: "This is someone in the group" on a stand-in: pick who it is, confirm. The pick and
+  // confirm sheets need no server; handing over the turns needs the new group-command.
+  current = 'this is someone in the group';
+  await page.goto(`${BASE}${groupPath}`);
+  await expectScreen('back on the group page', /Coming up/);
+  await page.getByRole('button', { name: 'Invite E2E', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+  await click('Invite E2E');
+  await expectScreen("stand-in sheet: This is someone in the group", /just for[\s\S]*This is someone in the group/);
+  await click('This is someone in the group');
+  await expectScreen('pick who the stand-in is', new RegExp(`Who is E2E Standin ${stamp}\\?[\\s\\S]*${me} \\(you\\)`));
+  if (process.env.E2E_SHOTS) await shoot('stand-in-pick-who');
+  await page.getByRole('radio', { name: `${me} (you)`, exact: true }).click();
+  await expectScreen('confirm: same person', new RegExp(`Is E2E Standin ${stamp} you\\?[\\s\\S]*turns from now on go to you[\\s\\S]*Yes, same person`));
+  if (process.env.E2E_SHOTS) await shoot('stand-in-confirm-same-person');
+  if (groupId && (await serverMergesStandIns(groupId))) {
+    await click('Yes, same person');
+    await expectScreen('stand-in turns handed over', new RegExp(`E2E Standin ${stamp}'s turns now belong to you`));
+    await sleep(4500);
+    if (await page.getByRole('button', { name: 'Invite E2E', exact: true }).filter({ visible: true }).count()) {
+      throw new Error('This is someone in the group: the stand-in is still in Members');
+    }
+    await page.goto(`${BASE}/activity`);
+    await expectScreen('Activity: stand-in turns now belong to', /stand-in turns now belong to you/);
+  } else {
+    await click('Back');
+    await expectScreen('confirm → back to the pick sheet', /Who is E2E Standin/);
+    await click('Cancel');
+    await sleep(600);
+    skip('handing a stand-in\'s turns over: needs server deploy (group-command with mergeStandIn)');
+  }
 
   // The install icon (feedback-2 tickets 06 and 07): other browser contexts, signed in as the same
   // guest (its stored session), with a phone's user agent and touch.

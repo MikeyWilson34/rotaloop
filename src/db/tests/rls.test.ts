@@ -291,6 +291,23 @@ describe('invite links', () => {
     );
   });
 
+  it('lists the Stand-ins to a signed-in holder of the join link only ("Are you one of these?")', async () => {
+    const token = await t.asUser(BEN, () =>
+      t.db.query<{ t: string }>('select public.group_invite_link($1) t', [GROUP_A]).then((r) => r.rows[0].t),
+    );
+    const claim = await t.asUser(BEN, () =>
+      t.db.query<{ t: string }>(`select public.claim_link_for($1, 'dee') t`, [GROUP_A]).then((r) => r.rows[0].t),
+    );
+    const standIns = (role: 'anon' | 'out', p: string) =>
+      role === 'anon'
+        ? t.as('anon', null, () => t.db.query('select * from public.invite_link_stand_ins($1)', [p]))
+        : t.asUser(OUT, () => t.db.query('select * from public.invite_link_stand_ins($1)', [p]));
+    expect((await standIns('out', token)).rows).toEqual([{ member_id: 'dee', name: 'DEE' }]);
+    expect((await standIns('out', claim)).rows).toEqual([]);
+    expect((await standIns('out', 'nope')).rows).toEqual([]);
+    await expect(standIns('anon', token)).rejects.toThrow(/permission denied/);
+  });
+
   it('lets any active Member rename the Group or change its time zone, and no one else', async () => {
     await t.asUser(BEN, () => t.db.query(`select public.update_group_details($1, ' Crew A ', 'America/Chicago')`, [GROUP_A]));
     const g = await t.asUser(BEN, () => t.db.query<{ name: string; time_zone: string }>('select name, time_zone from public.groups where id = $1', [GROUP_A]));

@@ -44,10 +44,11 @@ export type GroupCommandRequest =
     }
   /**
    * Join through an invite link. A Group's join link adds a new Member named
-   * `memberName`; a personal claim link claims that Placeholder Member (who keeps
-   * the name the Admin gave them).
+   * `memberName`, or with `standInId` ("Are you one of these?") claims that Stand-in
+   * (Placeholder Member) of the link's Group; a personal claim link claims its own Stand-in
+   * and ignores `standInId`. A claimed Stand-in keeps the name they were added with.
    */
-  | { action: 'join'; token: string; memberName: string };
+  | { action: 'join'; token: string; memberName: string; standInId?: string };
 
 export type GroupCommandFailure =
   | RejectionReason
@@ -61,6 +62,8 @@ export type GroupCommandFailure =
   | 'invalidInvite'
   /** The caller is already a Member of the Group they tried to join. */
   | 'alreadyMember'
+  /** The Stand-in picked when joining was claimed or removed meanwhile: pick again. */
+  | 'standInTaken'
   /** Others kept changing the Group; try again. */
   | 'conflict'
   | 'serverError';

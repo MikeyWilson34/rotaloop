@@ -863,6 +863,13 @@ export type Database = {
           placeholder_name: string
         }[]
       }
+      invite_link_stand_ins: {
+        Args: { p_token: string }
+        Returns: {
+          member_id: string
+          name: string
+        }[]
+      }
       is_group_admin: { Args: { p_group_id: string }; Returns: boolean }
       is_group_member: { Args: { p_group_id: string }; Returns: boolean }
       is_repeat_pattern: { Args: { p: Json }; Returns: boolean }

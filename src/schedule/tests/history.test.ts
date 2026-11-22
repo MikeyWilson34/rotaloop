@@ -51,9 +51,11 @@ function story(): Built {
   run(b, { type: 'renameMember', memberId: 'eve', name: 'Evie' }, 'eve');
   run(b, { type: 'setAdmin', memberId: 'ben', isAdmin: true }, 'ana');
   run(b, { type: 'setAdmin', memberId: 'ben', isAdmin: false }, 'ben');
-  run(b, { type: 'claimPlaceholder', memberId: 'dee', accountId: 'acct-dee' }, null);
+  run(b, { type: 'claimPlaceholder', memberId: 'dee', accountId: 'acct-dee', name: 'Deb', standInName: 'Dee' }, null);
   run(b, { type: 'removeMember', memberId: 'dee' }, 'dee');
   run(b, { type: 'removeMember', memberId: 'eve' }, 'eve');
+  run(b, { type: 'addMember', member: { id: 'fay', name: 'Fay', accountId: null } }, 'ana');
+  run(b, { type: 'mergeStandIn', standInId: 'fay', intoMemberId: 'ben' }, 'cal');
   // Responsibilities.
   run(b, { type: 'addResponsibility', responsibility: { id: 'host', name: 'Host', headcount: 1, requiresConfirmation: false } }, 'ana');
   run(b, { type: 'editResponsibility', responsibilityId: 'host', changes: { headcount: 2, requiresConfirmation: true } }, 'ana');
@@ -85,7 +87,7 @@ function story(): Built {
 const ALL_CAUSES: Cause['type'][] = [
   'fillSchedule', 'addEvents', 'addSkipDate', 'removeSkipDate', 'addTimeOff', 'removeTimeOff',
   'requestConfirmation', 'confirm', 'decline', 'cover', 'markCovered', 'changeSettings', 'rebalance',
-  'addMember', 'qualifyMember', 'unqualifyMember', 'removeMember', 'claimPlaceholder', 'renameMember',
+  'addMember', 'qualifyMember', 'unqualifyMember', 'removeMember', 'claimPlaceholder', 'mergeStandIn', 'renameMember',
   'setAdmin', 'addResponsibility', 'editResponsibility', 'removeResponsibility', 'reorderResponsibilities',
   'setPrimaryResponsibility', 'reorderQueue', 'addEventSeries', 'editEventSeries', 'removeEventSeries',
   'removeEvent', 'makeUpTurnPaid',
@@ -139,12 +141,13 @@ describe('describeHistoryEntry', () => {
   });
 
   it('describes membership', () => {
-    expect(texts('addMember')).toEqual(['You added Dee as a stand-in.', 'Eve joined the group.']);
+    expect(texts('addMember')).toEqual(['You added Dee as a stand-in.', 'Eve joined the group.', 'You added Fay as a stand-in.']);
+    expect(texts('mergeStandIn')).toEqual(["Fay's stand-in turns now belong to Ben."]);
     expect(texts('qualifyMember')).toEqual(['You added Deb to the Sound turns.']);
     expect(texts('unqualifyMember')).toEqual(['You took Deb out of the Sound Rotation.']);
     expect(texts('renameMember')).toEqual(['You renamed a Member to Deb.', 'Evie changed their name.']);
     expect(texts('setAdmin')).toEqual(["You changed Ben's group permissions.", 'Ben changed their group permissions.']);
-    expect(texts('claimPlaceholder')).toEqual(['Deb joined and took their place in the Rotations.']);
+    expect(texts('claimPlaceholder')).toEqual(["Deb joined and took over Dee's turns."]);
     expect(texts('removeMember')).toEqual([
       'Deb left the group. Their future turns moved to others.',
       'Evie left the group. Their future turns moved to others.',
